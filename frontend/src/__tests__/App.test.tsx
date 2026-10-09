@@ -1,11 +1,10 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../app/App';
 
-// Mock matchMedia for jsdom
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: vi.fn().mockImplementation(query => ({
+  value: vi.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -18,14 +17,26 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 describe('App Component', () => {
-  it('renders without crashing', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: 'Refresh token missing' }),
+      }),
+    );
+    window.history.pushState({}, '', '/login');
+  });
+
+  it('renders without crashing', async () => {
     render(<App />);
-    const heading = screen.getByRole('heading', { level: 1 });
+    const heading = await screen.findByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent(/CloudVault/i);
   });
 
-  it('displays the correct tagline', () => {
+  it('displays the correct tagline', async () => {
     render(<App />);
-    expect(screen.getByText(/AI-Native Cloud File Storage/i)).toBeInTheDocument();
+    expect(await screen.findByText(/AI-Native Cloud File Storage/i)).toBeInTheDocument();
   });
 });

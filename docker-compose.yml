@@ -72,6 +72,8 @@ services:
       - DATABASE_URL=postgresql+asyncpg://cloudvault:cloudvault@postgres:5432/cloudvault
       - REDIS_URL=redis://redis:6379/0
       - S3_ENDPOINT=http://minio:9000
+      - SECRET_KEY=change-me-in-development-only
+      - ENVIRONMENT=development
     depends_on:
       postgres:
         condition: service_healthy

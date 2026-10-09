@@ -27,6 +27,21 @@ CloudVault bridges the gap between simple object storage and intelligent documen
    ```bash
    docker-compose up -d
    ```
+4. Backend:
+   ```bash
+   cd backend
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements-dev.txt
+   alembic upgrade head
+   uvicorn app.main:app --reload
+   ```
+5. Frontend:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
 ## Documentation
 - [Architecture Details](ARCHITECTURE.md)

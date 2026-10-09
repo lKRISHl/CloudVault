@@ -20,6 +20,11 @@ CloudVault adopts a modular monolith approach for Phase 0.
 - **Cache/Queue**: Redis is provisioned for future caching and asynchronous task queues.
 - **Storage**: MinIO provides an S3-compatible local object storage environment for file blobs.
 
+## Authentication (Phase 1)
+- Register creates a tenant and an `owner` user.
+- Login returns a short-lived JWT access token and sets an HttpOnly refresh cookie.
+- Protected routes load the user only when `user.id` and `tenant_id` from the token both match.
+
 ## Configuration Management
 Configuration is managed using `pydantic-settings` on the backend, reading from environment variables. The `.env` file serves as the source of truth for the local development environment.
 

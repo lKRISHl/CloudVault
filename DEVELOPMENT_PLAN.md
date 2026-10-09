@@ -2,37 +2,31 @@
 
 ## Roadmap
 
-- **Phase 0: Project Foundation** [IN PROGRESS] (Complexity: Low)
+- **Phase 0: Project Foundation** [COMPLETE] (Complexity: Low)
   Set up repository, basic configuration, Docker Compose, initial docs, CI.
 
-- **Phase 1: Backend Scaffolding** (Complexity: Low)
-  Basic FastAPI setup, DB connections, initial models.
+- **Phase 1: Authentication & Tenants** [IN PROGRESS] (Complexity: Medium)
+  JWT auth, tenant + user models, register/login, frontend session.
 
-- **Phase 2: User Authentication & Tenants** (Complexity: Medium)
-  JWT auth, multi-tenant data structures, basic user management.
-
-- **Phase 3: File Storage Foundation** (Complexity: Medium)
+- **Phase 2: File Storage Foundation** (Complexity: Medium)
   S3 integration, file metadata models, presigned URLs for upload/download.
 
-- **Phase 4: Folder Structures & Navigation** (Complexity: Medium)
+- **Phase 3: Folder Structures & Navigation** (Complexity: Medium)
   Hierarchical folder models, navigation APIs.
 
-- **Phase 5: Frontend Scaffolding** (Complexity: Low)
-  React setup, routing, authentication context, basic layout.
-
-- **Phase 6: File Explorer UI** (Complexity: High)
+- **Phase 4: File Explorer UI** (Complexity: High)
   Drag-and-drop, folder navigation, file previews.
 
-- **Phase 7: Permissions & Sharing** (Complexity: High)
+- **Phase 5: Permissions & Sharing** (Complexity: High)
   Granular RBAC, shareable links, access control logic.
 
-- **Phase 8: Background Workers** (Complexity: Medium)
+- **Phase 6: Background Workers** (Complexity: Medium)
   Celery/Redis integration for asynchronous tasks (e.g., thumbnail generation).
 
-- **Phase 9: AI Pipeline Setup** (Complexity: High)
+- **Phase 7: AI Pipeline Setup** (Complexity: High)
   Integration with LLMs, document text extraction.
 
-- **Phase 10: Semantic Search (RAG)** (Complexity: High)
+- **Phase 8: Semantic Search (RAG)** (Complexity: High)
   pgvector setup, embeddings generation, search API.
 
-*(Phases 11-33 to be detailed as the project evolves, covering advanced collaboration, enterprise features, billing, analytics, etc.)*
+*(Later phases will cover advanced collaboration, enterprise features, billing, and analytics.)*
