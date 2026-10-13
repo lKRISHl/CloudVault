@@ -4,6 +4,39 @@ All notable changes to CloudVault will be documented in this file.
 
 ## [Unreleased] - 2026-10-13
 
+### Development Infrastructure
+- Install Docker Desktop/WSL and run PostgreSQL 16.15, Redis and Mailpit locally.
+- Verify all 81 backend tests and full migration upgrade/check/downgrade/re-upgrade against a separate PostgreSQL test database.
+- Replace unavailable MinIO server/client images with builds from pinned official source commits, keeping existing volumes and bucket configuration.
+- Add a repeatable Docker HTTP/storage round-trip smoke check and include it in CI.
+- Record archived MinIO community maintenance status as a production storage decision.
+
+### Phase 2A — Account Lifecycle and Email Delivery
+- Add verified-email gates, expiring single-use account challenges, password recovery, verified email changes, and current-password reauthentication.
+- Add stable login sessions and live revocation checks; logout/recovery/session controls revoke access tokens as well as refresh cookies.
+- Add an encrypted SMTP outbox, bounded retries/leases/deadlines, delivery status, Mailpit development configuration, and account-record retention maintenance.
+- Add verified non-owner account deletion with explicit confirmation, profile/invitation redaction, token removal, and owner protection.
+- Add persistent account/IP rate limits and generic recovery responses.
+- Add account security/recovery/action screens and seven real Chromium journeys against a disposable backend and real localhost SMTP.
+- Migration 003_accounts marks legacy addresses unverified and revokes old refresh cookies without replacing users/passwords.
+- Update vulnerable frontend tooling/runtime packages; adapt Vitest matcher integration. Final npm audit reports zero known vulnerabilities at verification time.
+- Local Docker/PostgreSQL verification passed in follow-up infrastructure work; remote CI and real production email-provider verification remain pending. Phase 2B has not started.
+
+### Roadmap Extensions (Planned)
+- Add Phase 2A for real email delivery, verification, password recovery, email changes, session revocation, and account deletion.
+- Add Phase 2B for multiple organizations, workspace switching, existing-account invitations, ownership transfer, and removed-member reactivation.
+- Add Phase 25A for provider-backed billing, subscription lifecycle, backend entitlements, and quota/AI usage enforcement.
+- Define completion criteria and dependencies; keep PostgreSQL/Docker CI verification as an immediate pending gate. These are planning changes, not implemented features.
+
+### Phase 2 — Users and Organizations
+- Add self-service profile editing, organization display-name editing, paginated members, basic roles, and member removal.
+- Add explicit memberships with tenant foreign-key constraints and role validation. Migration `002_memberships` backfills existing active users without replacing their accounts.
+- Add private, expiring, revocable invitation links for new accounts; acceptance atomically creates the account, membership, and session.
+- Enforce membership on login, refresh, and protected requests; role changes take effect using database permissions even with stale JWTs.
+- Add settings and invitation acceptance screens, scoped query caching, auth cache clearing, and browser flow tests.
+- Add tenant-isolation, role escalation, removal/revocation, replay, concurrent acceptance, rollback, and migration-backfill tests.
+- PostgreSQL/Docker runtime verification remains pending CI; local database checks use SQLite with foreign keys enabled.
+
 ### Fixed
 - Correct Docker frontend port mapping and preserve API paths through Nginx.
 - Apply migrations before development backend startup; exclude host dependencies and secrets from Docker build contexts.

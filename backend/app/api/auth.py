@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.security import clear_refresh_cookie, set_refresh_cookie
 from app.models import User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserRead
+from app.services.accounts import AccountService
 from app.services.auth import AuthService
 
 router = APIRouter()
@@ -22,8 +23,12 @@ def _cookie(request: Request) -> str | None:
 async def register(
     payload: RegisterRequest,
     response: Response,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TokenResponse:
+    await AccountService(db).limit(
+        "register", request.client.host if request.client else "unknown", payload.email
+    )
     session = await AuthService(db).register(payload)
     set_refresh_cookie(response, session.refresh_token)
     return session.to_response()
@@ -33,8 +38,12 @@ async def register(
 async def login(
     payload: LoginRequest,
     response: Response,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TokenResponse:
+    await AccountService(db).limit(
+        "login", request.client.host if request.client else "unknown", payload.email
+    )
     session = await AuthService(db).login(payload)
     set_refresh_cookie(response, session.refresh_token)
     return session.to_response()

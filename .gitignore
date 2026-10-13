@@ -14,6 +14,8 @@ htmlcov/
 
 # Node
 node_modules/
+test-results/
+playwright-report/
 dist/
 .vite/
 *.tsbuildinfo

@@ -52,3 +52,50 @@
 - **Context**: The abbreviated development plan diverged from the master roadmap, and Docker frontend ports and proxy paths were inconsistent.
 - **Decision**: Restore the full Phase 0–33 roadmap. Run development migrations before the Compose backend starts; serve frontend port 80 through host port 3000 and preserve `/api/v1` in proxy requests. Add PostgreSQL and Docker smoke verification to CI.
 - **Limitations**: Development startup assumes one backend container. Production migration orchestration is deferred to deployment phases. Docker and PostgreSQL are unavailable on the current host, so CI checks remain unverified until run remotely.
+
+## ADR-010: Organizations Reuse Tenants with Explicit Memberships
+- **Context**: Phase 1 already creates a workspace on registration and stores each user's tenant and role. Phase 2 requires organization membership without breaking existing accounts or auth responses.
+- **Decision**: Treat `Tenant` as the organization. Add `Membership` with a composite user/tenant foreign key, role constraint, and unique user constraint. Backfill active existing users in migration `002_memberships`. Keep `User.role` as a compatibility field synchronized with membership role; authorization reads the database and authentication rejects inconsistent rows.
+- **Rationale**: Avoids duplicating workspace identity or moving existing accounts. Basic organization collaboration works within the already documented single-tenant model.
+- **Alternatives**: A separate organization table would duplicate tenant identity. Global users with multiple memberships would require a tenant-switching/session redesign beyond this phase.
+- **Limitations**: One organization per account; owner transfer and moving/reactivating existing accounts are not implemented.
+
+## ADR-011: Invitations and Serialized Organization Management
+- **Context**: Membership needs a real onboarding path that does not let administrators choose another person's password or move their account silently. Concurrent management and invitation acceptance must preserve authorization and transaction invariants.
+- **Decision**: Owners/admins create seven-day invitation secrets and share them manually; only the hash is persisted. New users redeem a token and choose their own name/password. Organization-row locks serialize PostgreSQL management mutations; conditional invitation consumption ensures one successful acceptance. Account, membership, invitation consumption, and session commit together. Resending supersedes previous pending tokens for the same organization/email; role changes/removal invalidate the target's issued invitations.
+- **Roles**: Owners alone assign/invite admins. Admins invite/remove members and rename the organization. Members edit their own profile and read the roster. Owner membership is immutable.
+- **Frontend**: Invitation secrets use URL fragments to avoid inclusion in HTTP request URLs; the fragment is removed on successful join. Queries are scoped by tenant/user, and auth changes clear cached data.
+- **Limitations**: No email transport or proof of mailbox ownership. Possession of a private invitation link grants access to the bound email's new account, so links must be shared securely. SQLite concurrency tests cover conditional updates but do not prove PostgreSQL row-lock behavior; CI verification is pending.
+
+## ADR-012: Explicit Roadmap Extensions and Verification Criteria
+- **Context**: The owner requested that current account/membership limitations and missing subscription work receive explicit future implementation slots, rather than relying on unspecified later hardening.
+- **Decision**: Preserve original Phase 0–33 numbers. Schedule Phase 2A for email/account/session lifecycle, Phase 2B for multi-organization identity/membership lifecycle before file/folder implementation, and Phase 25A for billing after quotas/audit/webhooks. Define completion criteria and keep PostgreSQL/Docker verification as an immediate pending gate.
+- **Rationale**: Account verification precedes existing-account onboarding, and the future user/membership model should be settled before file schemas depend on it. Billing depends on reliable entitlements, quotas, and webhook handling.
+- **Status**: Planning only. Existing schemas and single-organization behavior are unchanged. New phases require explicit start instructions; no push or remote CI dispatch is authorized by this planning change.
+
+## ADR-013: Verified Account Actions and Live Session Revocation
+- **Context**: Phase 2A needs verified-email privileges, recovery, email changes, and immediate session revocation. Phase 1's JWT expiry alone cannot revoke an already-issued access token.
+- **Decision**: Add hashed purpose-bound account challenges and stable login-session rows. JWTs reference the session ID; protected requests check live revocation/expiry and membership. Refresh rotation retains the session ID and absolute seven-day deadline. Reset/email confirmation invalidates sessions and outstanding account links. Verification is independent of invitation possession.
+- **Migration**: 003_accounts preserves users/passwords, marks legacy addresses unverified, and revokes old refresh cookies. Tokens without a valid session ID are rejected; existing users must sign in and verify email. Do not infer verification from historic registration.
+- **Tradeoff**: Database-backed checks add request work but make revocation effective across backend instances without stale process-local caches. Account endpoints use shared atomic database rate counters; recovery has a generic response and minimum response duration, not a formal constant-time guarantee.
+- **Deletion**: Verified non-owners can remove profile/access with current password and explicit confirmation; minimal reference-safe tombstones remain. Owner deletion/transfer and full multi-organization handling are deferred to Phase 2B.
+
+## ADR-014: Encrypted SMTP Outbox and Technical Retention
+- **Context**: Email transport failures must not block account requests or expose recovery secrets in persisted plaintext or logs.
+- **Decision**: Queue encrypted mail payloads in the same transaction as their account actions. Fernet encryption uses a domain-separated key derived from SECRET_KEY. A dedicated SMTP process claims leased messages, uses a stable Message-ID, retries bounded failures, and stops before the mail/link deadline. Sent, superseded, and expired payloads are cleared; statuses contain safe metadata only. General Redis/Celery infrastructure remains Phase 16.
+- **Development**: Mailpit provides a local SMTP inbox; backend integration tests and Chromium E2E additionally use a real loopback SMTP receiver. Production requires HTTPS callback configuration and SMTP STARTTLS/provider configuration.
+- **Limits**: SMTP acknowledgement can be ambiguous after a crash; delivery is at-least-once, not exactly-once. Single-use tokens prevent repeated account-state changes. Signing-key rotation also changes outbox encryption: coordinate configuration and resend pending links as needed.
+- **Retention**: The running mail maintenance job clears expired rate counters and obsolete account tokens/session/refresh/invitation records 30 days after expiry or revocation/consumption as applicable, and mail metadata 30 days after creation. Self-deletion immediately removes account challenges, redacts profile/incoming invitation addresses, and clears pending personal mail payloads. Reference IDs/timestamps remain for integrity; delivered external email cannot be recalled.
+
+## ADR-015: Browser Account Verification and Dependency Security Updates
+- **Context**: Component tests with mocked fetch do not verify full mailbox-to-browser account flows. npm audit also reported known vulnerabilities in the prior frontend packages.
+- **Decision**: Add Playwright Chromium journeys using a disposable migrated SQLite backend and real local SMTP delivery, with no production test endpoints/database reuse. CI installs browser/Python requirements and runs these journeys. Update affected Vite/Vitest/React Router/TypeScript ESLint packages and compatible build plugins; use Vitest-specific DOM matcher integration.
+
+- **Verification**: Local component/API/migration/SMTP/browser checks and build/lint pass; npm audit reports zero known vulnerabilities at this verification point. That result is not a guarantee against unknown vulnerabilities. Subsequent PostgreSQL/storage verification is recorded in ADR-016 and CONTINUE.md; production-provider verification remains pending.
+
+## ADR-016: Build Development Storage from Pinned Official Sources
+- **Context**: MinIO server/client images cannot be pulled from Docker Hub or the checked Quay alternatives. Official community repositories are archived; the server README documents source-only distribution.
+- **Decision**: Build development server/client binaries from immutable official repository commits in `infra/minio/Dockerfile`, using Go module checksums, bounded compilation parallelism and minimal Alpine runtime stages. Preserve upstream licenses and existing volume/bucket configuration. No third-party binary mirror is introduced.
+- **Verification**: Add `scripts/docker_smoke.py` to check HTTP services and upload/read/delete a unique object in the development bucket; run it in Docker CI too. PostgreSQL verification now passes locally: 81 backend tests and Alembic upgrade/check/downgrade/re-upgrade on a separate database.
+- **Limitations**: First source compilation takes longer and requires GitHub/Go module access. Archived upstream software requires a maintained S3 provider/deployment decision before production; this fix restores development startup, not production certification.
+- **Sources**: https://github.com/minio/minio and https://github.com/minio/mc.

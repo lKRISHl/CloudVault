@@ -21,7 +21,13 @@ def test_production_rejects_unsafe_secret(secret):
 
 
 def test_production_accepts_custom_secret():
-    config = Settings(_env_file=None, ENVIRONMENT="production", SECRET_KEY="a" * 64)
+    config = Settings(
+        _env_file=None,
+        ENVIRONMENT="production",
+        SECRET_KEY="a" * 64,
+        SMTP_STARTTLS=True,
+        FRONTEND_URL="https://cloudvault.example",
+    )
     assert config.is_production
 
 
@@ -48,8 +54,11 @@ async def test_registration_stores_hashes_and_secure_cookie(client, db_factory):
 async def test_invalid_access_tokens_are_rejected(client, kind):
     owner = await register_user(client)
     claims = {
-        "sub": owner["user"]["id"], "tid": owner["user"]["tenant"]["id"],
-        "typ": "access", "exp": datetime.now(UTC) + timedelta(minutes=1),
+        "sub": owner["user"]["id"],
+        "tid": owner["user"]["tenant"]["id"],
+        "typ": "access",
+        "exp": datetime.now(UTC) + timedelta(minutes=1),
+        "sid": jwt.decode(owner["access_token"], options={"verify_signature": False})["sid"],
     }
     if kind == "expired":
         claims["exp"] = datetime.now(UTC) - timedelta(seconds=1)
@@ -57,7 +66,8 @@ async def test_invalid_access_tokens_are_rejected(client, kind):
         del claims["exp"]
     secret = (
         "different-signing-secret-of-at-least-32-bytes"
-        if kind == "bad-signature" else settings.SECRET_KEY
+        if kind == "bad-signature"
+        else settings.SECRET_KEY
     )
     token = "not-a-jwt" if kind == "malformed" else jwt.encode(claims, secret, algorithm="HS256")
     response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
@@ -70,7 +80,11 @@ async def test_existing_user_cannot_access_another_tenant(client):
     second = await register_user(client, email="second@example.com", tenant_name="Other Workspace")
     token = create_access_token(
         user_id=UUID(first["user"]["id"]),
-        tenant_id=UUID(second["user"]["tenant"]["id"]), role="owner",
+        tenant_id=UUID(second["user"]["tenant"]["id"]),
+        role="owner",
+        session_id=UUID(
+            jwt.decode(first["access_token"], options={"verify_signature": False})["sid"]
+        ),
     )
     response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
@@ -82,13 +96,24 @@ async def test_disabled_user_cannot_login_refresh_or_access_profile(client, db_f
     async with db_factory() as db:
         await db.execute(update(User).values(is_active=False))
         await db.commit()
-    assert (await client.post("/api/v1/auth/login", json={
-        "email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password"],
-    })).status_code == 401
+    assert (
+        await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": REGISTER_PAYLOAD["email"],
+                "password": REGISTER_PAYLOAD["password"],
+            },
+        )
+    ).status_code == 401
     assert (await client.post("/api/v1/auth/refresh")).status_code == 401
-    assert (await client.get("/api/v1/auth/me", headers={
-        "Authorization": f"Bearer {owner['access_token']}",
-    })).status_code == 401
+    assert (
+        await client.get(
+            "/api/v1/auth/me",
+            headers={
+                "Authorization": f"Bearer {owner['access_token']}",
+            },
+        )
+    ).status_code == 401
 
 
 @pytest.mark.asyncio

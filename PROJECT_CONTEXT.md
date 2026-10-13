@@ -25,11 +25,20 @@ The system enforces strict multi-tenancy. Every resource (file, folder, permissi
 
 ## Security Philosophy
 - **Defense in Depth**: Multiple layers of security from CORS, input validation, to strict RBAC.
-- **Secret Management**: No hardcoded secrets; configuration via environment variables.
+- **Secret Management**: Development defaults are explicitly non-production; production JWT signing keys must be supplied through secure configuration.
 - **Zero Trust**: Every request must be fully authenticated and authorized.
 
 ## Deployment Strategy
-Containerized microservices architecture orchestrated via Docker. Future scalability planned with Kubernetes or managed cloud services.
+Containerized modular monolith with separate infrastructure services. Extract application services only when actual scaling or operational needs justify it.
+
+## Current Organization Scope
+
+Phase 2 implements organizations using the existing tenant model, explicit memberships, profile editing, owner/admin/member management, and private invitation links for new accounts. Users currently belong to one organization. Existing-account migration, multi-workspace switching, and ownership transfer are future work.
+
+Phase 2A adds SMTP email delivery, verified-email access to organization features,
+recovery/email-change workflows, immediate session revocation, and protected profile
+deletion. Development delivery is tested against a real local SMTP inbox. Production
+provider and Docker/PostgreSQL checks remain pending; Phase 2B has not started.
 
 ## Commercial Vision
 - **Free Tier**: Basic storage, standard search.

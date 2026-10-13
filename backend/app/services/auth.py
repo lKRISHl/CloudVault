@@ -20,8 +20,10 @@ from app.core.security import (
     verify_password,
 )
 from app.core.slugs import slugify, unique_slug
-from app.models import RefreshToken, Tenant, User, UserRole
+from app.models import Membership, RefreshToken, Tenant, User, UserRole
+from app.models.account import LoginSession
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserRead
+from app.services.accounts import AccountService, issue_account_token
 
 
 @dataclass
@@ -62,7 +64,11 @@ class AuthService:
         )
         self.db.add(user)
         try:
-            await self.db.commit()
+            await self.db.flush()
+            self.db.add(Membership(tenant_id=tenant.id, user_id=user.id, role=UserRole.OWNER))
+            await self.db.flush()
+            await issue_account_token(self.db, user, "verify", user.email)
+            return await self.issue_session(user)
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(
@@ -70,22 +76,23 @@ class AuthService:
                 detail="An account with this email already exists",
             ) from exc
 
-        user = await self._get_user_by_id(user.id)
-        assert user is not None
-        return await self._issue_session(user)
-
     async def login(self, payload: LoginRequest) -> AuthSession:
         user = await self._get_user_by_email(payload.email.lower())
         password_hash = user.password_hash if user is not None else dummy_password_hash()
         password_ok = verify_password(payload.password, password_hash)
 
-        if user is None or not password_ok or not user.is_active:
+        if (
+            user is None
+            or not password_ok
+            or not user.is_active
+            or await self.get_user_in_tenant(user.id, user.tenant_id) is None
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
             )
 
-        return await self._issue_session(user)
+        return await self.issue_session(user)
 
     @staticmethod
     def _normalize_datetime(value: datetime | None) -> datetime | None:
@@ -120,6 +127,7 @@ class AuthService:
 
         if (
             stored is None
+            or stored.session_id is None
             or normalized_revoked_at is not None
             or normalized_expires_at is None
             or normalized_expires_at <= now
@@ -132,6 +140,8 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid refresh token",
             )
+
+        await AccountService(self.db).lock_user(stored.user_id)
 
         # Claim the token atomically. A concurrent refresh/logout wins at most once.
         claimed = await self.db.execute(
@@ -148,13 +158,23 @@ class AuthService:
         if claimed.scalar_one_or_none() is None:
             await self.db.rollback()
             raise HTTPException(status_code=401, detail="Invalid refresh token")
-        session = await self._issue_session(stored.user)
+        session = await self.issue_session(stored.user, stored.session_id)
         return session
 
     async def logout(self, raw_token: str | None) -> None:
         if not raw_token:
             return
         token_hash = hash_refresh_token(raw_token)
+        stored = await self.db.scalar(
+            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+        )
+        if stored is not None:
+            await self.db.scalar(select(User.id).where(User.id == stored.user_id).with_for_update())
+            await self.db.execute(
+                update(LoginSession)
+                .where(LoginSession.id == stored.session_id)
+                .values(revoked_at=datetime.now(UTC))
+            )
         await self.db.execute(
             update(RefreshToken)
             .where(RefreshToken.token_hash == token_hash, RefreshToken.revoked_at.is_(None))
@@ -165,12 +185,19 @@ class AuthService:
     async def get_user_in_tenant(self, user_id: UUID, tenant_id: UUID) -> User | None:
         result = await self.db.execute(
             select(User)
+            .join(Membership, Membership.user_id == User.id)
             .options(selectinload(User.tenant))
-            .where(User.id == user_id, User.tenant_id == tenant_id, User.is_active.is_(True))
+            .where(
+                User.id == user_id,
+                User.tenant_id == tenant_id,
+                User.is_active.is_(True),
+                Membership.tenant_id == tenant_id,
+                Membership.role == User.role,
+            )
         )
         return result.scalar_one_or_none()
 
-    def parse_access_token(self, token: str) -> tuple[UUID, UUID]:
+    def parse_access_token(self, token: str) -> tuple[UUID, UUID, UUID]:
         try:
             payload = decode_access_token(token)
         except InvalidTokenError as exc:
@@ -186,26 +213,69 @@ class AuthService:
             )
 
         try:
-            return UUID(str(payload["sub"])), UUID(str(payload["tid"]))
+            return UUID(str(payload["sub"])), UUID(str(payload["tid"])), UUID(str(payload["sid"]))
         except (KeyError, ValueError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid access token",
             ) from exc
 
-    async def _issue_session(self, user: User) -> AuthSession:
+    async def valid_session(self, user_id: UUID, session_id: UUID) -> bool:
+        return (
+            await self.db.scalar(
+                select(LoginSession.id).where(
+                    LoginSession.id == session_id,
+                    LoginSession.user_id == user_id,
+                    LoginSession.revoked_at.is_(None),
+                    LoginSession.expires_at > datetime.now(UTC),
+                )
+            )
+            is not None
+        )
+
+    async def issue_session(self, user: User, session_id: UUID | None = None) -> AuthSession:
+        user = await AccountService(self.db).lock_user(user.id)
+        if await self.get_user_in_tenant(user.id, user.tenant_id) is None:
+            await self.db.rollback()
+            raise HTTPException(status_code=401, detail="Organization membership required")
+        now = datetime.now(UTC)
+        if session_id is None:
+            login_session = LoginSession(
+                user_id=user.id,
+                expires_at=now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            )
+            self.db.add(login_session)
+            await self.db.flush()
+        else:
+            login_session = await self.db.scalar(
+                select(LoginSession)
+                .where(
+                    LoginSession.id == session_id,
+                    LoginSession.user_id == user.id,
+                    LoginSession.revoked_at.is_(None),
+                    LoginSession.expires_at > now,
+                )
+                .with_for_update()
+            )
+            if login_session is None:
+                await self.db.rollback()
+                raise HTTPException(status_code=401, detail="Session revoked or expired")
         raw_refresh = generate_refresh_token()
         refresh = RefreshToken(
             user_id=user.id,
+            session_id=login_session.id,
             token_hash=hash_refresh_token(raw_refresh),
-            expires_at=datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            expires_at=login_session.expires_at,
         )
         self.db.add(refresh)
         await self.db.commit()
         return AuthSession(
             user=user,
             access_token=create_access_token(
-                user_id=user.id, tenant_id=user.tenant_id, role=user.role.value
+                user_id=user.id,
+                tenant_id=user.tenant_id,
+                role=user.role.value,
+                session_id=login_session.id,
             ),
             refresh_token=raw_refresh,
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,

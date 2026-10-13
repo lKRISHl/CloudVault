@@ -30,7 +30,9 @@ services:
       - cloudvault-network
 
   minio:
-    image: minio/minio:latest
+    build:
+      context: ./infra/minio
+      target: server
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -49,7 +51,9 @@ services:
       - cloudvault-network
 
   minio-setup:
-    image: minio/mc:latest
+    build:
+      context: ./infra/minio
+      target: client
     depends_on:
       minio:
         condition: service_healthy
@@ -67,12 +71,21 @@ services:
     ports:
       - "8000:8000"
     command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
-    environment:
+    environment: &backend-environment
       - DATABASE_URL=postgresql+asyncpg://cloudvault:cloudvault@postgres:5432/cloudvault
       - REDIS_URL=redis://redis:6379/0
       - S3_ENDPOINT=http://minio:9000
       - SECRET_KEY=change-me-in-development-only
       - ENVIRONMENT=development
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - FRONTEND_URL=http://localhost:3000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,6 +93,30 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
+    networks:
+      - cloudvault-network
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    networks:
+      - cloudvault-network
+
+  email-worker:
+    build:
+      context: ./backend
+    command: ["python", "-m", "app.jobs.deliver_email"]
+    environment: *backend-environment
+    depends_on:
+      backend:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    restart: on-failure
     networks:
       - cloudvault-network
 

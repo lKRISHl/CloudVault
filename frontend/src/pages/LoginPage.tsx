@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +17,8 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login({ email, password });
-      navigate('/app', { replace: true });
+      const returnTo = location.state?.returnTo;
+      navigate(typeof returnTo === 'string' && returnTo.startsWith('/account/action#') ? returnTo : '/app', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in');
     } finally {
@@ -68,6 +70,9 @@ export function LoginPage() {
           >
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
+          <p className="text-sm text-gray-500 text-center">
+            <Link to="/account/recover" className="text-blue-600 underline">Forgot password?</Link>
+          </p>
           <p className="text-sm text-gray-500 text-center">
             New workspace?{' '}
             <Link to="/register" className="text-blue-600 font-medium">

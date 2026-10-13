@@ -34,6 +34,7 @@ export interface User {
   full_name: string;
   role: 'owner' | 'admin' | 'member';
   is_active: boolean;
+  email_verified: boolean;
   tenant: Tenant;
 }
 
@@ -54,4 +55,44 @@ export interface RegisterPayload {
 export interface LoginPayload {
   email: string;
   password: string;
+}
+
+export interface Member {
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: User['role'];
+  joined_at: string;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: 'admin' | 'member';
+  expires_at: string;
+}
+
+export interface InvitationCreated extends Invitation {
+  token: string;
+}
+
+export interface AcceptInvitationPayload {
+  token: string;
+  full_name: string;
+  password: string;
+}
+
+export interface AccountSession {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  current: boolean;
+}
+
+export interface EmailDelivery {
+  id: string;
+  purpose: string;
+  state: string;
+  attempts: number;
+  next_attempt_at: string;
 }

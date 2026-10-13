@@ -45,12 +45,19 @@ def generate_refresh_token() -> str:
     return secrets.token_urlsafe(48)
 
 
-def create_access_token(*, user_id: UUID, tenant_id: UUID, role: str) -> str:
+def create_access_token(
+    *,
+    user_id: UUID,
+    tenant_id: UUID,
+    role: str,
+    session_id: UUID | None = None,
+) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(user_id),
         "tid": str(tenant_id),
         "role": role,
+        "sid": str(session_id) if session_id else "",
         "typ": "access",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)).timestamp()),
@@ -60,8 +67,10 @@ def create_access_token(*, user_id: UUID, tenant_id: UUID, role: str) -> str:
 
 def decode_access_token(token: str) -> dict[str, Any]:
     return jwt.decode(
-        token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM],
-        options={"require": ["exp", "sub", "tid", "typ"]},
+        token,
+        settings.SECRET_KEY,
+        algorithms=[settings.JWT_ALGORITHM],
+        options={"require": ["exp", "sub", "tid", "typ", "sid"]},
     )
 
 

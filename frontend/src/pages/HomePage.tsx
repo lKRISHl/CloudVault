@@ -1,5 +1,6 @@
 import { HealthStatus } from '../components/ui/HealthStatus';
 import { useAuth } from '../auth/AuthContext';
+import { Link } from 'react-router-dom';
 
 export function HomePage() {
   const { user, logout } = useAuth();
@@ -22,6 +23,10 @@ export function HomePage() {
         </div>
 
         <div className="w-full max-w-md space-y-4">
+          <Link to="/app/security" className="block text-center text-blue-600 underline">Account security and email</Link>
+          <Link to="/app/settings" className="block text-center text-blue-600 underline">
+            Profile and organization
+          </Link>
           <HealthStatus />
           <button
             type="button"

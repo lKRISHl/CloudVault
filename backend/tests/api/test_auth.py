@@ -20,7 +20,48 @@ async def register_user(client: AsyncClient, **overrides: str) -> dict:
     payload = {**REGISTER_PAYLOAD, **overrides}
     response = await client.post(f"{settings.API_V1_PREFIX}/auth/register", json=payload)
     assert response.status_code == 201, response.text
-    return response.json()
+    data = response.json()
+    await verify_test_account(client, payload["email"])
+    data["user"]["email_verified"] = True
+    return data
+
+
+async def account_token_from_test_email(email: str, purpose: str) -> str:
+    import json
+    from urllib.parse import parse_qs, urlsplit
+
+    from sqlalchemy import select
+
+    from app.core.database import get_db
+    from app.main import app
+    from app.models import User
+    from app.models.account import EmailOutbox
+    from app.services.email import mail_cipher
+
+    sessions = app.dependency_overrides[get_db]()
+    db = await anext(sessions)
+    try:
+        user_id = await db.scalar(select(User.id).where(User.email == email.lower()))
+        mail = await db.scalar(
+            select(EmailOutbox)
+            .where(
+                EmailOutbox.user_id == user_id,
+                EmailOutbox.purpose == purpose,
+                EmailOutbox.encrypted_payload.is_not(None),
+            )
+            .order_by(EmailOutbox.created_at.desc())
+        )
+        payload = json.loads(mail_cipher().decrypt(mail.encrypted_payload.encode()))
+        link = next(line for line in payload["body"].splitlines() if line.startswith("http"))
+        return parse_qs(urlsplit(link).fragment)["token"][0]
+    finally:
+        await sessions.aclose()
+
+
+async def verify_test_account(client: AsyncClient, email: str) -> None:
+    token = await account_token_from_test_email(email, "verify")
+    result = await client.post("/api/v1/account/verify", json={"token": token})
+    assert result.status_code == 200, result.text
 
 
 @pytest.mark.asyncio
@@ -126,6 +167,9 @@ async def test_access_token_is_tenant_scoped(client: AsyncClient):
         user_id=uuid4(),
         tenant_id=UUID(owner["user"]["tenant"]["id"]),
         role="owner",
+        session_id=UUID(
+            jwt.decode(owner["access_token"], options={"verify_signature": False})["sid"]
+        ),
     )
     response = await client.get(
         f"{settings.API_V1_PREFIX}/auth/me",
@@ -136,11 +180,15 @@ async def test_access_token_is_tenant_scoped(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_access_token_rejects_wrong_type(client: AsyncClient):
-    await register_user(client)
+    owner = await register_user(client)
     token = jwt.encode(
         {
-            "sub": str(uuid4()), "tid": str(uuid4()), "role": "owner", "typ": "refresh",
+            "sub": str(uuid4()),
+            "tid": str(uuid4()),
+            "role": "owner",
+            "typ": "refresh",
             "exp": datetime.now(UTC) + timedelta(minutes=1),
+            "sid": jwt.decode(owner["access_token"], options={"verify_signature": False})["sid"],
         },
         settings.SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
