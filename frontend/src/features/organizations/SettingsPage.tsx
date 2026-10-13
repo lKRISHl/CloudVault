@@ -11,16 +11,19 @@ export function SettingsPage() {
   const { user, reloadUser } = useAuth();
   const cache = useQueryClient();
   const [fullName, setFullName] = useState(user?.full_name ?? '');
-  const [orgName, setOrgName] = useState(user?.tenant.name ?? '');
+  const [orgName, setOrgName] = useState(user?.tenant?.name ?? '');
+  const [transferTarget, setTransferTarget] = useState('');
+  const [transferPassword, setTransferPassword] = useState('');
+  const [transferConfirmation, setTransferConfirmation] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member'>('member');
   const [offset, setOffset] = useState(0);
   const [invitationOffset, setInvitationOffset] = useState(0);
   const [link, setLink] = useState('');
   const [message, setMessage] = useState('');
-  const verified = user?.email_verified === true;
+  const verified = user?.email_verified === true && !!user?.tenant;
   const manager = verified && (user?.role === 'owner' || user?.role === 'admin');
-  const key = ['organization', user?.tenant.id, user?.id];
+  const key = ['organization', user?.tenant?.id, user?.id];
   const members = useQuery({
     queryKey: [...key, 'members', offset], queryFn: () => api.members(offset), enabled: !!user && verified,
   });
@@ -31,7 +34,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     setFullName(user?.full_name ?? '');
-    setOrgName(user?.tenant.name ?? '');
+    setOrgName(user?.tenant?.name ?? '');
   }, [user]);
 
   async function refresh() {
@@ -48,6 +51,7 @@ export function SettingsPage() {
   });
   const invitation = useMutation({
     mutationFn: () => api.invite(email, role),
+    onMutate: () => setLink(''),
     onSuccess: async (created) => {
       setLink(`${window.location.origin}/join#token=${encodeURIComponent(created.token)}`);
       setEmail('');
@@ -60,8 +64,10 @@ export function SettingsPage() {
   });
   const remove = useMutation({ mutationFn: api.removeMember, onSuccess: refresh });
   const revoke = useMutation({ mutationFn: api.revokeInvitation, onSuccess: refresh });
+  const transfer = useMutation({ mutationFn: () => api.transferOwnership(transferTarget, transferPassword, transferConfirmation),
+    onSuccess: async () => { setTransferPassword(''); setTransferConfirmation(''); await refresh(); setMessage('Ownership transferred. You are now an admin.'); } });
   const errors = [members.error, manager ? invitations.error : null, profile.error,
-    organization.error, invitation.error, changeRole.error, remove.error, revoke.error].filter(Boolean);
+    organization.error, invitation.error, changeRole.error, remove.error, revoke.error, transfer.error].filter(Boolean);
 
   function submit(event: FormEvent, action: () => void) {
     event.preventDefault();
@@ -75,6 +81,7 @@ export function SettingsPage() {
       <h1 className="text-2xl font-semibold">Profile and organization</h1>
       <Link to="/app/security" className="block text-blue-600 underline">Account security and email</Link>
       {!verified && <p role="alert">Verify your email in account security before using organization features.</p>}
+      {!user?.tenant && <p>Select or create a workspace from the workspace page.</p>}
       {message && <p role="status">{message}</p>}
       {errors.map((error, index) => <p role="alert" className="text-red-700" key={index}>
         {error instanceof Error ? error.message : 'Unable to complete request'}
@@ -98,7 +105,7 @@ export function SettingsPage() {
               onChange={(event) => setOrgName(event.target.value)} />
           </label>
           <button disabled={organization.isPending} className={buttonClass}>Save organization</button>
-        </form> : <p>{user?.tenant.name}</p>}
+        </form> : <p>{user?.tenant?.name ?? 'No workspace selected'}</p>}
       </section>
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Members</h2>
@@ -118,7 +125,7 @@ export function SettingsPage() {
               (user?.role === 'owner' || member.role === 'member') &&
               <button disabled={remove.isPending} className={buttonClass}
                 aria-label={`Remove ${member.email}`} onClick={() => {
-                  if (window.confirm(`Remove ${member.email}? Their account will lose access.`)) {
+                  if (window.confirm(`Remove ${member.email}? They will lose access to this organization.`)) {
                     remove.mutate(member.user_id);
                   }
                 }}>Remove</button>}
@@ -133,7 +140,7 @@ export function SettingsPage() {
       </section>
       {manager && <section className="bg-white border rounded-xl p-5 space-y-4">
         <h2 className="text-lg font-semibold">Invite someone</h2>
-        <p>Invite someone new to CloudVault. Share their private link; it expires in seven days.</p>
+        <p>Invite a new or existing account. Removed members require an owner-created invitation and verified email. Links expire in seven days.</p>
         <form className="space-y-3" onSubmit={(event) => submit(event, () => invitation.mutate())}>
           <label className="block">Invitation email
             <input className={inputClass} type="email" required value={email}
@@ -165,6 +172,20 @@ export function SettingsPage() {
           <button className={buttonClass} disabled={invitations.data?.length !== 25 || invitations.isFetching}
             onClick={() => setInvitationOffset(invitationOffset + 25)}>Next invitations</button>
         </div>
+      </section>}
+      {verified && user?.role === 'owner' && <section className="bg-white border rounded-xl p-5 space-y-3">
+        <h2 className="text-lg font-semibold">Transfer ownership</h2>
+        <p>The new owner must be an active member with verified email. You become an admin.</p>
+        <form className="space-y-3" onSubmit={(event) => submit(event, () => transfer.mutate())}>
+          <label className="block">New owner<select aria-label="New owner" className={inputClass} required value={transferTarget} onChange={(event) => setTransferTarget(event.target.value)}>
+            <option value="">Choose an active member</option>
+            {members.data?.filter((member) => member.user_id !== user.id).map((member) => <option key={member.user_id} value={member.user_id}>{member.email}</option>)}
+          </select></label>
+          <label className="block">Ownership transfer password<input className={inputClass} type="password" autoComplete="current-password" required maxLength={128}
+            value={transferPassword} onChange={(event) => setTransferPassword(event.target.value)} /></label>
+          <label className="block">Type TRANSFER to confirm<input className={inputClass} required value={transferConfirmation} onChange={(event) => setTransferConfirmation(event.target.value)} /></label>
+          <button className={buttonClass} disabled={transfer.isPending || transferConfirmation !== 'TRANSFER'}>Transfer ownership</button>
+        </form>
       </section>}
     </div>
   </main>;

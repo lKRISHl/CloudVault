@@ -1,7 +1,7 @@
 # CloudVault Architecture
 
 ## Overview
-CloudVault uses a modular monolith. Phase 2 adds organization and membership services to the existing backend.
+CloudVault uses a modular monolith. Phase 2B separates global accounts from organization memberships and adds explicit session workspace selection.
 
 ```text
 [Frontend Client (React/Vite)] 
@@ -21,22 +21,24 @@ CloudVault uses a modular monolith. Phase 2 adds organization and membership ser
 - **Storage**: MinIO provides an S3-compatible local object storage environment for file blobs.
 
 ## Authentication (Phase 1)
-- Register creates a tenant and an `owner` user.
+- Register creates a global user, tenant and owner membership.
 - Login returns a short-lived JWT access token and sets an HttpOnly refresh cookie.
-- Protected routes require matching user and tenant IDs, active user status, and an explicit membership with a matching stored role. JWT role claims are not used to grant management privileges.
+- Protected routes require an active global user and live session matching the claimed tenant. Workspace routes also require an active membership; current membership roles govern management privileges. Account routes remain usable without an active workspace. JWT role claims do not grant privileges.
 
 ## Organizations and Membership (Phase 2)
 
 - The existing `Tenant` is the organization/workspace; there is no duplicate organization table.
 - Registration creates a tenant, owner user, membership, and session in one transaction.
-- `memberships` records organization membership and its role. A unique user constraint preserves the current one-organization-per-user model. A composite foreign key binds membership to the user's actual tenant.
-- `invitations` contains a hashed, seven-day bearer token, bound email and role, issuing user, organization, expiry, and consumption timestamp. Its issuer is constrained to the same tenant.
+- `memberships` records independent roles for each (tenant, global user), with foreign keys to both identities and a revocation tombstone. A partial unique index permits one active owner per tenant. Users store no tenant/role columns; response compatibility properties are populated from the authenticated session's membership.
+- `invitations` contains a hashed, seven-day token, bound email and role, issuing user, organization, expiry, consumption timestamp and reactivation flag. Creation/acceptance recheck issuer authority in that organization. Existing verified users must explicitly accept while authenticated with the addressed email.
 - Only owners can assign admin roles. Admins can rename organizations, invite members, and remove members; members can edit their own profile and read their organization's roster.
-- Owner membership cannot be removed or demoted. Removing a member deletes their membership, disables their account, revokes refresh tokens, and invalidates invitations they issued.
+- Ordinary role/removal operations cannot alter the owner. Ownership transfer requires the owner's current password, explicit confirmation and a verified active target member; demotion and promotion commit atomically. Removal marks only that membership revoked and revokes its workspace sessions/refresh tokens and affected invitations. Other organization access and global identity remain available.
 - PostgreSQL organization-row locks serialize management operations. Invitation acceptance uses an additional conditional update and commits token consumption, account, membership, and session together.
-- `User.role` remains for Phase 1 response compatibility and is updated with `Membership.role` in the same transaction. Authentication fails closed if these disagree.
+- Global deletion locks relevant tenants in stable order before the identity, checks ownership across all memberships, and removes all memberships/recovery access only after ownership is transferred. Profile redaction and session revocation remain global operations.
 - Frontend routes `/app/settings` and `/join` provide management and invitation onboarding. Query caches are scoped to tenant/user and cleared when authentication changes. Invitation secrets are placed in the URL fragment and cleared after acceptance.
-- File/folder permissions and multi-workspace membership are not implemented in this phase.
+- Workspace listing/creation/switching is available on `/app`. Switching revokes the current session, issues a replacement bound to the selected membership and preserves the absolute expiry; other browser sessions retain their selected workspace. Login selects the earliest active membership deterministically, or an account-only session if none remain. Frontend changes cancel/clear queries and reject stale responses; a shared cookie cannot silently retry an old workspace mutation in a new workspace.
+- Migration `004_workspaces` preserves existing accounts, passwords, memberships and valid sessions. Former removal disables become revoked membership tombstones with account-only recovery; identities disabled with intact memberships remain disabled. Downgrade refuses multi-workspace/workspace-less data or incompatible invitation history instead of deleting it.
+- File/folder permissions are planned for subsequent phases.
 
 ## Account Lifecycle (Phase 2A)
 
@@ -47,7 +49,7 @@ CloudVault uses a modular monolith. Phase 2 adds organization and membership ser
 - Compose adds a local Mailpit inbox and an email dispatcher. Shared database rate counters protect account endpoints across backend processes without relying on local memory.
 - Migration `003_accounts` preserves identities/passwords, marks addresses unverified, and revokes legacy refresh cookies. Legacy access tokens lack the required session claim and are rejected; existing users must sign in and verify their address.
 - `/account/recover`, `/account/action`, and `/app/security` provide recovery, verification/email confirmation, delivery status, and session management. Action secrets use URL fragments; successful actions clear those fragments.
-- Verified non-owner deletion redacts profile identifiers, removes memberships/recovery tokens, and revokes access while retaining reference-safe tombstones. Full multi-organization deletion/ownership transfer remains Phase 2B work.
+- Verified deletion redacts profile identifiers, removes all memberships/recovery tokens, and revokes all access while retaining reference-safe identity tombstones. Ownership in every organization must first be transferred through Phase 2B's ownership flow.
 
 ## Configuration Management
 Configuration is managed using `pydantic-settings` on the backend, reading from environment variables. The `.env` file serves as the source of truth for the local development environment.

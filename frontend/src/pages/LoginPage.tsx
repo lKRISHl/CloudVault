@@ -18,7 +18,7 @@ export function LoginPage() {
     try {
       await login({ email, password });
       const returnTo = location.state?.returnTo;
-      navigate(typeof returnTo === 'string' && returnTo.startsWith('/account/action#') ? returnTo : '/app', { replace: true });
+      navigate(typeof returnTo === 'string' && (returnTo.startsWith('/account/action#') || returnTo.startsWith('/join#')) ? returnTo : '/app', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in');
     } finally {

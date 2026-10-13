@@ -322,10 +322,13 @@ class AccountService:
         await self.db.commit()
 
     async def delete_account(self, actor: User, password: str) -> None:
-        # Lock the organization first, as membership administration does.
+        # Lock every organization in stable order before the global identity.
         from app.models import Tenant
 
-        await self.db.scalar(select(Tenant).where(Tenant.id == actor.tenant_id).with_for_update())
+        tenant_ids = select(Membership.tenant_id).where(Membership.user_id == actor.id)
+        await self.db.execute(
+            select(Tenant).where(Tenant.id.in_(tenant_ids)).order_by(Tenant.id).with_for_update()
+        )
         user = await self.lock_user(actor.id)
         self.reauthenticate(user, password)
         if not user.email_verified:
@@ -337,6 +340,7 @@ class AccountService:
                 select(Membership.user_id).where(
                     Membership.user_id == user.id,
                     Membership.role == UserRole.OWNER,
+                    Membership.revoked_at.is_(None),
                 )
             )
             is not None

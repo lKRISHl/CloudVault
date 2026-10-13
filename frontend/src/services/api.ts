@@ -1,10 +1,11 @@
-import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User } from '../types';
+import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<TokenResponse> | null = null;
+let sessionEpoch = 0;
 const sessionExpiredListeners = new Set<() => void>();
 
 export function onSessionExpired(listener: () => void) {
@@ -13,8 +14,11 @@ export function onSessionExpired(listener: () => void) {
 }
 
 export function setAccessToken(token: string | null) {
+  sessionEpoch += 1;
   accessToken = token;
 }
+
+export function beginSessionChange() { sessionEpoch += 1; }
 
 export function getAccessToken() {
   return accessToken;
@@ -44,10 +48,19 @@ async function parseError(response: Response): Promise<string> {
 
 function refreshSession(): Promise<TokenResponse> {
   if (!refreshPromise) {
+    const epoch = sessionEpoch;
     refreshPromise = fetchApi<TokenResponse>(`${API_V1}/auth/refresh`, {
       method: 'POST',
     }, false).then((session) => {
-      setAccessToken(session.access_token);
+      if (epoch !== sessionEpoch) throw new ApiRequestError('Session changed; try again', 409);
+      const workspace = (token: string) => {
+        try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).tid; }
+        catch { return undefined; }
+      };
+      if (accessToken && workspace(accessToken) !== workspace(session.access_token)) {
+        throw new ApiRequestError('Workspace changed in another tab; reload to continue', 401);
+      }
+      accessToken = session.access_token;
       return session;
     }).finally(() => {
       refreshPromise = null;
@@ -61,12 +74,13 @@ async function tryRefresh(): Promise<boolean> {
     await refreshSession();
     return true;
   } catch {
-    setAccessToken(null);
     return false;
   }
 }
 
 async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Promise<T> {
+  const epoch = sessionEpoch;
+  const scoped = !['/account/verify', '/account/reset-password', '/account/recovery-request', '/health', '/health/ready'].some((path) => url.endsWith(path));
   const headers = new Headers(options?.headers);
   headers.set('Accept', 'application/json');
   if (options?.body && !headers.has('Content-Type')) {
@@ -81,9 +95,11 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
     headers,
     credentials: 'include',
   });
+  if (scoped && epoch !== sessionEpoch) throw new ApiRequestError('Workspace or session changed; try again', 409);
 
   if (response.status === 401 && retry && !url.includes('/auth/refresh') && !url.includes('/auth/login')) {
     const refreshed = await tryRefresh();
+    if (scoped && epoch !== sessionEpoch) throw new ApiRequestError('Workspace or session changed; try again', 409);
     if (refreshed) {
       return fetchApi<T>(url, options, false);
     }
@@ -103,7 +119,9 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
     throw new ApiRequestError(await parseError(response), response.status);
   }
 
-  return response.json();
+  const data = await response.json();
+  if (scoped && epoch !== sessionEpoch) throw new ApiRequestError('Workspace or session changed; try again', 409);
+  return data;
 }
 
 export const api = {
@@ -129,6 +147,19 @@ export const api = {
     method: 'PATCH', body: JSON.stringify({ full_name }),
   }),
   organization: () => fetchApi<Tenant>(`${API_V1}/organizations/current`),
+  workspaces: (offset = 0) => fetchApi<Workspace[]>(`${API_V1}/organizations?offset=${offset}&limit=25`),
+  createWorkspace: (name: string) => fetchApi<TokenResponse>(`${API_V1}/organizations`, {
+    method: 'POST', body: JSON.stringify({ name }),
+  }, false),
+  switchWorkspace: (id: string) => fetchApi<TokenResponse>(`${API_V1}/organizations/${id}/switch`, {
+    method: 'POST',
+  }, false),
+  acceptExistingInvitation: (token: string) => fetchApi<Tenant>(`${API_V1}/organizations/invitations/accept-existing`, {
+    method: 'POST', body: JSON.stringify({ token }),
+  }, false),
+  transferOwnership: (user_id: string, password: string, confirmation: string) => fetchApi<void>(`${API_V1}/organizations/current/ownership`, {
+    method: 'POST', body: JSON.stringify({ user_id, password, confirmation }),
+  }, false),
   renameOrganization: (name: string) => fetchApi<Tenant>(`${API_V1}/organizations/current`, {
     method: 'PATCH', body: JSON.stringify({ name }),
   }),

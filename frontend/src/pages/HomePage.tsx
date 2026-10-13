@@ -1,6 +1,7 @@
 import { HealthStatus } from '../components/ui/HealthStatus';
 import { useAuth } from '../auth/AuthContext';
 import { Link } from 'react-router-dom';
+import { WorkspaceSwitcher } from '../features/organizations/WorkspaceSwitcher';
 
 export function HomePage() {
   const { user, logout } = useAuth();
@@ -17,12 +18,13 @@ export function HomePage() {
           </p>
           {user && (
             <p className="text-sm text-gray-600">
-              Signed in as <span className="font-medium">{user.full_name}</span> · {user.tenant.name}
+              Signed in as <span className="font-medium">{user.full_name}</span> · {user.tenant?.name ?? 'No workspace selected'}
             </p>
           )}
         </div>
 
         <div className="w-full max-w-md space-y-4">
+          <WorkspaceSwitcher />
           <Link to="/app/security" className="block text-center text-blue-600 underline">Account security and email</Link>
           <Link to="/app/settings" className="block text-center text-blue-600 underline">
             Profile and organization

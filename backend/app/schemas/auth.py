@@ -32,10 +32,10 @@ class UserRead(BaseModel):
     id: UUID
     email: EmailStr
     full_name: str
-    role: UserRole
+    role: UserRole | None
     is_active: bool
     email_verified: bool
-    tenant: TenantRead
+    tenant: TenantRead | None
 
     model_config = {"from_attributes": True}
 

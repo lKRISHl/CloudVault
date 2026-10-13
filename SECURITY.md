@@ -17,19 +17,26 @@
 
 ## Future Security Roadmap
 - **RBAC (Role-Based Access Control)**: Granular permissions for files and folders.
-- **Membership**: Multi-workspace membership remains future work; richer resource permissions arrive in Phase 12.
+- **Membership**: Global users have independent roles per organization. Richer resource permissions arrive in Phase 12.
 - Rate limiting, token-family replay response, cross-tab refresh coordination, and wider security review remain future hardening work.
 
 ## Phase 2 Organizations
 - Authenticated requests must have an active membership in the claimed tenant; roles are checked against current database state, not the JWT's role claim.
-- Composite membership and invitation-issuer foreign keys enforce tenant consistency. Role checks and request schemas reject invalid roles and client-supplied tenant assignments.
+- Membership foreign keys enforce global user/organization references. Current membership and issuer authority are checked in services; request schemas reject owner grants and client-supplied tenant assignments. Session tenant and token tenant must match, even when a user belongs to both tenants.
 - Cross-tenant member/invitation IDs return 404. Rosters and invitation lists are bounded and tenant-scoped.
 - Only owners change roles or invite admins. Owners cannot be removed/demoted; admins cannot remove other admins. Removed members are disabled and their refresh tokens are revoked, so subsequent protected requests are denied.
 - Invitation secrets are random, hashed at rest, expire after seven days, and are consumed atomically. Acceptance has transactional rollback and replay/concurrency coverage.
 - A private invitation link grants pending account creation for its fixed email. Phase 2A sends a separate verification challenge and requires mailbox proof before organization access. Protect both links as bearer credentials.
 - Invitation links use a URL fragment, which is not sent as part of the HTTP request URL. Do not add analytics or logs that record these secrets or request passwords.
 - Role changes and removal invalidate invitations issued by the affected user. A replacement invitation invalidates earlier pending tokens for that organization/email.
-- Existing-account movement and removed-account reactivation remain Phase 2B work. Phase 2A adds account/invitation rate limits; broader abuse controls remain future hardening work.
+- Existing accounts explicitly accept using the verified invited email. Removed memberships require a fresh owner-authorized reactivation invitation; old invitations/sessions never regain access. Rate limits apply to account/invitation/workspace creation/ownership actions; broader abuse controls remain future work.
+
+## Phase 2B Workspace and Ownership Controls
+- A session selects one workspace. Switching revokes its old access/refresh session and preserves the absolute expiry. Login without any membership permits account management but no organization access.
+- Current-password reauthentication and literal TRANSFER confirmation protect ownership transfer. Tenant locks, conditional updates and a partial owner uniqueness index protect concurrent transfer/removal/demotion; normal routes cannot leave an organization ownerless.
+- Removal revokes only the target organization membership/sessions. Global deletion checks ownership across all organizations before removing every membership and session.
+- Frontend cancels and clears query state on switching, rejects stale responses and avoids retrying old workspace mutations through another tab's newly selected refresh cookie. Public verification remains independent of workspace changes.
+- Migration preserves valid identity/session data and removed-member tombstones while retaining suspensions with intact memberships. Lossy downgrade is refused; restore a backup when data no longer fits the prior model.
 
 ## Phase 2A Account Lifecycle
 - Organization routes require verified email; profile and recovery/session screens remain available to unverified accounts. Invitation possession alone does not verify an email address.

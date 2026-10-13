@@ -1,72 +1,63 @@
 # CloudVault — Current State
 
 Current Phase:
-Phase 2A — Email, Account Recovery + Session Lifecycle
+Phase 2B — Multiple Organizations + Membership Lifecycle
 
 Status:
-Implementation and local verification complete. Full Docker Compose development stack now runs, including source-built MinIO and setup client. All 81 backend tests and the migration cycle pass against a disposable PostgreSQL database. HTTP/storage round-trip and registration-to-Mailpit dispatcher checks pass. Real production email-provider verification and remote CI remain pending. Phase 2B and Phase 3 have not started.
+Implementation and local verification complete on 2026-10-14. The updated Docker app runs at http://localhost:3000 with migration 004_workspaces. Phase 3 has not started. Phase 2B changes are uncommitted; nothing was pushed or dispatched to remote CI.
 
 Completed Work:
-- Phase 0–2 foundations remain: modular FastAPI/React application, authentication, explicit organization memberships, roles, profile editing, invitation onboarding, and tenant isolation.
-- Phase 2A adds verification on registration/invitation acceptance, purpose-bound single-use account challenges, generic recovery, password reset, email changes, and current-password reauthentication.
-- Organization features require verified email. Invitation possession alone does not verify the recipient's address.
-- Stable database login sessions are referenced by JWT sid claims. Refresh preserves the same session and absolute deadline. Logout, reset, email confirmation, and session controls reject subsequent access-token and refresh-cookie use.
-- Encrypted SMTP outbox with delivery leases, bounded retry, challenge-aligned deadlines, safe delivery status, and payload clearing. Compose adds Mailpit and a dedicated dispatcher; general Celery infrastructure remains future work.
-- Persistent atomic per-IP/per-account rate limits, generic recovery responses, and minimum recovery response duration.
-- Verified non-owner deletion requires password and explicit DELETE confirmation. Membership/challenges/access are removed or revoked; profile/incoming invitation addresses are redacted. Owners are protected until Phase 2B ownership transfer.
-- Technical maintenance clears expired rate counters and obsolete account/token/session/invitation/outbox records; minimal identity tombstones remain for referential integrity.
-- New account recovery/action/security screens, verified-email UI gating, and real Chromium journeys against a disposable migrated database and actual loopback SMTP delivery.
-- Upgrade affected frontend dependencies identified by npm audit; preserve the existing stack and use Vitest-specific DOM matcher integration.
+- Phase 0–2A foundations remain: FastAPI/React, account authentication/verification/recovery, encrypted SMTP outbox, live revocation, memberships, profile editing and invitations.
+- Global user identity stores no tenant/role columns. Memberships independently hold role and revocation per organization, with tenant/user foreign keys and one active owner per organization.
+- Workspace listing/creation and explicit switching. Login deterministically selects the earliest active membership or an account-only session if none remain.
+- Sessions select one tenant and JWT tenant must match. Switching revokes this session/refresh tokens and issues a replacement without extending the absolute deadline; other browser sessions remain usable in their selected workspace.
+- Existing verified accounts explicitly accept addressed invitations while retaining their identity, password and other memberships. New accounts still separately verify email.
+- Scoped removal keeps a membership tombstone and revokes only affected workspace sessions/invitations. Reactivation requires a fresh owner-issued invitation, current owner authorization, verified identity and explicit role; old sessions remain revoked.
+- Ownership transfer requires current password and literal TRANSFER, promotes a verified active member, demotes the former owner to admin, and invalidates their pending invitations. Tenant/user locks, conditional updates and a partial unique index protect final ownership during concurrent requests.
+- Global deletion checks every owned organization, requires transfer first, then removes all memberships/challenges and revokes/redacts account access/profile/mail references. Minimal identity tombstones remain.
+- Frontend workspace controls, existing-account joining and ownership forms. Session changes cancel/clear query state and reject old responses; shared-cookie refresh cannot retry an old workspace mutation in another tenant. Public verification/recovery remains independent of session restoration.
+- Migration preserves accounts/passwords and existing valid session selections, converts legacy removal disables to revoked membership tombstones, and retains suspensions with intact memberships. Unsafe downgrade refuses incompatible data rather than discarding it.
 
-Files Changed:
-- Backend account models/schemas/API/services: app/models/account.py, app/models/user.py, app/models/refresh_token.py, app/models/__init__.py, app/schemas/accounts.py, app/schemas/auth.py, app/api/accounts.py, app/api/auth.py, app/api/deps.py, app/api/organizations.py, app/api/router.py, app/services/accounts.py, app/services/auth.py, app/services/email.py, app/services/organizations.py, app/core/config.py, app/core/security.py, app/jobs/deliver_email.py.
-- Migrations: migrations/versions/002_organizations_memberships.py and 003_account_lifecycle.py.
-- Backend tests: tests/api/test_accounts.py, existing auth/organization regression helpers, tests/test_email_delivery.py, tests/test_account_retention.py, tests/test_migrations.py.
-- Frontend: src/features/accounts/, src/features/organizations/SettingsPage.tsx, src/auth/AuthContext.tsx, src/services/api.ts, src/types/index.ts, app/routes and login/home links, setupTests.ts, package.json/package-lock.json, vite.config.ts, playwright.config.ts, e2e/accounts.pw.ts.
-- Infrastructure/testing: docker-compose.yml, .env.example, .github/workflows/ci.yml, .gitignore, frontend/.dockerignore, scripts/account_e2e_stack.py.
-- Documentation: docs/phases/phase2a.md, docs/phases/README.md, README.md, SECURITY.md, ARCHITECTURE.md, PROJECT_CONTEXT.md, DECISIONS.md, CHANGELOG.md, DEVELOPMENT_PLAN.md, CONTINUE.md.
+Important Files:
+- backend/migrations/versions/004_global_identity.py
+- backend/app/models/user.py, membership.py, account.py, invitation.py; app/services/auth.py, workspaces.py, organizations.py, accounts.py; api/deps.py and organizations.py.
+- frontend/src/features/organizations/WorkspaceSwitcher.tsx, SettingsPage.tsx, JoinPage.tsx; auth/AuthContext.tsx, services/api.ts, types/index.ts; home/login/app routes and security text.
+- backend/tests/api/test_workspaces.py, tests/test_workspace_migration.py and adjusted organization/migration regressions.
+- frontend/e2e/workspaces.pw.ts, src/__tests__/WorkspaceSafety.test.ts and updated organization fixtures.
+- docs/phases/phase2b.md and phase index; README, ARCHITECTURE, PROJECT_CONTEXT, DEVELOPMENT_PLAN, SECURITY, DECISIONS, CHANGELOG.
 
-Tests Passed:
-- Backend: 81 tests passed locally using SQLite with foreign keys enabled, including real localhost SMTP integration.
-- Coverage: purpose/expiry/replacement/replay, generic unknown recovery, email-change password/account binding and uniqueness-race rollback, immediate session revocation, stable refresh sessions, scoped session IDs, owner deletion protection, explicit confirmation/redaction, rate limits, actual SMTP delivery/failure/retry/expiry, concurrent reset, retention preserving active sessions, and legacy migration preservation/revocation.
-- Frontend component tests: 20 passed. Real Chromium account journeys: 7 passed against a disposable migrated backend and real localhost SMTP, including verification after session revocation.
-- Ruff, ESLint, TypeScript/Vite production build passed. npm audit reports zero known vulnerabilities for the installed graph at verification time.
-- Alembic upgrade/check/downgrade/re-upgrade and seeded existing-data tests pass locally. Existing password hashes/identities remain; legacy email addresses become unverified and refresh cookies are revoked.
+Verification Passed:
+- 92 backend tests on SQLite and PostgreSQL, including actual localhost SMTP integration.
+- PostgreSQL uses dedicated cloudvault_phase2b_test; the earlier cloudvault_test retained the previous schema and was not counted as a successful verification run. Seeded migration tests create their own disposable PostgreSQL database and remove it afterward.
+- Coverage: independent roles, list/create/switch, stable refresh binding/absolute expiry, tenant-session forgery, unrelated workspace denial, verified existing acceptance, replay, scoped removal, owner reactivation, stale sessions, ownership password/confirmation, deletion across memberships, and concurrent transfer versus transfer/removal/demotion.
+- Seeded PostgreSQL/SQLite migrations preserve identity/password/email state and live sessions; removed access remains revoked, suspensions stay disabled, and unsafe downgrade preserves multiple memberships by refusing the operation.
+- PostgreSQL Alembic upgrade/check/downgrade/re-upgrade passed; SQLite schema/migration checks passed.
+- 24 frontend component tests, 9 real Chromium/SMTP journeys, Ruff, ESLint and TypeScript/Vite production build passed.
+- Full Docker rebuild/start passed. Application database is at 004_workspaces with no Alembic schema differences. HTTP/API proxy/Mailpit checks and actual storage upload/read/delete passed. Actual Docker registration, SMTP verification, two-workspace create/list/switch and old-session revocation also passed through the frontend proxy. A uniquely named local smoke identity/workspaces remain as development test data; SMTP dispatcher runs.
+- Pre-upgrade development database backup: .local/backups/cloudvault-before-phase2b.sql (ignored by Git). Do not overwrite or commit it.
 
-Known Issues / Verification Limits:
-- Docker Desktop 4.95.0 (Engine 29.8.2, Compose v5.6.0) and Microsoft WSL 2.7.13 are installed. PostgreSQL 16.15, Redis and Mailpit are running through Compose; Mailpit returns HTTP 200 at localhost:8025. PostgreSQL tests use separate cloudvault_test, never cloudvault. All 81 backend tests and Alembic upgrade/check/downgrade/re-upgrade pass on PostgreSQL. Remote CI remains unrun; no push or dispatch was performed.
-- Unavailable public MinIO images are replaced by source builds from pinned official commits in infra/minio/Dockerfile. Full `docker compose up --build -d` succeeds. MinIO bucket setup exits 0; API waits for it. scripts/docker_smoke.py passes HTTP checks plus actual object upload/read/delete. Registration through the frontend proxy queues a verification email delivered once to Mailpit by the Compose dispatcher. Smoke data uses a uniquely named development account/workspace.
-- Initial builds exhausted Windows virtual-memory capacity. WSL is limited to 4 GB in the host's .wslconfig; Go builds use one worker and a conservative memory budget. Upstream community MinIO repositories are archived/unmaintained; production needs a maintained S3 deployment/provider decision.
-- Production SMTP delivery requires real provider/TLS/from-address configuration; local SMTP acceptance and inbox delivery do not establish production inbox placement.
-- Migration 003_accounts intentionally requires existing users to sign in again and verify their email. Legacy JWTs without session IDs are rejected; no legacy address is assumed verified.
-- One organization per account. Ownership transfer, multiple workspaces, existing-account invitations, reactivation, and complete multi-organization deletion belong to Phase 2B.
-- SMTP can duplicate a message after an ambiguous acknowledgement/crash. Account actions are single-use; no exactly-once email guarantee is claimed.
-- Outbox encryption is derived from SECRET_KEY. Coordinate key rotation across API/dispatcher and resend affected pending links.
-- Generic recovery and a minimum duration reduce enumeration signals; response timing is not formally constant under all database load.
-- No MFA or recovery without access to the bound mailbox; broader abuse controls, token-family replay response, cross-tab coordination, and independent security review remain future work.
-- Deletion redacts personal fields but retains minimal IDs/timestamps/role and tenant references for integrity; no legal-compliance or complete-metadata-erasure claim is made.
+Remaining Limits:
+- No file/folder/upload/sharing/AI features yet; Phase 3 is next.
+- Remote CI and real production SMTP/from-domain/provider verification remain unrun. No push or dispatch was performed.
+- Full tab synchronization and real-time roster updates remain future work. Shared-cookie workspace changes fail closed for stale mutations; reload/sign in to adopt the new selection. Membership/ownership lists are paginated.
+- MFA, wider abuse controls, independent security review, deployment hardening, monitoring and backup operations remain later phases.
+- SMTP can duplicate after an ambiguous acknowledgement/crash; action links stay single-use. Signing-key rotation affects queued encryption; coordinate API/dispatcher and resend links.
+- Deletion retains minimal identity references; no legal-compliance or complete metadata-erasure claim.
+- Community MinIO is archived/unmaintained. Local source builds use pinned official commits; production needs a maintained S3 provider/deployment decision.
+- Docker/WSL run locally; WSL memory is limited to 4 GB after initial host resource exhaustion. Builds use conservative Go compilation limits.
 
-Architecture Changes:
-- Add account_tokens, login_sessions, email_outbox, rate_limits, email verification/deletion fields, and refresh-to-session linkage.
-- Account changes and their queued emails share database transactions. Protected access now depends on live session state as well as membership.
-- Email delivery/maintenance is a small dedicated process, not general Celery infrastructure. Runtime uses shared database state rather than process-local auth/rate counters.
-
-Important Decisions:
-- ADR-010/011: existing tenant organization model, explicit membership, invitations, and serialized management.
-- ADR-013: verified account actions and live session revocation; conservative legacy migration.
-- ADR-014: encrypted SMTP outbox, bounded delivery, technical retention, and at-least-once transport limitations.
-- ADR-015: actual browser/SMTP verification and dependency security updates.
+Decisions:
+ADR-017 — Global identity, revoked memberships and workspace-bound sessions.
+ADR-018 — Atomic ownership transfer and global deletion.
+Earlier ADRs document account actions/outbox and development storage source builds.
 
 Next Exact Phase:
-Phase 2B — Multiple Organizations + Membership Lifecycle, only on explicit instruction. Local PostgreSQL/Docker verification is complete; remote CI requires authorized push/dispatch. Phase 3 remains unstarted.
+Phase 3 — Folder System, only on explicit instruction. Phase 2B is complete locally; remote CI remains a separate verification gate requiring authorized push/dispatch.
 
-Last Verified State:
-2026-10-13 — 81 backend tests pass on PostgreSQL as well as prior SQLite checks; PostgreSQL migration cycle, full Docker startup, HTTP/storage smoke and Compose registration email delivery pass. Prior 20 frontend component tests, 7 Chromium/SMTP journeys, Ruff, ESLint, production build and npm audit passed. Production provider and remote CI checks remain pending.
+Last Commit:
+f79122d — feat: add organizations and verified account lifecycle (Phase 2/2A and Docker fix). Phase 2B is currently uncommitted.
 
-Commit Checkpoint:
-This checkpoint records completed Phase 2, Phase 2A and verified Docker storage startup work before Phase 2B. Previous checkpoint: def0420 — fix: harden phase 0-1 authentication and align master roadmap. Nothing was pushed.
+Suggested Commit:
+feat: add multiple workspaces and membership lifecycle
 
-Checkpoint Commit Message:
-feat: add organizations and verified account lifecycle
-
-Phase reports live in docs/phases/, named phase2.md, phase2a.md, phase2b.md, etc. Add completed reports to docs/phases/README.md; do not create placeholders for unimplemented phases.
+Phase reports live in docs/phases/. Read docs/phases/phase2b.md for the full explanation and operating limits.

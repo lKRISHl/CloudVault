@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, String, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -9,14 +9,7 @@ from app.core.database import Base
 
 class Invitation(Base):
     __tablename__ = "invitations"
-    __table_args__ = (
-        CheckConstraint("role IN ('admin', 'member')", name="ck_invitations_role"),
-        ForeignKeyConstraint(
-            ["created_by", "tenant_id"],
-            ["users.id", "users.tenant_id"],
-            name="fk_invitations_issuer_tenant",
-        ),
-    )
+    __table_args__ = (CheckConstraint("role IN ('admin', 'member')", name="ck_invitations_role"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(
@@ -34,3 +27,4 @@ class Invitation(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reactivation: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

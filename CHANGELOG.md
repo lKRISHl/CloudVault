@@ -2,6 +2,17 @@
 
 All notable changes to CloudVault will be documented in this file.
 
+## [Unreleased] - 2026-10-14
+
+### Phase 2B — Multiple Organizations and Membership Lifecycle
+- Separate global user identity from per-organization roles; migrate existing accounts/passwords and bind valid sessions to their prior workspace.
+- Add verified existing-user invitation acceptance, workspace listing/creation/switching, and scoped removal/reactivation without disabling other memberships.
+- Add confirmed password-protected ownership transfer, atomic owner replacement and final-owner protection during concurrent removal/demotion/transfer.
+- Complete deletion across all memberships; require ownership transfer in every owned organization first.
+- Reject stale frontend responses and cross-workspace retries; preserve independent public account actions during session restoration.
+- Verify 92 backend tests on SQLite/PostgreSQL, 24 frontend component tests, 9 Chromium/SMTP journeys, migrations, lint/build, and updated Docker/storage runtime.
+- Save an ignored pre-upgrade local database backup. Phase 3 remains unstarted; no commit/push/remote CI was performed for Phase 2B.
+
 ## [Unreleased] - 2026-10-13
 
 ### Development Infrastructure

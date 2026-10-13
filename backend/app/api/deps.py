@@ -26,7 +26,7 @@ async def get_current_user(
     service = AuthService(db)
     user_id, tenant_id, session_id = service.parse_access_token(credentials.credentials)
     user = await service.get_user_in_tenant(user_id, tenant_id)
-    if user is None or not await service.valid_session(user_id, session_id):
+    if user is None or not await service.valid_session(user_id, session_id, tenant_id):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
@@ -41,4 +41,10 @@ async def get_verified_user(user: Annotated[User, Depends(get_current_user)]) ->
         raise HTTPException(
             status_code=403, detail="Verify your email before using organization features"
         )
+    return user
+
+
+async def get_workspace_user(user: Annotated[User, Depends(get_verified_user)]) -> User:
+    if user.tenant is None:
+        raise HTTPException(status_code=403, detail="Select a workspace first")
     return user

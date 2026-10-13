@@ -44,7 +44,7 @@ describe('Organization and profile flows', () => {
   let invitations: typeof pendingInvitation[];
 
   beforeEach(() => {
-    currentUser = { ...baseUser, tenant: { ...baseUser.tenant } };
+    currentUser = { ...baseUser, tenant: { ...baseUser.tenant! } };
     members = [{ ...teamMember }];
     invitations = [{ ...pendingInvitation }];
     setAccessToken(null);
@@ -63,7 +63,7 @@ describe('Organization and profile flows', () => {
         return respond(currentUser);
       }
       if (url.endsWith('/organizations/current') && method === 'PATCH') {
-        currentUser = { ...currentUser, tenant: { ...currentUser.tenant, name: body.name } };
+        currentUser = { ...currentUser, tenant: { ...currentUser.tenant!, name: body.name } };
         return respond(currentUser.tenant);
       }
       if (url.includes('/current/members?')) {
@@ -89,6 +89,7 @@ describe('Organization and profile flows', () => {
         return respond(undefined, 204);
       }
       if (url.includes('/health')) return respond({ status: 'ok' });
+      if (url.includes('/organizations?')) return respond([{ tenant: currentUser.tenant, role: currentUser.role }]);
       throw new Error(`Unexpected request ${method} ${url}`);
     }));
   });
@@ -108,7 +109,7 @@ describe('Organization and profile flows', () => {
     await user.click(screen.getByRole('button', { name: 'Save organization' }));
     expect(await screen.findByText('Organization saved.')).toBeInTheDocument();
     expect(currentUser.full_name).toBe('Updated Owner');
-    expect(currentUser.tenant.name).toBe('Updated Organization');
+    expect(currentUser.tenant!.name).toBe('Updated Organization');
   });
 
   it('creates a private invitation link and revokes it', async () => {
@@ -166,6 +167,7 @@ describe('Organization and profile flows', () => {
       if (String(input).endsWith('/invitations/accept')) {
         return respond({ access_token: 'token', token_type: 'bearer', expires_in: 900, user: baseUser }, 201);
       }
+      if (String(input).includes('/organizations?')) return respond([{ tenant: baseUser.tenant, role: baseUser.role }]);
       return respond({ status: 'ok' });
     });
     render(<App />);

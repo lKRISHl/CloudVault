@@ -49,6 +49,7 @@ docker-compose.override.yml
 logs/
 
 # Data
+.local/
 data/
 minio-data/
 

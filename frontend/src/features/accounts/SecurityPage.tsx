@@ -58,7 +58,7 @@ export function SecurityPage() {
       <ul>{deliveries.data?.map((item) => <li key={item.id}>{item.purpose} · {item.state} · attempts: {item.attempts}</li>)}</ul>
     </section>
     <section className="space-y-3"><h2 className="text-lg font-semibold">Delete account</h2>
-      <p>Deletion removes your profile and access. Organization owners must transfer ownership first. Ownership transfer is not available yet.</p>
+      <p>Deletion removes your profile and all organization memberships. Transfer ownership of every organization you own before deleting.</p>
       <form onSubmit={(event) => submit(event, () => deletion.mutate())} className="space-y-3">
         <label className="block">Type DELETE to confirm<input className="block border rounded p-2" required
           value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>

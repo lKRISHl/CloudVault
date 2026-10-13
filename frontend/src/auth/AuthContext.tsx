@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, onSessionExpired, setAccessToken } from '../services/api';
+import { api, beginSessionChange, onSessionExpired, setAccessToken } from '../services/api';
 import type { AcceptInvitationPayload, LoginPayload, RegisterPayload, User } from '../types';
 
 interface AuthContextValue {
@@ -12,6 +12,8 @@ interface AuthContextValue {
   reloadUser: () => Promise<void>;
   acceptInvitation: (payload: AcceptInvitationPayload) => Promise<void>;
   clearSession: () => void;
+  switchWorkspace: (id: string) => Promise<void>;
+  createWorkspace: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -86,9 +88,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session.user);
   }, [cache]);
 
+  const switchWorkspace = useCallback(async (id: string) => {
+    beginSessionChange();
+    await cache.cancelQueries();
+    const session = await api.switchWorkspace(id);
+    cache.clear();
+    setAccessToken(session.access_token);
+    setUser(session.user);
+  }, [cache]);
+
+  const createWorkspace = useCallback(async (name: string) => {
+    beginSessionChange();
+    await cache.cancelQueries();
+    const session = await api.createWorkspace(name);
+    cache.clear();
+    setAccessToken(session.access_token);
+    setUser(session.user);
+  }, [cache]);
+
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout, reloadUser, acceptInvitation, clearSession }),
-    [user, isLoading, login, register, logout, reloadUser, acceptInvitation, clearSession],
+    () => ({ user, isLoading, login, register, logout, reloadUser, acceptInvitation, clearSession, switchWorkspace, createWorkspace }),
+    [user, isLoading, login, register, logout, reloadUser, acceptInvitation, clearSession, switchWorkspace, createWorkspace],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

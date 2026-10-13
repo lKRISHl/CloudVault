@@ -48,14 +48,14 @@ def generate_refresh_token() -> str:
 def create_access_token(
     *,
     user_id: UUID,
-    tenant_id: UUID,
+    tenant_id: UUID | None,
     role: str,
     session_id: UUID | None = None,
 ) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(user_id),
-        "tid": str(tenant_id),
+        "tid": str(tenant_id) if tenant_id else "",
         "role": role,
         "sid": str(session_id) if session_id else "",
         "typ": "access",

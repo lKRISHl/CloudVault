@@ -56,10 +56,10 @@ function App() {
           <Routes>
             <Route path="/account/recover" element={<RecoveryPage />} />
             <Route path="/account/action" element={<AccountActionPage />} />
+            <Route path="/join" element={<JoinPage />} />
             <Route element={<GuestRoute />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
-              <Route path="/join" element={<JoinPage />} />
             </Route>
             <Route element={<ProtectedRoute />}>
               <Route path="/app" element={<HomePage />} />

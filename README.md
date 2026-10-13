@@ -81,6 +81,7 @@ includes the dispatcher automatically. Queued email is not the same as delivered
 - [Phase Reports](docs/phases/README.md)
 - [Phase 2 Explanation](docs/phases/phase2.md)
 - [Phase 2A Explanation](docs/phases/phase2a.md)
+- [Phase 2B Explanation](docs/phases/phase2b.md)
 
 ## Profiles and Organizations
 
@@ -89,16 +90,30 @@ Everyone can edit their name and view their organization's members. Owners and a
 can rename the organization and create invitations. Owners can assign admin roles;
 admins can invite and remove ordinary members.
 
-Create an invitation for someone new to CloudVault. It is queued for email delivery;
+Create an invitation for a new or existing CloudVault account. It is queued for email delivery;
 the private link is also available for secure manual sharing. It expires after seven
-days; its recipient chooses their own name/password and separately verifies their
-email before using organization features. Pending invitations can be revoked.
-Accounts currently belong to one organization; existing accounts cannot be moved or
-joined to additional organizations. Removed accounts are disabled.
+days. New users choose their name/password and separately verify email. Existing users
+sign in with the verified invited address and explicitly accept; their other memberships
+stay available. Pending invitations can be revoked. Removed membership access can
+only be restored through a new owner-created invitation and verified acceptance.
+
+Use **Your workspaces** on the home page to create or switch workspaces. Roles belong
+to each organization. Switching replaces this session and clears cached workspace data;
+other browser sessions keep their workspace. Removing a member revokes only that
+organization's access. If their current workspace was removed, sign in again to select
+another membership or use the account without a workspace.
+
+Owners can transfer ownership from **Profile and organization** to another verified,
+active member, using their current password and typing `TRANSFER`. The previous owner
+becomes an admin. Ordinary role changes and removals cannot remove the final owner.
 
 Run `alembic upgrade head` when upgrading a local backend. Migration `002_memberships`
 preserves existing users and backfills memberships for active accounts. Compose applies
 migrations automatically on backend startup.
+Migration `004_workspaces` preserves accounts/passwords and valid session selections.
+Back up the database before upgrading. Downgrade refuses data that cannot safely fit
+the earlier single-workspace model. The local development upgrade backup is ignored
+under `.local/backups/`; keep backups outside Git.
 
 ## Account Verification and Recovery
 
@@ -113,10 +128,10 @@ require the current password and verification at the new address; confirmation r
 all sessions. **Forgot password?** provides a generic recovery response and a one-use
 email link. Password reset revokes all sessions and requires normal sign-in.
 
-Verified non-owner users may delete their account with their password and explicit
+Verified users may delete their account with their password and explicit
 `DELETE` confirmation. Profile identifiers are redacted and access is revoked. Owners
-are protected until ownership transfer is implemented in Phase 2B. See the phase report
-for the retention policy and remaining multi-organization limitations.
+must transfer ownership in every organization first. Deletion removes all memberships
+and revokes all sessions. See the phase report for retention and operational limits.
 
 Production requires a secure signing key, HTTPS `FRONTEND_URL`, SMTP STARTTLS,
 appropriate `SMTP_HOST`/`SMTP_PORT`, and provider-specific username/password/from-address

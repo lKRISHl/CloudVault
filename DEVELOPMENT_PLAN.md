@@ -2,13 +2,13 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 2A implementation and local verification are complete, including PostgreSQL tests/migrations and full Docker HTTP/storage/SMTP smoke checks. Evidence is recorded in CONTINUE.md; remote CI and production email-provider verification remain pending. Phase 2B and Phase 3 have not started.
+Current state: Phase 2B implementation and local verification are complete: 92 backend tests, 24 frontend component tests, 9 Chromium journeys, PostgreSQL migrations/concurrency and the updated Docker stack. Evidence is recorded in CONTINUE.md; remote CI and production email-provider verification remain pending. Phase 3 has not started.
 
-Next planned implementation: Phase 2B, then Phase 3. Start each on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 3, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
-Status: Pending; verification work, not a future feature phase.
+Status: Local PostgreSQL/migration/Docker verification passed. Remote CI run remains pending; this is verification work, not a future feature phase.
 
 - Obtain a successful CI run for PostgreSQL-backed API/concurrency tests, real migrations, and Docker smoke checks before describing infrastructure behavior as verified. Do not defer this to Phase 30.
 - Verify migration upgrade, schema alignment, downgrade/re-upgrade, and existing-data preservation on PostgreSQL.
@@ -81,7 +81,7 @@ Completion criteria:
 
 ## PHASE 2B — Multiple Organizations + Membership Lifecycle
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-14. PostgreSQL concurrency/migrations, browser journeys and rebuilt Docker runtime pass. See docs/phases/phase2b.md. Remote CI pending.
 
 Dependencies: Phase 2A. Complete before Phase 3 so file/folder schemas do not depend on the temporary single-organization user model.
 

@@ -65,9 +65,14 @@ def test_phase_two_migration_backfills_existing_active_users_and_preserves_data(
     migrate(["check"])
     with sqlite3.connect(database) as connection:
         rows = connection.execute("SELECT tenant_id, user_id, role FROM memberships").fetchall()
-        assert set(rows) == {
-            (tenant_id, user_id, role) for user_id, role, active in users if active
-        }
+        assert set(rows) == {(tenant_id, user_id, role) for user_id, role, active in users}
+        revoked = connection.execute(
+            "SELECT user_id FROM memberships WHERE revoked_at IS NOT NULL"
+        ).fetchall()
+        assert revoked == [(user_id,) for user_id, _, active in users if not active]
+        assert (
+            connection.execute("SELECT count(*) FROM users WHERE is_active = 1").fetchone()[0] == 3
+        )
         assert connection.execute("SELECT count(*) FROM users").fetchone()[0] == 3
     migrate(["downgrade", "001_auth"])
     with sqlite3.connect(database) as connection:

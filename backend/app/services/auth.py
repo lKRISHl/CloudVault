@@ -7,7 +7,6 @@ from jwt import InvalidTokenError
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.security import (
@@ -55,6 +54,7 @@ class AuthService:
 
         slug = await self._allocate_slug(payload.tenant_name)
         tenant = Tenant(name=payload.tenant_name.strip(), slug=slug)
+        self.db.add(tenant)
         user = User(
             tenant=tenant,
             email=payload.email.lower(),
@@ -81,17 +81,13 @@ class AuthService:
         password_hash = user.password_hash if user is not None else dummy_password_hash()
         password_ok = verify_password(payload.password, password_hash)
 
-        if (
-            user is None
-            or not password_ok
-            or not user.is_active
-            or await self.get_user_in_tenant(user.id, user.tenant_id) is None
-        ):
+        if user is None or not password_ok or not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
             )
 
+        await self.select_default_workspace(user)
         return await self.issue_session(user)
 
     @staticmethod
@@ -111,9 +107,7 @@ class AuthService:
 
         token_hash = hash_refresh_token(raw_token)
         result = await self.db.execute(
-            select(RefreshToken)
-            .options(selectinload(RefreshToken.user).selectinload(User.tenant))
-            .where(RefreshToken.token_hash == token_hash)
+            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
         )
         stored = result.scalar_one_or_none()
         now = datetime.now(UTC)
@@ -131,7 +125,6 @@ class AuthService:
             or normalized_revoked_at is not None
             or normalized_expires_at is None
             or normalized_expires_at <= now
-            or not stored.user.is_active
         ):
             if stored is not None and normalized_revoked_at is None:
                 stored.revoked_at = now
@@ -141,7 +134,7 @@ class AuthService:
                 detail="Invalid refresh token",
             )
 
-        await AccountService(self.db).lock_user(stored.user_id)
+        user = await AccountService(self.db).lock_user(stored.user_id)
 
         # Claim the token atomically. A concurrent refresh/logout wins at most once.
         claimed = await self.db.execute(
@@ -158,7 +151,7 @@ class AuthService:
         if claimed.scalar_one_or_none() is None:
             await self.db.rollback()
             raise HTTPException(status_code=401, detail="Invalid refresh token")
-        session = await self.issue_session(stored.user, stored.session_id)
+        session = await self.issue_session(user, stored.session_id)
         return session
 
     async def logout(self, raw_token: str | None) -> None:
@@ -182,22 +175,43 @@ class AuthService:
         )
         await self.db.commit()
 
-    async def get_user_in_tenant(self, user_id: UUID, tenant_id: UUID) -> User | None:
-        result = await self.db.execute(
-            select(User)
-            .join(Membership, Membership.user_id == User.id)
-            .options(selectinload(User.tenant))
-            .where(
-                User.id == user_id,
-                User.tenant_id == tenant_id,
-                User.is_active.is_(True),
-                Membership.tenant_id == tenant_id,
-                Membership.role == User.role,
+    async def get_user_in_tenant(self, user_id: UUID, tenant_id: UUID | None) -> User | None:
+        user = await self.db.scalar(
+            select(User).where(
+                User.id == user_id, User.is_active.is_(True), User.deleted_at.is_(None)
             )
         )
-        return result.scalar_one_or_none()
+        if user is None:
+            return None
+        user.tenant = None
+        user.role = None
+        if tenant_id is not None:
+            row = (
+                await self.db.execute(
+                    select(Tenant, Membership.role)
+                    .join(Membership, Membership.tenant_id == Tenant.id)
+                    .where(
+                        Membership.user_id == user_id,
+                        Membership.tenant_id == tenant_id,
+                        Membership.revoked_at.is_(None),
+                    )
+                )
+            ).one_or_none()
+            if row is None:
+                return None
+            user.tenant, user.role = row
+        return user
 
-    def parse_access_token(self, token: str) -> tuple[UUID, UUID, UUID]:
+    async def select_default_workspace(self, user: User) -> None:
+        tenant_id = await self.db.scalar(
+            select(Membership.tenant_id)
+            .where(Membership.user_id == user.id, Membership.revoked_at.is_(None))
+            .order_by(Membership.joined_at, Membership.tenant_id)
+            .limit(1)
+        )
+        await self.get_user_in_tenant(user.id, tenant_id)
+
+    def parse_access_token(self, token: str) -> tuple[UUID, UUID | None, UUID]:
         try:
             payload = decode_access_token(token)
         except InvalidTokenError as exc:
@@ -213,19 +227,24 @@ class AuthService:
             )
 
         try:
-            return UUID(str(payload["sub"])), UUID(str(payload["tid"])), UUID(str(payload["sid"]))
+            return (
+                UUID(str(payload["sub"])),
+                UUID(str(payload["tid"])) if payload["tid"] else None,
+                UUID(str(payload["sid"])),
+            )
         except (KeyError, ValueError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid access token",
             ) from exc
 
-    async def valid_session(self, user_id: UUID, session_id: UUID) -> bool:
+    async def valid_session(self, user_id: UUID, session_id: UUID, tenant_id: UUID | None) -> bool:
         return (
             await self.db.scalar(
                 select(LoginSession.id).where(
                     LoginSession.id == session_id,
                     LoginSession.user_id == user_id,
+                    LoginSession.tenant_id == tenant_id,
                     LoginSession.revoked_at.is_(None),
                     LoginSession.expires_at > datetime.now(UTC),
                 )
@@ -233,16 +252,18 @@ class AuthService:
             is not None
         )
 
-    async def issue_session(self, user: User, session_id: UUID | None = None) -> AuthSession:
+    async def issue_session(
+        self, user: User, session_id: UUID | None = None, expires_at: datetime | None = None
+    ) -> AuthSession:
         user = await AccountService(self.db).lock_user(user.id)
-        if await self.get_user_in_tenant(user.id, user.tenant_id) is None:
-            await self.db.rollback()
-            raise HTTPException(status_code=401, detail="Organization membership required")
         now = datetime.now(UTC)
         if session_id is None:
+            if await self.get_user_in_tenant(user.id, user.tenant_id) is None:
+                raise HTTPException(status_code=401, detail="Organization membership required")
             login_session = LoginSession(
                 user_id=user.id,
-                expires_at=now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+                tenant_id=user.tenant_id,
+                expires_at=expires_at or now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
             )
             self.db.add(login_session)
             await self.db.flush()
@@ -260,6 +281,8 @@ class AuthService:
             if login_session is None:
                 await self.db.rollback()
                 raise HTTPException(status_code=401, detail="Session revoked or expired")
+            if await self.get_user_in_tenant(user.id, login_session.tenant_id) is None:
+                raise HTTPException(status_code=401, detail="Organization membership required")
         raw_refresh = generate_refresh_token()
         refresh = RefreshToken(
             user_id=user.id,
@@ -274,7 +297,7 @@ class AuthService:
             access_token=create_access_token(
                 user_id=user.id,
                 tenant_id=user.tenant_id,
-                role=user.role.value,
+                role=user.role.value if user.role else "",
                 session_id=login_session.id,
             ),
             refresh_token=raw_refresh,
@@ -282,15 +305,11 @@ class AuthService:
         )
 
     async def _get_user_by_email(self, email: str) -> User | None:
-        result = await self.db.execute(
-            select(User).options(selectinload(User.tenant)).where(User.email == email.lower())
-        )
+        result = await self.db.execute(select(User).where(User.email == email.lower()))
         return result.scalar_one_or_none()
 
     async def _get_user_by_id(self, user_id: UUID) -> User | None:
-        result = await self.db.execute(
-            select(User).options(selectinload(User.tenant)).where(User.id == user_id)
-        )
+        result = await self.db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
 
     async def _allocate_slug(self, tenant_name: str) -> str:

@@ -13,3 +13,4 @@ and interview questions. Record verification gaps explicitly.
 
 - [Phase 2 — Users and Organizations](phase2.md)
 - [Phase 2A — Account Lifecycle and Email Delivery](phase2a.md)
+- [Phase 2B — Multiple Organizations and Membership Lifecycle](phase2b.md)

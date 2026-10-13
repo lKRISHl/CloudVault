@@ -1,6 +1,6 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -189,7 +189,9 @@ async def test_admin_can_invite_and_remove_members_but_cannot_manage_admins(clie
             "password": "correct-horse",
         },
     )
-    assert login.status_code == 401
+    assert login.status_code == 200
+    assert login.json()["user"]["tenant"] is None
+    assert (await client.get(PREFIX, headers=bearer(login.json()))).status_code == 403
 
 
 @pytest.mark.asyncio
@@ -315,17 +317,22 @@ async def test_jwt_role_cannot_escalate_a_member(client):
 
 
 @pytest.mark.asyncio
-async def test_membership_database_constraint_rejects_cross_tenant_link(client, db_factory):
+async def test_global_membership_allows_additional_tenant_but_rejects_missing_tenant(
+    client, db_factory
+):
     first = await register_user(client)
     other = await register_user(client, email="other@example.com", tenant_name="Other")
     async with db_factory() as db:
-        await db.execute(delete(Membership).where(Membership.user_id == UUID(first["user"]["id"])))
         db.add(
             Membership(
                 user_id=UUID(first["user"]["id"]),
                 tenant_id=UUID(other["user"]["tenant"]["id"]),
                 role=UserRole.MEMBER,
             )
+        )
+        await db.commit()
+        db.add(
+            Membership(user_id=UUID(first["user"]["id"]), tenant_id=uuid4(), role=UserRole.MEMBER)
         )
         with pytest.raises(IntegrityError):
             await db.commit()

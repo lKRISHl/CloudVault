@@ -2,13 +2,14 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import delete, select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.security import generate_refresh_token, hash_password, hash_refresh_token
 from app.models import Invitation, Membership, RefreshToken, Tenant, User, UserRole
+from app.models.account import LoginSession
 from app.schemas.organizations import (
     AcceptInvitation,
     InvitationCreated,
@@ -25,6 +26,7 @@ class OrganizationService:
         self.db = db
 
     async def update_profile(self, actor: User, full_name: str) -> User:
+        actor = await AccountService(self.db).lock_user(actor.id)
         actor.full_name = full_name
         await self.db.commit()
         return actor
@@ -47,6 +49,7 @@ class OrganizationService:
             .where(
                 Membership.user_id == actor.id,
                 Membership.tenant_id == actor.tenant_id,
+                Membership.revoked_at.is_(None),
                 User.is_active.is_(True),
             )
         )
@@ -67,7 +70,7 @@ class OrganizationService:
             .join(Membership, Membership.user_id == User.id)
             .where(
                 Membership.tenant_id == actor.tenant_id,
-                User.tenant_id == actor.tenant_id,
+                Membership.revoked_at.is_(None),
                 User.is_active.is_(True),
             )
             .order_by(Membership.joined_at, User.id)
@@ -92,7 +95,7 @@ class OrganizationService:
                 .join(Membership, Membership.user_id == User.id)
                 .where(
                     User.id == user_id,
-                    User.tenant_id == actor.tenant_id,
+                    Membership.revoked_at.is_(None),
                     Membership.tenant_id == actor.tenant_id,
                     User.is_active.is_(True),
                 )
@@ -110,8 +113,32 @@ class OrganizationService:
             raise HTTPException(status_code=403, detail="Only the owner can change roles")
         if membership.role == UserRole.OWNER:
             raise HTTPException(status_code=409, detail="Owner membership cannot be changed")
-        membership.role = UserRole(role)
-        user.role = UserRole(role)
+        manager = Membership.__table__.alias("manager")
+        authorized = (
+            select(manager.c.user_id)
+            .where(
+                manager.c.user_id == actor.id,
+                manager.c.tenant_id == actor.tenant_id,
+                manager.c.role == UserRole.OWNER,
+                manager.c.revoked_at.is_(None),
+            )
+            .exists()
+        )
+        changed = await self.db.scalar(
+            update(Membership)
+            .where(
+                Membership.tenant_id == actor.tenant_id,
+                Membership.user_id == user_id,
+                Membership.revoked_at.is_(None),
+                Membership.role != UserRole.OWNER,
+                authorized,
+            )
+            .values(role=UserRole(role))
+            .returning(Membership.user_id)
+            .execution_options(synchronize_session="fetch")
+        )
+        if changed is None:
+            raise HTTPException(status_code=409, detail="Membership or authority changed; reload")
         await self._revoke_invitations(user.id, actor.tenant_id)
         await self.db.commit()
         return MemberRead(
@@ -131,22 +158,58 @@ class OrganizationService:
         if actor_role == UserRole.ADMIN and membership.role != UserRole.MEMBER:
             raise HTTPException(status_code=403, detail="Admins can remove members only")
         await AccountService(self.db).lock_user(user.id)
-        await self.db.execute(
-            delete(Membership).where(
+        manager = Membership.__table__.alias("manager")
+        authorized = (
+            select(manager.c.user_id)
+            .where(
+                manager.c.user_id == actor.id,
+                manager.c.tenant_id == actor.tenant_id,
+                manager.c.revoked_at.is_(None),
+                or_(
+                    manager.c.role == UserRole.OWNER,
+                    and_(manager.c.role == UserRole.ADMIN, Membership.role == UserRole.MEMBER),
+                ),
+            )
+            .correlate(Membership)
+            .exists()
+        )
+        removed = await self.db.scalar(
+            update(Membership)
+            .where(
                 Membership.tenant_id == actor.tenant_id,
                 Membership.user_id == user_id,
+                Membership.revoked_at.is_(None),
+                Membership.role != UserRole.OWNER,
+                authorized,
             )
+            .values(revoked_at=datetime.now(UTC))
+            .returning(Membership.user_id)
+            .execution_options(synchronize_session="fetch")
         )
-        user.is_active = False
+        if removed is None:
+            raise HTTPException(status_code=409, detail="Membership or authority changed; reload")
+        await self.db.execute(
+            update(LoginSession)
+            .where(LoginSession.user_id == user_id, LoginSession.tenant_id == actor.tenant_id)
+            .values(revoked_at=datetime.now(UTC))
+        )
         await self.db.execute(
             update(RefreshToken)
             .where(
                 RefreshToken.user_id == user_id,
+                RefreshToken.session_id.in_(
+                    select(LoginSession.id).where(LoginSession.tenant_id == actor.tenant_id)
+                ),
                 RefreshToken.revoked_at.is_(None),
             )
             .values(revoked_at=datetime.now(UTC))
         )
         await self._revoke_invitations(user.id, actor.tenant_id)
+        await self.db.execute(
+            update(Invitation)
+            .where(Invitation.tenant_id == actor.tenant_id, Invitation.email == user.email)
+            .values(consumed_at=datetime.now(UTC))
+        )
         await self.db.commit()
 
     async def _revoke_invitations(self, user_id: UUID, tenant_id: UUID) -> None:
@@ -166,8 +229,16 @@ class OrganizationService:
         if payload.role == "admin" and actor_role != UserRole.OWNER:
             raise HTTPException(status_code=403, detail="Only the owner can invite admins")
         email = payload.email.lower()
-        if await self.db.scalar(select(User.id).where(User.email == email)) is not None:
-            raise HTTPException(status_code=409, detail="Email already has an account")
+        existing = await self.db.scalar(select(User).where(User.email == email))
+        membership = (
+            await self.db.get(Membership, (actor.tenant_id, existing.id)) if existing else None
+        )
+        if membership and membership.revoked_at is None:
+            raise HTTPException(status_code=409, detail="Already a member of this organization")
+        if membership and actor_role != UserRole.OWNER:
+            raise HTTPException(
+                status_code=403, detail="Only the owner can re-invite removed members"
+            )
         await self.db.execute(
             update(Invitation)
             .where(
@@ -184,6 +255,7 @@ class OrganizationService:
             role=payload.role,
             token_hash=hash_refresh_token(token),
             created_by=actor.id,
+            reactivation=membership is not None,
             expires_at=datetime.now(UTC) + timedelta(days=7),
         )
         self.db.add(invitation)
@@ -193,7 +265,7 @@ class OrganizationService:
             "invitation",
             email,
             "Join your CloudVault organization",
-            f"You were invited to {actor.tenant.name}. Create your account:\n"
+            f"You were invited to {actor.tenant.name}. Sign in or create your account:\n"
             f"{settings.FRONTEND_URL.rstrip('/')}/join#token={token}\n"
             "You will also need to verify your email after joining.",
         )
@@ -247,6 +319,7 @@ class OrganizationService:
         if invitation is None:
             raise HTTPException(status_code=400, detail="Invalid or expired invitation")
         organization = await self._lock_organization(invitation.tenant_id)
+        await self._check_issuer(invitation)
         now = datetime.now(UTC)
         claimed = await self.db.execute(
             update(Invitation)
@@ -285,3 +358,113 @@ class OrganizationService:
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(status_code=409, detail="Email already has an account") from exc
+
+    async def _check_issuer(self, invitation: Invitation) -> None:
+        role = await self.db.scalar(
+            select(Membership.role)
+            .join(User, User.id == Membership.user_id)
+            .where(
+                Membership.tenant_id == invitation.tenant_id,
+                Membership.user_id == invitation.created_by,
+                Membership.revoked_at.is_(None),
+                User.is_active.is_(True),
+                User.email_verified.is_(True),
+            )
+        )
+        if role not in (UserRole.OWNER, UserRole.ADMIN) or (
+            (invitation.role == "admin" or invitation.reactivation) and role != UserRole.OWNER
+        ):
+            raise HTTPException(status_code=400, detail="Invitation is no longer authorized")
+
+    async def accept_existing(self, actor: User, token: str) -> Tenant:
+        invitation = await self.db.scalar(
+            select(Invitation).where(Invitation.token_hash == hash_refresh_token(token))
+        )
+        if invitation is None:
+            raise HTTPException(status_code=400, detail="Invalid or expired invitation")
+        organization = await self._lock_organization(invitation.tenant_id)
+        user = await AccountService(self.db).lock_user(actor.id)
+        if not user.email_verified or user.email != invitation.email:
+            raise HTTPException(
+                status_code=403,
+                detail="Sign in with the verified email addressed by this invitation",
+            )
+        await self._check_issuer(invitation)
+        membership = await self.db.get(Membership, (organization.id, user.id))
+        if membership and membership.revoked_at is None:
+            raise HTTPException(status_code=409, detail="Already a member of this organization")
+        if membership and not invitation.reactivation:
+            raise HTTPException(
+                status_code=400, detail="Ask the owner for a new reactivation invitation"
+            )
+        claimed = await self.db.scalar(
+            update(Invitation)
+            .where(
+                Invitation.id == invitation.id,
+                Invitation.consumed_at.is_(None),
+                Invitation.expires_at > datetime.now(UTC),
+            )
+            .values(consumed_at=datetime.now(UTC))
+            .returning(Invitation.id)
+            .execution_options(synchronize_session=False)
+        )
+        if claimed is None:
+            raise HTTPException(status_code=400, detail="Invalid or expired invitation")
+        if membership:
+            membership.revoked_at = None
+            membership.role = UserRole(invitation.role)
+            membership.joined_at = datetime.now(UTC)
+        else:
+            self.db.add(
+                Membership(
+                    tenant_id=organization.id, user_id=user.id, role=UserRole(invitation.role)
+                )
+            )
+        await self.db.commit()
+        return organization
+
+    async def transfer(self, actor: User, target_id: UUID, password: str) -> None:
+        await self._lock_organization(actor.tenant_id)
+        if await self._require_manager(actor) != UserRole.OWNER:
+            raise HTTPException(status_code=403, detail="Only the owner can transfer ownership")
+        if target_id == actor.id:
+            raise HTTPException(status_code=409, detail="Choose another active member")
+        await self._target(actor, target_id)
+        # Tenant before users; stable user ordering avoids inverse pair locks.
+        for user_id in sorted((actor.id, target_id), key=str):
+            await AccountService(self.db).lock_user(user_id)
+        AccountService.reauthenticate(actor, password)
+        target, membership = await self._target(actor, target_id)
+        if not target.email_verified:
+            raise HTTPException(status_code=409, detail="The new owner must verify their email")
+        demoted = await self.db.scalar(
+            update(Membership)
+            .where(
+                Membership.tenant_id == actor.tenant_id,
+                Membership.user_id == actor.id,
+                Membership.role == UserRole.OWNER,
+                Membership.revoked_at.is_(None),
+            )
+            .values(role=UserRole.ADMIN)
+            .returning(Membership.user_id)
+            .execution_options(synchronize_session=False)
+        )
+        if demoted is None:
+            await self.db.rollback()
+            raise HTTPException(status_code=403, detail="Ownership changed; reload and try again")
+        promoted = await self.db.scalar(
+            update(Membership)
+            .where(
+                Membership.tenant_id == actor.tenant_id,
+                Membership.user_id == target_id,
+                Membership.revoked_at.is_(None),
+            )
+            .values(role=UserRole.OWNER)
+            .returning(Membership.user_id)
+            .execution_options(synchronize_session=False)
+        )
+        if promoted is None:
+            await self.db.rollback()
+            raise HTTPException(status_code=409, detail="Target membership changed; try again")
+        await self._revoke_invitations(actor.id, actor.tenant_id)
+        await self.db.commit()

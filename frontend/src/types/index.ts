@@ -32,10 +32,10 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'owner' | 'admin' | 'member';
+  role: 'owner' | 'admin' | 'member' | null;
   is_active: boolean;
   email_verified: boolean;
-  tenant: Tenant;
+  tenant: Tenant | null;
 }
 
 export interface TokenResponse {
@@ -61,7 +61,7 @@ export interface Member {
   user_id: string;
   email: string;
   full_name: string;
-  role: User['role'];
+  role: 'owner' | 'admin' | 'member';
   joined_at: string;
 }
 
@@ -95,4 +95,9 @@ export interface EmailDelivery {
   state: string;
   attempts: number;
   next_attempt_at: string;
+}
+
+export interface Workspace {
+  tenant: Tenant;
+  role: 'owner' | 'admin' | 'member';
 }

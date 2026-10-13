@@ -33,12 +33,14 @@ Containerized modular monolith with separate infrastructure services. Extract ap
 
 ## Current Organization Scope
 
-Phase 2 implements organizations using the existing tenant model, explicit memberships, profile editing, owner/admin/member management, and private invitation links for new accounts. Users currently belong to one organization. Existing-account migration, multi-workspace switching, and ownership transfer are future work.
+Phase 2B builds on Phase 2 organizations: global identities can hold independent owner/admin/member roles in multiple tenants. Users can create/list/switch workspaces and accept invitations with verified existing identities. Owners transfer ownership with password/confirmation; removal/reactivation is scoped to one membership, and global deletion checks all owned organizations first.
 
 Phase 2A adds SMTP email delivery, verified-email access to organization features,
 recovery/email-change workflows, immediate session revocation, and protected profile
 deletion. Development delivery is tested against a real local SMTP inbox. Production
-provider and Docker/PostgreSQL checks remain pending; Phase 2B has not started.
+provider verification and remote CI remain pending. Phase 2B passes 92 backend tests,
+24 frontend component tests, 9 real Chromium/SMTP journeys, PostgreSQL migrations and
+concurrency checks, and the updated Docker/storage smoke. Phase 3 is next and unstarted.
 
 ## Commercial Vision
 - **Free Tier**: Basic storage, standard search.
