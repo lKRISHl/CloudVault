@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import jwt
@@ -108,8 +109,11 @@ async def test_refresh_rotates_cookie(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_logout_revokes_refresh_token(client: AsyncClient):
     await register_user(client)
+    saved_cookie = client.cookies.get(settings.REFRESH_COOKIE_NAME)
     logout = await client.post(f"{settings.API_V1_PREFIX}/auth/logout")
     assert logout.status_code == 204
+
+    client.cookies.set(settings.REFRESH_COOKIE_NAME, saved_cookie)
 
     refreshed = await client.post(f"{settings.API_V1_PREFIX}/auth/refresh")
     assert refreshed.status_code == 401
@@ -134,7 +138,10 @@ async def test_access_token_is_tenant_scoped(client: AsyncClient):
 async def test_access_token_rejects_wrong_type(client: AsyncClient):
     await register_user(client)
     token = jwt.encode(
-        {"sub": str(uuid4()), "tid": str(uuid4()), "role": "owner", "typ": "refresh"},
+        {
+            "sub": str(uuid4()), "tid": str(uuid4()), "role": "owner", "typ": "refresh",
+            "exp": datetime.now(UTC) + timedelta(minutes=1),
+        },
         settings.SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
     )

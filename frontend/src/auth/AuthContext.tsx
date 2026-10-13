@@ -21,13 +21,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const session = await api.refresh();
-        setAccessToken(session.access_token);
         if (!cancelled) {
+          setAccessToken(session.access_token);
           setUser(session.user);
         }
       } catch {
-        setAccessToken(null);
         if (!cancelled) {
+          setAccessToken(null);
           setUser(null);
         }
       } finally {

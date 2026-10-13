@@ -1,76 +1,63 @@
 # CloudVault — Current State
 
 Current Phase:
-Phase 1 — Authentication
+Phase 1 — Authentication (Phase 0–1 corrective work)
 
 Status:
-Complete
+Implementation fixes complete; local checks pass. Full Docker/PostgreSQL verification remains pending a CI run. Phase 2 has not started.
 
-Completed:
-- User and Tenant domain models with SQLAlchemy 2.0 async mapped classes
-- Initial Alembic migration `001_auth_tenants_users.py` creating `tenants`, `users`, and `refresh_tokens` tables with foreign keys and unique indexes
-- Argon2id password hashing via `argon2-cffi` with constant-time dummy verify fallback on login misses
-- Dual-token auth system: 15-minute JWT access tokens carrying `sub`, `tid` (tenant ID), and `role`; rotating 7-day refresh tokens delivered via HttpOnly, SameSite=lax cookies
-- Database persistence of SHA-256 refresh token fingerprints with explicit revocation timestamps
-- FastAPI authentication API under `/api/v1/auth`:
-  - `POST /register`: Atomic workspace & owner creation with slug generation
-  - `POST /login`: Timing-safe authentication returning bearer token and refresh cookie
-  - `POST /refresh`: Rotating refresh token validation and re-issuance
-  - `POST /logout`: Refresh token revocation and cookie clearing
-  - `GET /me`: Tenant-scoped user profile retrieval
-- Reusable FastAPI dependencies (`get_current_user`, `get_current_tenant_id`) enforcing active user status and tenant boundary
-- Frontend authentication layer (`frontend/src/auth/`):
-  - `AuthContext` providing user state, login, registration, and logout
-  - Silent session bootstrap on app startup via refresh cookie
-  - Axios/Fetch interceptors automatically attaching Bearer access token
-  - Responsive, Tailwind-styled `LoginPage` and `RegisterPage` with form validation and error handling
-  - Protected navigation in `App.tsx` with authenticated user profile and logout controls
+Completed Work:
+- Phase 0 foundation: React/TypeScript/Vite/Tailwind/TanStack Query, FastAPI, configuration, PostgreSQL configuration, health checks, Docker Compose, CI, and project documentation.
+- Phase 1: registration, login, Argon2id password hashing, JWT access tokens, rotating HttpOnly refresh cookies, logout, current-user endpoint, and protected frontend routes.
+- Tenant/user/refresh-token models and initial Alembic migration; authenticated lookups enforce active status and matching tenant ID.
+- Atomic conditional refresh-token consumption; replacement insertion and revocation commit together. Concurrent losers receive 401.
+- Frontend shares pending refresh requests, including StrictMode session bootstrap and simultaneous unauthorized requests.
+- Production startup rejects development signing keys and keys shorter than 32 bytes. JWT decoding requires expiry, subject, tenant, and token type.
+- Corrected Compose frontend port and API proxy, added migration startup, and excluded host dependencies/secrets from Docker contexts.
+- Restored the complete Phase 0–33 roadmap in DEVELOPMENT_PLAN.md.
+- Added PostgreSQL-backed tests, migration round-trip checks, and Docker smoke verification to CI.
 
-Tests:
-- Backend: 15 passed, 0 warnings (100% pass rate)
-  - `test_register_creates_owner_and_sets_refresh_cookie`: PASS
-  - `test_register_rejects_duplicate_email`: PASS
-  - `test_register_rejects_short_password`: PASS
-  - `test_login_and_me`: PASS
-  - `test_login_rejects_bad_password`: PASS
-  - `test_me_requires_auth`: PASS
-  - `test_refresh_rotates_cookie`: PASS
-  - `test_logout_revokes_refresh_token`: PASS
-  - `test_access_token_is_tenant_scoped`: PASS
-  - `test_access_token_rejects_wrong_type`: PASS
-  - `test_liveness_returns_ok`: PASS
-  - `test_liveness_content_type`: PASS
-  - `test_readiness_structure`: PASS
-  - `test_readiness_db_down_without_postgres`: PASS
-  - `test_root_endpoint`: PASS
-- Frontend: 3 passed (100% pass rate)
-  - `LoginPage > shows sign-in controls`: PASS
-  - `App > renders without crashing`: PASS
-  - `App > displays the correct tagline`: PASS
-- Linters:
-  - Backend: `ruff check .` — All checks passed!
-  - Frontend: `npm run lint` — ESLint 0 warnings, 0 errors!
-- Build:
-  - Frontend: `npm run build` — Clean production bundle in `dist/`
+Files Changed:
+- Backend: app/core/config.py, app/core/security.py, app/models/user.py, app/services/auth.py, .dockerignore.
+- Backend tests: tests/conftest.py, tests/api/test_auth.py, tests/api/test_auth_security.py, tests/api/test_health.py, tests/test_migrations.py.
+- Frontend: src/auth/AuthContext.tsx, src/services/api.ts, src/__tests__/AuthFlows.test.tsx, nginx.conf, Dockerfile, .dockerignore.
+- Infrastructure: docker-compose.yml, .github/workflows/ci.yml.
+- Documentation: DEVELOPMENT_PLAN.md, CONTINUE.md, CHANGELOG.md, README.md, SECURITY.md, DECISIONS.md.
 
-Known Issues:
-- Docker daemon is not installed on the local Windows host; local verification runs directly on Python 3.13 and Node 24.
-- In Vitest, `--pool=forks --no-file-parallelism` is configured for stable test execution on Node 24 on Windows.
+Tests Passed:
+- Backend: 28 tests passed locally using temporary SQLite databases.
+- Security cases: expired/invalid/malformed JWTs, missing expiry, wrong token type, genuine tenant mismatch, disabled user, expired refresh token, concurrent refresh, logout-cookie replay, stored hashes, and production secret validation.
+- Real Alembic upgrade, model alignment, downgrade, and re-upgrade passed against SQLite.
+- Frontend: 9 tests passed, covering rendering, registration, login success/failure, logout, protected routes, StrictMode session restore, and shared concurrent refresh.
+- Ruff and ESLint passed; TypeScript/Vite production build passed.
+- React Router emits future-version migration warnings during tests.
+
+Known Issues / Verification Limits:
+- Docker and PostgreSQL executables are unavailable here. Full Compose startup and PostgreSQL migration/concurrency checks have not been executed locally or remotely during this work. CI contains those checks; do not claim they passed until a run confirms it.
+- Local backend tests use SQLite. TEST_DATABASE_URL enables PostgreSQL tests against a dedicated disposable database; fixtures remove application tables.
+- Logout revokes the presented refresh token; existing access tokens remain valid until expiry.
+- Shared refresh coordination is within one tab; cross-tab coordination and token-family replay handling remain future security work.
+- Rate limiting and broader hardening belong to later phases. No commercial-readiness claim is made.
+- Compose uses development credentials and a single-backend migration startup; production migration orchestration is deferred.
 
 Architecture Changes:
-- Established `/api/v1/auth` endpoints.
-- Bound tenant identification directly into JWT access token claims (`tid`) to enforce multi-tenant isolation at the authorization layer.
-- Added `refresh_tokens` table to enable instant server-side revocation of sessions without storing raw secret material.
+- No new application service or phase introduced. Refresh-token consumption now uses an atomic conditional database update.
+- Role enum length explicitly matches the existing VARCHAR(20) migration; no new migration is needed.
 
 Important Decisions:
-- ADR-006: JWT Access Tokens + Rotating Refresh Cookies (tokens in memory, refresh in HttpOnly cookie, hashed fingerprint in DB).
-- ADR-007: One Tenant per User at Registration (owner workspace initialized immediately).
+- ADR-006: JWT access tokens plus rotating refresh cookies.
+- ADR-007: One tenant per user at registration; organization membership is planned in Phase 2.
+- ADR-008: Atomic refresh rotation and shared browser refresh.
+- ADR-009: Full roadmap alignment, development startup, and infrastructure verification in CI.
 
 Next Exact Phase:
-Phase 2 — Users + Organizations
+Phase 2 — Users + Organizations, only on explicit user instruction. Obtain a successful Docker/PostgreSQL CI run before describing Phases 0–1 as fully verified.
 
 Last Verified State:
-2026-10-09T19:12:00+05:30 (Pytest: 15 passed, Vitest: 3 passed, Ruff: clean, ESLint: clean, Vite Build: successful)
+2026-10-13 — 28 backend tests, 9 frontend tests, Ruff, ESLint, and frontend build passed locally. Infrastructure CI checks pending.
 
 Last Commit:
-Pending Phase 1 commit
+Phase 0–1 corrective commit: `fix: harden phase 0-1 authentication and align master roadmap` (this commit). Previous Phase 1 commit: bae5096. No push was performed.
+
+Suggested Git Commit:
+fix: harden phase 0-1 authentication and align master roadmap

@@ -9,6 +9,21 @@ on:
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cloudvault
+          POSTGRES_PASSWORD: cloudvault
+          POSTGRES_DB: cloudvault_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloudvault -d cloudvault_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://cloudvault:cloudvault@localhost:5432/cloudvault_test
+      TEST_DATABASE_URL: postgresql+asyncpg://cloudvault:cloudvault@localhost:5432/cloudvault_test
     defaults:
       run:
         working-directory: ./backend
@@ -30,6 +45,32 @@ jobs:
       - name: Test with pytest
         run: |
           pytest
+      - name: Verify PostgreSQL migrations
+        run: |
+          alembic upgrade head
+          alembic check
+          alembic downgrade base
+          alembic upgrade head
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and start stack
+        run: |
+          docker compose config --quiet
+          docker compose up --build -d
+      - name: Verify frontend and proxied API
+        run: |
+          curl --fail --retry 30 --retry-delay 3 --retry-all-errors http://localhost:3000/
+          curl --fail --retry 30 --retry-delay 3 --retry-all-errors http://localhost:3000/api/v1/health
+          curl --fail -X POST http://localhost:3000/api/v1/auth/register -H 'Content-Type: application/json' -d '{"email":"smoke@example.com","password":"smoke-test-password","full_name":"Smoke Test","tenant_name":"Smoke Workspace"}'
+      - name: Container logs
+        if: always()
+        run: docker compose logs
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
 
   frontend-tests:
     runs-on: ubuntu-latest

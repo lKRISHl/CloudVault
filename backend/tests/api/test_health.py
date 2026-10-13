@@ -39,8 +39,12 @@ async def test_readiness_structure(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_readiness_db_down_without_postgres(client: AsyncClient):
+async def test_readiness_db_down_without_postgres(client: AsyncClient, monkeypatch):
     """Without a running PostgreSQL, readiness should report degraded with DB down."""
+    async def unavailable():
+        return False
+
+    monkeypatch.setattr("app.api.health.check_db_connection", unavailable)
     response = await client.get(f"{settings.API_V1_PREFIX}/health/ready")
     data = response.json()
     # No PostgreSQL running in test environment

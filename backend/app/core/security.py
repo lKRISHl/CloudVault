@@ -59,7 +59,10 @@ def create_access_token(*, user_id: UUID, tenant_id: UUID, role: str) -> str:
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    return jwt.decode(
+        token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM],
+        options={"require": ["exp", "sub", "tid", "typ"]},
+    )
 
 
 def set_refresh_cookie(response: Response, raw_token: str) -> None:

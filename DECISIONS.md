@@ -33,7 +33,7 @@
 ## ADR-007: One Tenant Per User at Registration
 - **Context**: CloudVault is multi-tenant; registration must create an isolated workspace.
 - **Decision**: Registering creates a tenant plus the first user as `owner`. Users currently belong to a single tenant via `users.tenant_id`.
-- **Rationale**: Delivers tenant isolation immediately without a membership join table. Invites and multi-workspace membership can be added in the permissions phase.
+- **Rationale**: Delivers tenant isolation immediately without a membership join table. Organization membership is planned in Phase 2; resource permissions are planned in Phase 12.
 - **Alternatives considered**: Global users with a memberships table from day one.
 
 ## ADR-005: PostgreSQL + pgvector for Vector Search
@@ -41,3 +41,14 @@
 - **Decision**: Use PostgreSQL with the pgvector extension.
 - **Rationale**: Keeps relational and vector data in the same datastore, simplifying operations and transactions.
 - **Alternatives considered**: Pinecone, Milvus, Qdrant (rejected to reduce infrastructure complexity initially).
+
+## ADR-008: Atomic Refresh Rotation and Shared Browser Refresh
+- **Context**: Concurrent requests could read the same valid refresh token and issue multiple replacements.
+- **Decision**: Claim refresh tokens using `UPDATE ... WHERE revoked_at IS NULL AND expires_at > now RETURNING id`; commit that update together with replacement insertion. Logout also uses a conditional update. Share one in-flight refresh promise within each frontend tab, including React StrictMode startup.
+- **Rationale**: Enforces one successful rotation in shared database state across backend instances, without relying on process-local locks. Local concurrency tests use separate sessions against a temporary SQLite file; CI runs them against PostgreSQL.
+- **Limitations**: Separate tabs do not share the frontend promise. Token-family revocation on replay is deferred to security hardening.
+
+## ADR-009: Phase 0–1 Verification and Development Startup
+- **Context**: The abbreviated development plan diverged from the master roadmap, and Docker frontend ports and proxy paths were inconsistent.
+- **Decision**: Restore the full Phase 0–33 roadmap. Run development migrations before the Compose backend starts; serve frontend port 80 through host port 3000 and preserve `/api/v1` in proxy requests. Add PostgreSQL and Docker smoke verification to CI.
+- **Limitations**: Development startup assumes one backend container. Production migration orchestration is deferred to deployment phases. Docker and PostgreSQL are unavailable on the current host, so CI checks remain unverified until run remotely.

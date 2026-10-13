@@ -2,6 +2,23 @@
 
 All notable changes to CloudVault will be documented in this file.
 
+## [Unreleased] - 2026-10-13
+
+### Fixed
+- Correct Docker frontend port mapping and preserve API paths through Nginx.
+- Apply migrations before development backend startup; exclude host dependencies and secrets from Docker build contexts.
+- Atomically consume refresh tokens and share concurrent browser refresh requests.
+- Reject unsafe production signing secrets and access tokens missing required claims.
+- Align role column length with the existing migration.
+- Restore the full Phase 0–33 roadmap and correct current-state documentation.
+
+### Testing
+- Add expired/invalid JWT, disabled-user, cross-tenant, stored-hash, expired-refresh, and concurrent-refresh coverage.
+- Replay the saved logout cookie to verify server-side revocation.
+- Add browser registration/login/logout, protected-route, session restore, and concurrent refresh tests.
+- Verify actual Alembic upgrade, schema alignment, downgrade, and re-upgrade locally using SQLite.
+- Add PostgreSQL-backed tests and migrations plus Docker/frontend/API registration smoke checks to CI; those infrastructure checks have not run on this host.
+
 ## [0.2.0] - 2026-10-08
 
 ### Added

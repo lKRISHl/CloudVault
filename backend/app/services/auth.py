@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from jwt import InvalidTokenError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -133,21 +133,34 @@ class AuthService:
                 detail="Invalid refresh token",
             )
 
-        stored.revoked_at = now
+        # Claim the token atomically. A concurrent refresh/logout wins at most once.
+        claimed = await self.db.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.id == stored.id,
+                RefreshToken.revoked_at.is_(None),
+                RefreshToken.expires_at > now,
+            )
+            .values(revoked_at=now)
+            .returning(RefreshToken.id)
+            .execution_options(synchronize_session=False)
+        )
+        if claimed.scalar_one_or_none() is None:
+            await self.db.rollback()
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
         session = await self._issue_session(stored.user)
-        await self.db.commit()
         return session
 
     async def logout(self, raw_token: str | None) -> None:
         if not raw_token:
             return
         token_hash = hash_refresh_token(raw_token)
-        query = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-        result = await self.db.execute(query)
-        stored = result.scalar_one_or_none()
-        if stored is not None and stored.revoked_at is None:
-            stored.revoked_at = datetime.now(UTC)
-            await self.db.commit()
+        await self.db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.token_hash == token_hash, RefreshToken.revoked_at.is_(None))
+            .values(revoked_at=datetime.now(UTC))
+        )
+        await self.db.commit()
 
     async def get_user_in_tenant(self, user_id: UUID, tenant_id: UUID) -> User | None:
         result = await self.db.execute(

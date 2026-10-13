@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,6 +44,15 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() == "production"
+
+    @model_validator(mode="after")
+    def validate_production_secret(self) -> "Settings":
+        if self.is_production and (
+            len(self.SECRET_KEY.encode("utf-8")) < 32
+            or self.SECRET_KEY.lower().startswith("change-me")
+        ):
+            raise ValueError("Production requires a non-default SECRET_KEY of at least 32 bytes")
+        return self
 
 
 settings = Settings()

@@ -4,6 +4,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
 
 let accessToken: string | null = null;
+let refreshPromise: Promise<TokenResponse> | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
@@ -35,19 +36,28 @@ async function parseError(response: Response): Promise<string> {
   return `API error: ${response.status}`;
 }
 
+function refreshSession(): Promise<TokenResponse> {
+  if (!refreshPromise) {
+    refreshPromise = fetchApi<TokenResponse>(`${API_V1}/auth/refresh`, {
+      method: 'POST',
+    }, false).then((session) => {
+      setAccessToken(session.access_token);
+      return session;
+    }).finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
 async function tryRefresh(): Promise<boolean> {
-  const response = await fetch(`${API_V1}/auth/refresh`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) {
+  try {
+    await refreshSession();
+    return true;
+  } catch {
     setAccessToken(null);
     return false;
   }
-  const data = (await response.json()) as TokenResponse;
-  setAccessToken(data.access_token);
-  return true;
 }
 
 async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Promise<T> {
@@ -97,10 +107,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  refresh: () =>
-    fetchApi<TokenResponse>(`${API_V1}/auth/refresh`, {
-      method: 'POST',
-    }, false),
+  refresh: refreshSession,
   logout: () =>
     fetchApi<void>(`${API_V1}/auth/logout`, {
       method: 'POST',

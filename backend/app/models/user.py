@@ -38,6 +38,7 @@ class User(Base):
             name="user_role",
             values_callable=lambda items: [item.value for item in items],
             native_enum=False,
+            length=20,
         ),
         nullable=False,
         default=UserRole.OWNER,

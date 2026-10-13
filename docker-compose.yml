@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -68,6 +66,7 @@ services:
       context: ./backend
     ports:
       - "8000:8000"
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     environment:
       - DATABASE_URL=postgresql+asyncpg://cloudvault:cloudvault@postgres:5432/cloudvault
       - REDIS_URL=redis://redis:6379/0
@@ -88,9 +87,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "3000:3000"
-    environment:
-      - VITE_API_URL=http://backend:8000
+      - "3000:80"
     depends_on:
       - backend
     networks:
