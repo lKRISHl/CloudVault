@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, Response
@@ -8,13 +9,29 @@ from app.api.storage import UploadStorage
 from app.api.users import Database
 from app.schemas.downloads import DownloadTicket
 from app.schemas.files import FilePage, FileRead
+from app.schemas.search import FileSearchPage, FileSearchQuery
 from app.schemas.uploads import UploadConfiguration, UploadProof, UploadStart, UploadTicket
 from app.services.downloads import DownloadService
 from app.services.files import FileService
+from app.services.search import FileSearchService
 from app.services.uploads import UploadService
 
 router = APIRouter()
 router.include_router(multipart_router)
+
+
+@router.get("/search", response_model=FileSearchPage)
+async def search(
+    actor: WorkspaceUser,
+    db: Database,
+    query: Annotated[FileSearchQuery, Query()],
+    response: Response,
+    request: Request,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await FileSearchService(db).search(
+        actor, query, request.client.host if request.client else ""
+    )
 
 
 @router.get("/upload-configuration", response_model=UploadConfiguration)

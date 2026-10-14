@@ -19,6 +19,7 @@ target_metadata = Base.metadata
 
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -33,7 +34,16 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    def include_object(obj, name, type_, reflected, compare_to):
+        return not (
+            connection.dialect.name == "sqlite"
+            and type_ == "index"
+            and name == "ix_files_search_trgm"
+        )
+
+    context.configure(
+        connection=connection, target_metadata=target_metadata, include_object=include_object
+    )
 
     with context.begin_transaction():
         context.run_migrations()

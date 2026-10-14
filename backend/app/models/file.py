@@ -91,6 +91,38 @@ class File(Base):
         ),
         Index("ix_files_children", "tenant_id", "folder_id", "name", "id"),
         Index("ix_files_creator", "tenant_id", "created_by"),
+        *[
+            Index(
+                f"ix_files_search_{name}",
+                "tenant_id",
+                field,
+                "id",
+                postgresql_where=text("upload_cleanup_at IS NULL"),
+                sqlite_where=text("upload_cleanup_at IS NULL"),
+            )
+            for name, field in [
+                ("name", "name_key"),
+                ("size", "declared_size_bytes"),
+                ("created", "created_at"),
+                ("updated", "updated_at"),
+            ]
+        ],
+        Index(
+            "ix_files_search_status",
+            "tenant_id",
+            "status",
+            "name_key",
+            "id",
+            postgresql_where=text("upload_cleanup_at IS NULL"),
+            sqlite_where=text("upload_cleanup_at IS NULL"),
+        ),
+        Index(
+            "ix_files_search_trgm",
+            "name_key",
+            postgresql_using="gin",
+            postgresql_ops={"name_key": "gin_trgm_ops"},
+            postgresql_where=text("upload_cleanup_at IS NULL"),
+        ).ddl_if(dialect="postgresql"),
         Index(
             "ix_files_upload_cleanup",
             "status",

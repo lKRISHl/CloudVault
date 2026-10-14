@@ -64,6 +64,7 @@ export function FoldersPage() {
   return <main className="folder-page space-y-6">
     <Link to="/app" className="text-blue-600 underline">Back to workspace</Link>
     <div className="page-heading"><div><span className="eyebrow">YOUR CONTENT, ORGANIZED</span><h1>Folders</h1><p>A little structure. A lot more room to create.</p></div><span className="page-emblem"><Icon name="folder" /></span></div>
+    <Link className="secondary-button" to={`/app/search${parent ? `?folder=${encodeURIComponent(parent)}` : ''}`}>{parent ? 'Search this folder' : 'Search workspace files'}</Link>
 
     <p className="muted-copy">Workspace members can browse. Folder creators, owners and admins can organize folders.</p>
     {!enabled && <p role="alert">Select a workspace and verify your email in account security to use folders.</p>}

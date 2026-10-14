@@ -1,4 +1,5 @@
 import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace, Folder, FolderPage, FilePage, FileMetadata, UploadTicket, DownloadTicket, MultipartTicket, MultipartStart, MultipartProgress, PartTicket } from '../types';
+import type { FileSearchQuery, FileSearchPage } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -125,6 +126,11 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
 }
 
 export const api = {
+  searchFiles: (filters: FileSearchQuery, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
+    return fetchApi<FileSearchPage>(`${API_V1}/files/search?${params}`, { signal });
+  },
   uploadConfiguration: () => fetchApi<{ max_bytes: number; enabled: boolean; multipart_max_bytes?: number; multipart_part_size?: number }>(`${API_V1}/files/upload-configuration`),
   startUpload: (payload: { name: string; folder_id: string | null; declared_size_bytes: number; declared_content_type: string | null; checksum_sha256: string; request_id: string }) => fetchApi<UploadTicket>(`${API_V1}/files/uploads`, { method: 'POST', body: JSON.stringify(payload) }),
   retryUpload: (id: string, checksum_sha256: string) => fetchApi<UploadTicket>(`${API_V1}/files/${id}/upload-url`, { method: 'POST', body: JSON.stringify({ checksum_sha256 }) }),

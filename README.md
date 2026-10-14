@@ -284,3 +284,25 @@ Current cleanup requires an unversioned bucket and reviewed maintenance permissi
 MinIO is local-only; exact-key durable intents address its inventory limitations. Compose
 also configures local stale-upload expiry at 24 hours/hourly scanning. Production S3/R2
 lifecycle, IAM, version-aware cleanup, monitoring and backup/restore remain deployment gates.
+
+## Finding files (Phase 10)
+
+Open **Search files** from navigation, or **Search this folder** while browsing.
+Search part of a filename and combine scope/status/transfer method/creator/declared-type/
+byte filters. Sort by filename, size, created or updated date; choose 5/25/50 results per
+page. Results show folder context and link to normal browsing; completed files retain
+authorized downloads. New searches/cleared filters reset pagination.
+
+Search is case-insensitive with Unicode NFC/case folding; accents stay significant.
+Percent/underscore match literal characters. Folder scope searches direct children.
+Pending size/MIME are declarations, and files remain unscanned. Search currently follows
+shared workspace read policy; private resource ACLs remain Phase 12.
+
+Back up before upgrading to 010_file_search. PostgreSQL needs pg_trgm provisioning
+permission (or prior operator installation); SQLite uses the B-tree fallback. Search
+index rollback to 009 preserves data and the shared extension. The local ignored backup
+is `.local/backups/cloudvault-before-phase10.sql`. Rebuild/start Compose after changes.
+
+API pages cap at 100 and offsets at 10000. Short/common terms can still scan; synthetic
+index verification is not a production benchmark. Review query logging, workloads,
+database timeouts, maintenance and deployment gates before production.

@@ -175,6 +175,7 @@ async def test_multipart_migration_preserves_basic_data_and_guards_part_records(
             intent_guard.returncode != 0
             and "Cannot discard upload initialization intents" in intent_guard.stderr
         )
+        assert migrate("upgrade", "head").returncode == 0
         assert migrate("check").returncode == 0
     finally:
         await engine.dispose()

@@ -11,6 +11,7 @@ import { SecurityPage } from '../features/accounts/SecurityPage';
 import { RecoveryPage } from '../features/accounts/RecoveryPage';
 import { AccountActionPage } from '../features/accounts/AccountActionPage';
 import { FoldersPage } from '../features/folders/FoldersPage';
+import { FileSearchPage } from '../features/search/FileSearchPage';
 import { AppShell } from '../components/AppShell';
 import { ApiRequestError } from '../services/api';
 
@@ -72,6 +73,7 @@ function App() {
               <Route path="/app/settings" element={<SettingsPage />} />
               <Route path="/app/security" element={<SecurityPage />} />
               <Route path="/app/folders" element={<FoldersPage />} />
+              <Route path="/app/search" element={<FileSearchPage />} />
               </Route>
             </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />

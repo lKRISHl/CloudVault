@@ -152,6 +152,16 @@ export interface FilePage {
   has_more: boolean;
 }
 
+export interface FileSearchQuery {
+  q?: string; scope?: 'workspace' | 'root' | 'folder'; folder_id?: string;
+  status?: 'pending' | 'uploaded'; upload_method?: 'basic' | 'multipart'; created_by?: string;
+  declared_content_type?: string; min_bytes?: number; max_bytes?: number;
+  sort?: 'name' | 'size' | 'created_at' | 'updated_at'; direction?: 'asc' | 'desc';
+  offset?: number; limit?: number;
+}
+export interface FileSearchItem extends FileMetadata { folder_name?: string | null }
+export interface FileSearchPage extends FilePage { items: FileSearchItem[] }
+
 export interface UploadTicket {
   file: FileMetadata;
   upload_url: string;

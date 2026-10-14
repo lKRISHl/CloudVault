@@ -22,3 +22,4 @@ and interview questions. Record verification gaps explicitly.
 - [Phase 7 — Basic Download](phase7.md)
 - [Phase 8 — Chunked/Multipart Uploads](phase8.md)
 - [Phase 9 — Resumable Uploads](phase9.md)
+- [Phase 10 — File Search](phase10.md)

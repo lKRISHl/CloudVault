@@ -25,6 +25,10 @@ async def db_factory(tmp_path):
             cursor.close()
 
     async with engine.begin() as conn:
+        if url.startswith("postgresql"):
+            from sqlalchemy import text
+
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
         await conn.run_sync(Base.metadata.create_all)
 
     session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

@@ -82,3 +82,10 @@ cleanup references reclaim expired/abandoned uploads and names. 206 backend test
 53 frontend tests, 14 Chromium journeys and Docker checks pass at 009_upload_cleanup.
 Current cleanup requires an unversioned bucket; provider lifecycle/production gates
 remain. Phase 9 is uncommitted; Phase 10 filename search is next.
+
+Phase 9 and its regression notes are now committed as 0551f25. Phase 10 filename
+search is implemented with tenant isolation, metadata filters, stable sorting,
+bounded pagination, folder context and PostgreSQL trigram/tenant B-tree indexes.
+214 backend tests, 60 frontend tests, 15 browser journeys and Docker checks pass at
+010_file_search. Phase 10 is uncommitted; Phase 11 Sharing is next. Production
+load/provider/remote CI and existing deployment gates remain pending.

@@ -89,6 +89,12 @@ def main():
             assert received.headers["content-disposition"].startswith("attachment;")
         page = require(api.get("/files"), 200)
         assert any(file["id"] == uploaded["id"] for file in page["items"])
+        found_response = api.get(
+            "/files/search", params={"q": "verified docker", "status": "uploaded"}
+        )
+        found = require(found_response, 200)
+        assert found_response.headers["cache-control"] == "no-store"
+        assert [file["id"] for file in found["items"]] == [uploaded["id"]]
         config = require(api.get("/files/upload-configuration"), 200)
         part_size = config["multipart_part_size"]
         chunks = [b"M" * part_size, b"CloudVault multipart tail"]
@@ -152,8 +158,39 @@ def main():
             download = require(api.post(f"/files/{file_id}/download-url"), 200)
             received = transfer.get(download["download_url"])
             assert received.status_code == 200 and received.content == b"".join(chunks)
+        sorted_files = require(
+            api.get(
+                "/files/search",
+                params={
+                    "scope": "root",
+                    "status": "uploaded",
+                    "sort": "size",
+                    "direction": "desc",
+                    "limit": 1,
+                },
+            ),
+            200,
+        )
+        assert sorted_files["has_more"] and sorted_files["items"][0]["id"] == file_id
+        next_page = require(
+            api.get(
+                "/files/search",
+                params={
+                    "scope": "root",
+                    "status": "uploaded",
+                    "sort": "size",
+                    "direction": "desc",
+                    "limit": 1,
+                    "offset": 1,
+                },
+            ),
+            200,
+        )
+        assert (
+            not next_page["has_more"] and next_page["items"][0]["id"] == uploaded["id"]
+        )
         print(
-            "Docker SMTP, basic/multipart upload, saved progress/resume and download passed"
+            "Docker SMTP/upload/resume/download and filename search/filter/sort/pagination passed"
         )
         print("Unique smoke account/workspace/two files retained as development data")
 

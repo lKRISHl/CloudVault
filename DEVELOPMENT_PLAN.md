@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 9 implementation and local verification are complete. Resume after reload, saved progress and automatic upload cleanup pass database/provider/browser/Docker checks. Schema is 009_upload_cleanup. Evidence and test counts are in CONTINUE.md; remote CI and production provider checks remain pending.
+Current state: Phase 10 implementation and local verification are complete. Filename search, filters, sorting, pagination and indexes pass database/browser/Docker checks. Schema is 010_file_search. Phase 9 is committed as 0551f25; Phase 10 is uncommitted. Evidence is in CONTINUE.md; remote CI and production provider/load checks remain pending.
 
-Next planned implementation: Phase 10, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 11, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
@@ -178,7 +178,7 @@ Scope: creator-authorized progress discovery, original-manifest resume after rel
 
 ## PHASE 10 — File Search
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-15. See docs/phases/phase10.md. 214 backend tests on SQLite/PostgreSQL with real storage, 60 frontend tests, 15 Chromium journeys and rebuilt Docker search/transfer/schema/maintenance checks pass. Synthetic PostgreSQL index paths are verified; production load/provider/remote CI checks remain pending.
 
 - filename search
 - filtering
@@ -204,6 +204,8 @@ Status: Not started.
 - owner/admin roles
 - resource-level authorization
 - secure access checks
+
+Apply resource read ACLs to search/list predicates before pagination and folder-name context. Search must not reveal inaccessible filenames, locations or result counts.
 
 ## PHASE 13 — Trash + Restore
 

@@ -4,6 +4,19 @@ All notable changes to CloudVault will be documented in this file.
 
 ## [Unreleased] - 2026-10-15
 
+### Phase 10 — File Search
+- Add current-member tenant-scoped literal filename search, Unicode normalization,
+  metadata filters, direct folder/root scope, whitelisted sorting and bounded pagination.
+- Exclude cleanup tombstones/private storage references; join folder names by tenant.
+- Add partial tenant B-tree and PostgreSQL pg_trgm GIN indexes via 010_file_search,
+  preserving data and supporting index-only rollback without dropping shared extensions.
+- Add search page/navigation/folder shortcut, submitted filters, page controls, current
+  folder links/downloads and workspace/user cache/cancellation guards.
+- Verify 214 SQLite/PostgreSQL backend tests, 60 frontend tests, 15 browser journeys,
+  schema/data-preserving migrations, synthetic index paths and Docker real search/transfer
+  checks. Save an ignored pre-upgrade backup. No benchmark/remote CI/production claim.
+- Phase 9 was committed as 0551f25; Phase 10 remains uncommitted.
+
 ### Phase 9 — Resumable Uploads
 - Add creator-authorized provider-reconciled progress and original-manifest resume.
   Reload recovery uses original chunk size/deadline and transfers only missing parts.

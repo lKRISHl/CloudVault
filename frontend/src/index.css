@@ -75,6 +75,13 @@ h1, h2, h3 { letter-spacing: -.025em; }
 .upload-icon { display: grid; place-items: center; background: #e6dcf4; color: #8b69bb; border-radius: 11px; height: 42px; width: 42px; flex-shrink: 0; }
 .primary-button, .auth-form button[type=submit] { background: #7357be; color: white; border: 0; border-radius: 9px; padding: 12px 18px; font-size: 13px; font-weight: 550; box-shadow: 0 4px 9px #7357be19; }
 .primary-button:hover:not(:disabled), .auth-form button[type=submit]:hover:not(:disabled) { background: #6145ab; }
+.secondary-button { display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border: 1px solid #ded6eb; border-radius: 9px; background: #fff; color: #68527f; font-size: 12px; font-weight: 550; text-decoration: none; }
+.secondary-button:hover:not(:disabled) { background: #f5f1fc; border-color: #c8b8e7; }
+.secondary-button:disabled { opacity: .45; }
+.file-search-page .page-heading { flex-wrap: wrap; gap: 16px; }
+.file-search-page form label { font-size: 12px; color: #786e85; }
+.file-search-page form input:not([type=checkbox]), .file-search-page form select { margin-top: 6px; }
+.file-search-page .file-name strong { min-width: 0; overflow-wrap: anywhere; }
 .empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 32px 20px; border: 1px solid #eae6ef; border-radius: 14px; background: #ffffff90; gap: 8px; }
 .empty-state svg { width: 28px; height: 28px; color: #b9aace; margin-bottom: 4px; }
 .empty-state strong { font-size: 13px; color: #71637f; }
