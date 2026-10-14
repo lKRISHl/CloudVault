@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import httpx
@@ -8,7 +9,11 @@ import pytest
 
 from app.api.storage import get_upload_storage
 from app.core.config import settings
+from app.jobs import cleanup_uploads
 from app.main import app
+from app.models import File, UploadIntent
+from app.services.upload_cleanup import UploadCleanupService
+from app.storage.base import MultipartNotFoundError, ObjectRef, StorageUnavailableError
 from tests import test_storage_integration
 from tests.api.test_auth import register_user
 from tests.api.test_organizations import bearer
@@ -101,3 +106,106 @@ async def test_actual_multipart_parts_integrity_completion_download_and_abort(
         assert (
             await transfer.put(part["upload_url"], headers=part["headers"], content=pieces[0])
         ).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_real_cleanup_reclaims_name_retries_late_bytes_and_aborts_unknown_upload(
+    client, db_factory, storage, monkeypatch
+):
+    owner = await register_user(client)
+    tenant_id = UUID(owner["user"]["tenant"]["id"])
+    storage.tenant_id = tenant_id
+    for field in ("S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY"):
+        monkeypatch.setattr(settings, field, getattr(storage.config, field))
+    monkeypatch.setattr(settings, "S3_PUBLIC_ENDPOINT", None)
+    monkeypatch.setattr(settings, "S3_BUCKET_NAME", storage.bucket)
+
+    async def override():
+        yield storage
+
+    app.dependency_overrides[get_upload_storage] = override
+    body = b"Abandoned basic upload"
+    digest = base64.b64encode(hashlib.sha256(body).digest()).decode()
+    metadata = {
+        "name": "Expired.txt",
+        "declared_size_bytes": len(body),
+        "checksum_sha256": digest,
+        "request_id": str(uuid4()),
+    }
+    ticket = (
+        await client.post("/api/v1/files/uploads", headers=bearer(owner), json=metadata)
+    ).json()
+    file_id = UUID(ticket["file"]["id"])
+    async with httpx.AsyncClient(timeout=30) as transfer:
+        assert (
+            await transfer.put(ticket["upload_url"], content=body, headers=ticket["headers"])
+        ).status_code == 200
+        async with db_factory() as db:
+            file = await db.get(File, file_id)
+            file.upload_expires_at = datetime.now(UTC) - timedelta(hours=2)
+            await db.commit()
+        await cleanup_uploads.tick(factory=db_factory)
+        assert not (await client.get("/api/v1/files", headers=bearer(owner))).json()["items"]
+        replacement = await client.post(
+            "/api/v1/files/uploads",
+            headers=bearer(owner),
+            json={**metadata, "request_id": str(uuid4())},
+        )
+        assert replacement.status_code == 201
+        # The provider URL is deliberately still valid in this clock-controlled test:
+        # simulate a write that finishes after the cleanup observation.
+        assert (
+            await transfer.put(ticket["upload_url"], content=body, headers=ticket["headers"])
+        ).status_code == 200
+        async with db_factory() as db:
+            assert await UploadCleanupService(db, storage).sweep(file_id, tenant_id)
+        orphan = ObjectRef(tenant_id, uuid4(), uuid4())
+        orphan_id = await storage.create_multipart(orphan)
+        orphan_body = b"untracked part"
+        orphan_hash = base64.b64encode(hashlib.sha256(orphan_body).digest()).decode()
+        grant = await storage.presign_part(orphan, orphan_id, 1, len(orphan_body), orphan_hash, 300)
+        assert (
+            await transfer.put(grant.url, content=orphan_body, headers=grant.headers)
+        ).status_code == 200
+        inventory = await storage.call(
+            storage.client.list_multipart_uploads, Prefix="", MaxUploads=100
+        )
+        assert any(item["UploadId"] == orphan_id for item in inventory.get("Uploads", [])), {
+            key: value for key, value in inventory.items() if key != "ResponseMetadata"
+        }
+        await cleanup_uploads.sweep_orphans(
+            storage, db_factory, now=datetime.now(UTC) + timedelta(days=1)
+        )
+        with pytest.raises(MultipartNotFoundError):
+            await storage.list_parts(orphan, orphan_id)
+        original_create = storage.create_multipart
+        lost_ids = []
+
+        async def lost_create(ref):
+            lost_ids.append((ref, await original_create(ref)))
+            raise StorageUnavailableError("lost create acknowledgement")
+
+        monkeypatch.setattr(storage, "create_multipart", lost_create)
+        part_size = settings.MULTIPART_PART_BYTES
+        initialization = await client.post(
+            "/api/v1/files/multipart/uploads",
+            headers=bearer(owner),
+            json={
+                "name": "Lost create.bin",
+                "declared_size_bytes": 1,
+                "part_size": part_size,
+                "checksums": [base64.b64encode(hashlib.sha256(b"x").digest()).decode()],
+                "request_id": str(uuid4()),
+            },
+        )
+        assert initialization.status_code == 503
+        monkeypatch.setattr(storage, "create_multipart", original_create)
+        ref, upload_id = lost_ids[0]
+        async with db_factory() as db:
+            intent = await db.get(UploadIntent, ref.file_id)
+            assert intent.object_id == ref.object_id and await db.get(File, ref.file_id) is None
+            intent.expires_at = datetime.now(UTC) - timedelta(hours=2)
+            await db.commit()
+        await cleanup_uploads.tick(factory=db_factory)
+        with pytest.raises(MultipartNotFoundError):
+            await storage.list_parts(ref, upload_id)

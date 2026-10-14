@@ -339,3 +339,21 @@ class S3ObjectStorage:
             await self.call(
                 self.client.abort_multipart_upload, Key=self.key(ref), UploadId=upload_id
             )
+
+    async def pending_for_object(self, ref: ObjectRef) -> list[str]:
+        key = self.key(ref)
+        marker, found = None, []
+        while True:
+            params = {"Prefix": key, "MaxUploads": 1000}
+            if marker:
+                params.update(KeyMarker=marker[0], UploadIdMarker=marker[1])
+            page = await self.call(self.client.list_multipart_uploads, **params)
+            found.extend(item["UploadId"] for item in page.get("Uploads", []) if item["Key"] == key)
+            if len(found) > 1024:
+                raise StorageUnavailableError("Too many initialization uploads")
+            if not page.get("IsTruncated"):
+                return found
+            following = (page.get("NextKeyMarker", ""), page.get("NextUploadIdMarker", ""))
+            if not following[0] or following == marker:
+                raise StorageUnavailableError("Invalid upload inventory pagination")
+            marker = following

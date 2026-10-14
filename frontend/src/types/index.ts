@@ -163,4 +163,5 @@ export interface DownloadTicket { file: FileMetadata; download_url: string; expi
 
 export interface PartTicket { number: number; size_bytes: number; checksum_sha256: string; confirmed: boolean; expires_at?: string | null; upload_url?: string | null; headers: Record<string, string> }
 export interface MultipartTicket { file: FileMetadata; part_size: number; parts: PartTicket[]; expires_at: string }
+export interface MultipartProgress extends MultipartTicket { confirmed_bytes: number; can_resume: boolean }
 export interface MultipartStart { name: string; folder_id: string | null; declared_size_bytes: number; declared_content_type: string | null; request_id: string; part_size: number; checksums: string[] }

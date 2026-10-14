@@ -2,6 +2,24 @@
 
 All notable changes to CloudVault will be documented in this file.
 
+## [Unreleased] - 2026-10-15
+
+### Phase 9 — Resumable Uploads
+- Add creator-authorized provider-reconciled progress and original-manifest resume.
+  Reload recovery uses original chunk size/deadline and transfers only missing parts.
+- Add saved-progress UI, reselected-content checks, completion-grace verification and
+  safe expired/error handling. Keep bounded retries and credential-free storage transfer.
+- Persist initialization intent before provider creation to recover exact keys after
+  lost acknowledgements. Retain hidden cleanup references for repeated late-write sweeps.
+- Add periodic maintenance in Compose/direct setups: expiry/grace/settling guards,
+  provider abort/delete verification, name reclamation and versioned-bucket refusal.
+- Add partial name indexes and rollback guards in 009_upload_cleanup, preserving data.
+- Address MinIO inventory behavior with durable exact-key recovery; configure local
+  stale-upload expiry/hourly scan. Production provider/lifecycle verification remains.
+- Pass 206 SQLite/PostgreSQL backend tests with actual storage, 53 frontend tests,
+  14 browser journeys, lint/build, migrations and Docker upload/resume/download/maintenance.
+- Commit previous phases as 670d2a0; Phase 9 remains uncommitted. No remote CI/push.
+
 ## [Unreleased] - 2026-10-14
 
 ### Phase 8 — Chunked/Multipart Uploads

@@ -30,7 +30,11 @@ class FileService:
     async def details(self, actor: User, file_id: UUID) -> FileRead:
         role = await self.folders.authorize(actor)
         file = await self.db.scalar(
-            select(File).where(File.id == file_id, File.tenant_id == actor.tenant_id)
+            select(File).where(
+                File.id == file_id,
+                File.tenant_id == actor.tenant_id,
+                File.upload_cleanup_at.is_(None),
+            )
         )
         if file is None:
             raise HTTPException(status_code=404, detail="File not found")
@@ -44,7 +48,11 @@ class FileService:
         rows = list(
             await self.db.scalars(
                 select(File)
-                .where(File.tenant_id == actor.tenant_id, File.folder_id == folder_id)
+                .where(
+                    File.tenant_id == actor.tenant_id,
+                    File.folder_id == folder_id,
+                    File.upload_cleanup_at.is_(None),
+                )
                 .order_by(File.name, File.id)
                 .offset(offset)
                 .limit(limit + 1)
@@ -80,6 +88,7 @@ class FileService:
                     File.tenant_id == actor.tenant_id,
                     File.folder_id == payload.folder_id,
                     File.name_key == payload.name.casefold(),
+                    File.upload_cleanup_at.is_(None),
                 )
             )
             is not None

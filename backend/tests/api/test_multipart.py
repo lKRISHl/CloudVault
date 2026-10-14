@@ -9,7 +9,7 @@ import pytest_asyncio
 from app.api.storage import get_upload_storage
 from app.core.config import settings
 from app.main import app
-from app.models import File, UploadPart
+from app.models import File, UploadIntent, UploadPart
 from app.storage.base import (
     ObjectInfo,
     ObjectNotFoundError,
@@ -137,6 +137,111 @@ async def start(client, actor, **values):
     assert result.status_code == 201, result.text
     assert result.headers["cache-control"] == "no-store"
     return result.json()
+
+
+@pytest.mark.asyncio
+async def test_progress_reconciles_actual_parts_and_resume_requires_original_content(
+    client, db_factory, storage
+):
+    owner = await register_user(client)
+    ticket = await start(client, owner)
+    id = ticket["file"]["id"]
+    storage.received(ticket)
+    # Lost confirmation response: storage has part 1, database has no receipts.
+    storage.receipts.pop((UUID(id), 2))
+    progress = await client.post(f"{ROOT}/{id}/multipart/progress", headers=bearer(owner))
+    assert progress.status_code == 200 and progress.headers["cache-control"] == "no-store"
+    state = progress.json()
+    assert state["confirmed_bytes"] == PART and state["can_resume"]
+    assert [part["confirmed"] for part in state["parts"]] == [True, False]
+    assert all(part["upload_url"] is None for part in state["parts"])
+    wrong = await client.post(
+        f"{ROOT}/{id}/multipart/resume", headers=bearer(owner), json={"checksums": HASHES[::-1]}
+    )
+    assert wrong.status_code == 409
+    resumed = await client.post(
+        f"{ROOT}/{id}/multipart/resume", headers=bearer(owner), json={"checksums": HASHES}
+    )
+    assert resumed.status_code == 200
+    assert resumed.json()["parts"][0]["upload_url"] is None
+    assert resumed.json()["parts"][1]["upload_url"]
+    assert resumed.json()["expires_at"] == ticket["expires_at"]
+    # A provider part that disappeared must never remain trusted as confirmed.
+    storage.receipts.clear()
+    refresh = await client.post(f"{ROOT}/{id}/multipart/progress", headers=bearer(owner))
+    assert refresh.json()["confirmed_bytes"] == 0
+    async with db_factory() as db:
+        file = await db.get(File, UUID(id))
+        file.upload_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        await db.commit()
+    grace = await client.post(f"{ROOT}/{id}/multipart/progress", headers=bearer(owner))
+    assert grace.status_code == 200 and not grace.json()["can_resume"]
+    assert (
+        await client.post(
+            f"{ROOT}/{id}/multipart/resume", headers=bearer(owner), json={"checksums": HASHES}
+        )
+    ).status_code == 410
+
+
+@pytest.mark.asyncio
+async def test_progress_and_resume_reject_other_creators_tenants_and_missing_sessions(
+    client, storage
+):
+    owner = await register_user(client)
+    ticket = await start(client, owner)
+    id = ticket["file"]["id"]
+    other = await register_user(
+        client, email="other-progress@example.com", tenant_name="Other progress"
+    )
+    member, _ = await add_member(client, owner, "progress-member@example.com", "member")
+    for actor, status in [(other, 404), (member, 403)]:
+        assert (
+            await client.post(f"{ROOT}/{id}/multipart/progress", headers=bearer(actor))
+        ).status_code == status
+        assert (
+            await client.post(
+                f"{ROOT}/{id}/multipart/resume", headers=bearer(actor), json={"checksums": HASHES}
+            )
+        ).status_code == status
+    storage.error = ObjectNotFoundError("private-provider-id")
+    failed = await client.post(f"{ROOT}/{id}/multipart/progress", headers=bearer(owner))
+    assert failed.status_code == 409 and "private-provider-id" not in failed.text
+
+
+@pytest.mark.asyncio
+async def test_lost_create_acknowledgement_retains_exact_key_before_provider_write(
+    client, db_factory, storage, monkeypatch
+):
+    owner = await register_user(client)
+    request = payload()
+    original = storage.create_multipart
+
+    async def lost(ref):
+        await original(ref)
+        raise StorageUnavailableError("private-lost-ack")
+
+    monkeypatch.setattr(storage, "create_multipart", lost)
+    response = await client.post(ROOT + "/multipart/uploads", headers=bearer(owner), json=request)
+    assert response.status_code == 503 and "private-lost-ack" not in response.text
+    from sqlalchemy import select
+
+    async with db_factory() as db:
+        intent = await db.scalar(select(UploadIntent))
+        assert (
+            intent.file_id == storage.created[0].file_id
+            and intent.object_id == storage.created[0].object_id
+        )
+        assert await db.get(File, intent.file_id) is None
+        deadline = intent.expires_at
+    monkeypatch.setattr(storage, "create_multipart", original)
+    changed = await client.post(
+        ROOT + "/multipart/uploads", headers=bearer(owner), json={**request, "name": "Changed.bin"}
+    )
+    assert changed.status_code == 409
+    retry = await client.post(ROOT + "/multipart/uploads", headers=bearer(owner), json=request)
+    assert retry.status_code == 201 and UUID(retry.json()["file"]["id"]) == intent.file_id
+    async with db_factory() as db:
+        assert (await db.get(UploadIntent, intent.file_id)).expires_at == deadline
 
 
 @pytest.mark.asyncio

@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 8 implementation and local verification are complete. Multipart uploads, verified completion/cancellation and downloads pass database/provider/browser/Docker checks. Schema is 008_multipart. Evidence and test counts are in CONTINUE.md; remote CI and production provider checks remain pending.
+Current state: Phase 9 implementation and local verification are complete. Resume after reload, saved progress and automatic upload cleanup pass database/provider/browser/Docker checks. Schema is 009_upload_cleanup. Evidence and test counts are in CONTINUE.md; remote CI and production provider checks remain pending.
 
-Next planned implementation: Phase 9, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 10, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
@@ -146,7 +146,7 @@ Status: Implemented and locally verified on 2026-10-14. See docs/phases/phase6.m
 
 ## PHASE 7 — Basic Download
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-14. See docs/phases/phase7.md. Authorized provider-checked attachment downloads pass database/provider/browser/Docker checks. Phase 7 introduced no migration. Remote CI and production provider checks remain pending.
 
 - permission checks
 - signed URLs
@@ -166,13 +166,15 @@ Scope: bounded chunk hashing/direct transfer, signed per-part size/SHA-256, serv
 
 ## PHASE 9 — Resumable Uploads
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-15. See docs/phases/phase9.md. 206 backend tests on SQLite/PostgreSQL with real MinIO, 53 frontend tests, 14 Chromium journeys and Docker SMTP/progress/resume/download/maintenance checks pass. Schema is 009_upload_cleanup. Remote CI and production verification remain pending.
 
 - upload sessions
 - persistent progress
 - retry
 - resume after interruption
 - abandoned upload cleanup
+
+Scope: creator-authorized progress discovery, original-manifest resume after reload, only missing-part transfer, unchanged deadlines, durable pre-provider initialization intents and automatic expired/abandoned cleanup. Cleanup waits for expiry, grace and settling delay; hidden tombstones release names but retain references for retries/late writes. The worker refuses versioned buckets until explicit version-aware cleanup exists. Production provider/lifecycle/maintenance-IAM verification remains required.
 
 ## PHASE 10 — File Search
 
@@ -213,6 +215,8 @@ Status: Not started.
 - permanent delete
 - cleanup jobs
 
+Coordinate deletion/trash retention with upload initialization intents and cleanup tombstones; maintenance must not remove object versions still referenced by retained content.
+
 ## PHASE 14 — File Versioning
 
 Status: Not started.
@@ -221,6 +225,8 @@ Status: Not started.
 - current version
 - restore version
 - metadata/history
+
+Before enabling provider bucket versioning, extend and verify upload cleanup with explicit version handling. Delete markers alone do not establish byte reclamation; current Phase 9 maintenance fails closed on versioned buckets.
 
 ## PHASE 15 — File Preview
 

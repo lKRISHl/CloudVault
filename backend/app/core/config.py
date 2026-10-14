@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     UPLOAD_URL_SECONDS: int = Field(default=900, ge=60, le=1800)
     DOWNLOAD_URL_SECONDS: int = Field(default=300, ge=30, le=900)
     UPLOAD_COMPLETION_GRACE_SECONDS: int = Field(default=300, ge=0, le=600)
+    UPLOAD_CLEANUP_INTERVAL_SECONDS: int = Field(default=60, ge=5, le=3600)
+    UPLOAD_CLEANUP_SETTLE_SECONDS: int = Field(default=300, ge=60, le=86400)
     S3_ACCESS_KEY: SecretStr | None = None
     S3_SECRET_KEY: SecretStr | None = None
     S3_BUCKET_NAME: str | None = None

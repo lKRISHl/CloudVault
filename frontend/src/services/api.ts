@@ -1,4 +1,4 @@
-import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace, Folder, FolderPage, FilePage, FileMetadata, UploadTicket, DownloadTicket, MultipartTicket, MultipartStart, PartTicket } from '../types';
+import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace, Folder, FolderPage, FilePage, FileMetadata, UploadTicket, DownloadTicket, MultipartTicket, MultipartStart, MultipartProgress, PartTicket } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -134,6 +134,8 @@ export const api = {
   confirmPart: (id: string, number: number, signal?: AbortSignal) => fetchApi<PartTicket>(`${API_V1}/files/${id}/multipart/parts/${number}/confirm`, { method: 'POST', signal }),
   completeMultipart: (id: string, signal?: AbortSignal) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/multipart/complete`, { method: 'POST', signal }),
   abortMultipart: (id: string) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/multipart/abort`, { method: 'POST' }),
+  multipartProgress: (id: string, signal?: AbortSignal) => fetchApi<MultipartProgress>(`${API_V1}/files/${id}/multipart/progress`, { method: 'POST', signal }),
+  resumeMultipart: (id: string, checksums: string[], signal?: AbortSignal) => fetchApi<MultipartTicket>(`${API_V1}/files/${id}/multipart/resume`, { method: 'POST', body: JSON.stringify({ checksums }), signal }),
   completeUpload: (id: string) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/complete`, { method: 'POST' }),
   files: (folder_id: string | null = null, offset = 0) => fetchApi<FilePage>(`${API_V1}/files?offset=${offset}&limit=25${folder_id ? `&folder_id=${encodeURIComponent(folder_id)}` : ''}`),
   folders: (parent_id: string | null = null, offset = 0) => fetchApi<FolderPage>(`${API_V1}/folders?offset=${offset}&limit=25${parent_id ? `&parent_id=${encodeURIComponent(parent_id)}` : ''}`),
@@ -291,9 +293,16 @@ export async function downloadBrowserFile(id: string, signal?: AbortSignal) {
 }
 
 export async function uploadMultipartFile(file: File, folderId: string | null, requestId: string,
-  partSize: number, maxBytes: number, signal: AbortSignal, progress: (message: string) => void, started?: (id: string) => void) {
+  partSize: number, maxBytes: number, signal: AbortSignal, progress: (message: string) => void, started?: (id: string) => void, resumeId?: string) {
   const epoch = sessionEpoch;
   const current = () => { if (signal.aborted) throw new DOMException('Upload stopped', 'AbortError'); if (epoch !== sessionEpoch) throw new ApiRequestError('Session changed; try again', 409); };
+  current();
+  if (resumeId) {
+    const saved = await api.multipartProgress(resumeId, signal); current();
+    if (saved.file.declared_size_bytes !== file.size) throw new Error('Choose the original file content to resume.');
+    partSize = saved.part_size;
+    maxBytes = Math.max(maxBytes, saved.file.declared_size_bytes);
+  }
   if (!file.size || file.size > maxBytes || partSize < 5 * 1024 * 1024 || partSize > 32 * 1024 * 1024) throw new Error('File exceeds multipart limits.');
   const count = Math.ceil(file.size / partSize);
   if (count > 1024) throw new Error('Too many upload parts.');
@@ -306,7 +315,7 @@ export async function uploadMultipartFile(file: File, folderId: string | null, r
   }
   const combined = new Uint8Array(count * 32); digests.forEach((digest, index) => combined.set(digest, index * 32));
   const expected = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', combined)))); current();
-  const ticket = await api.startMultipart({ name: file.name, folder_id: folderId, declared_size_bytes: file.size,
+  const ticket = resumeId ? await api.resumeMultipart(resumeId, checksums, signal) : await api.startMultipart({ name: file.name, folder_id: folderId, declared_size_bytes: file.size,
     declared_content_type: /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+$/.test(file.type) ? file.type : null,
     request_id: requestId, part_size: partSize, checksums }, signal); current();
   started?.(ticket.file.id);

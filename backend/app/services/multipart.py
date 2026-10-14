@@ -10,9 +10,15 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import File, UploadPart, User
+from app.models import File, UploadIntent, UploadPart, User
 from app.schemas.files import FileMetadataCreate
-from app.schemas.multipart import MultipartStart, MultipartTicket, PartTicket
+from app.schemas.multipart import (
+    MultipartProgress,
+    MultipartResume,
+    MultipartStart,
+    MultipartTicket,
+    PartTicket,
+)
 from app.services.accounts import AccountService
 from app.services.files import FileService
 from app.services.uploads import utc
@@ -35,7 +41,11 @@ class MultipartService:
         role = await self.files.folders.authorize(actor, write=True)
         file = await self.db.scalar(
             select(File)
-            .where(File.id == file_id, File.tenant_id == actor.tenant_id)
+            .where(
+                File.id == file_id,
+                File.tenant_id == actor.tenant_id,
+                File.upload_cleanup_at.is_(None),
+            )
             .with_for_update()
             .execution_options(populate_existing=True)
         )
@@ -140,6 +150,7 @@ class MultipartService:
             ).digest()
         ).decode()
         await self.limit(actor, ip, "multipart-start")
+        intent = await self.prepare_intent(actor, payload)
         role = await self.files.folders.authorize(actor, write=True)
         existing = await self.db.scalar(
             select(File).where(
@@ -151,6 +162,8 @@ class MultipartService:
         created = None
         try:
             if existing:
+                if existing.upload_cleanup_at is not None:
+                    raise HTTPException(410, "Upload expired and was cleaned; start a new upload")
                 if (
                     existing.upload_method != "multipart"
                     or existing.name != payload.name
@@ -180,14 +193,12 @@ class MultipartService:
                     ),
                 )
                 file.id, file.object_id, file.storage_bucket = (
-                    uuid4(),
-                    uuid4(),
-                    settings.S3_BUCKET_NAME,
+                    intent.file_id,
+                    intent.object_id,
+                    intent.storage_bucket,
                 )
                 file.upload_request_id, file.expected_checksum_sha256 = payload.request_id, digest
-                file.upload_expires_at = datetime.now(UTC) + timedelta(
-                    seconds=settings.MULTIPART_UPLOAD_SECONDS
-                )
+                file.upload_expires_at = utc(intent.expires_at)
                 file.upload_method, file.checksum_kind, file.multipart_state = (
                     "multipart",
                     "sha256-composite",
@@ -224,6 +235,53 @@ class MultipartService:
                 with suppress(StorageError):
                     await self.storage.abort_multipart(*created)
             raise
+
+    async def prepare_intent(self, actor, payload):
+        """Commit the exact key before any provider create; no file bytes or upload URL."""
+        existing_file = await self.db.scalar(
+            select(File.id).where(
+                File.tenant_id == actor.tenant_id,
+                File.created_by == actor.id,
+                File.upload_request_id == payload.request_id,
+            )
+        )
+        if existing_file:
+            await self.db.commit()
+            return None
+        fingerprint = hashlib.sha256(payload.model_dump_json().encode()).hexdigest()
+        query = select(UploadIntent).where(
+            UploadIntent.tenant_id == actor.tenant_id,
+            UploadIntent.created_by == actor.id,
+            UploadIntent.request_id == payload.request_id,
+        )
+        intent = await self.db.scalar(query)
+        if intent is None:
+            intent = UploadIntent(
+                file_id=uuid4(),
+                tenant_id=actor.tenant_id,
+                object_id=uuid4(),
+                created_by=actor.id,
+                request_id=payload.request_id,
+                storage_bucket=settings.S3_BUCKET_NAME,
+                fingerprint=fingerprint,
+                expires_at=datetime.now(UTC) + timedelta(seconds=settings.MULTIPART_UPLOAD_SECONDS),
+            )
+            self.db.add(intent)
+            try:
+                await self.db.commit()
+            except IntegrityError:
+                await self.db.rollback()
+                intent = await self.db.scalar(query)
+        if intent is None:
+            raise HTTPException(503, "Cannot reserve upload initialization")
+        if intent.fingerprint != fingerprint:
+            raise HTTPException(409, "Upload request ID belongs to different metadata")
+        if intent.storage_bucket != settings.S3_BUCKET_NAME:
+            raise HTTPException(503, "Upload storage configuration changed")
+        if utc(intent.expires_at) <= datetime.now(UTC):
+            raise HTTPException(410, "Initialization expired; start a new upload")
+        await self.db.commit()
+        return intent
 
     async def part_url(self, actor, file_id, number, ip=""):
         await self.limit(actor, ip, "multipart-part-grant", True)
@@ -348,3 +406,88 @@ class MultipartService:
         await self.db.commit()
         await self.db.refresh(file)
         return self.files.read(actor, role, file)
+
+    async def reconcile_parts(self, file):
+        declarations = await self.parts(file)
+        actual = await self.storage.list_parts(self.ref(file), file.multipart_upload_id)
+        by_number = {part.number: part for part in actual}
+        if len(by_number) != len(actual) or any(
+            number < 1 or number > file.multipart_count for number in by_number
+        ):
+            raise HTTPException(409, "Unexpected provider parts")
+        for declaration in declarations:
+            stored = by_number.get(declaration.number)
+            if stored is None:
+                declaration.storage_etag = declaration.confirmed_at = None
+            else:
+                self.check_part(declaration, stored)
+                declaration.storage_etag, declaration.confirmed_at = stored.etag, datetime.now(UTC)
+        return declarations
+
+    async def progress(self, actor, file_id, ip=""):
+        await self.limit(actor, ip, "multipart-progress")
+        file, role = await self.own(actor, file_id)
+        try:
+            if file.status == "uploaded":
+                declarations = await self.parts(file)
+            else:
+                self.active(file, grace=True)
+                info = await self.existing_object(file)
+                if info is not None:
+                    await self.finish(actor, role, file, info)
+                    declarations = await self.parts(file)
+                else:
+                    declarations = await self.reconcile_parts(file)
+            parts = [
+                PartTicket(
+                    number=part.number,
+                    size_bytes=part.size_bytes,
+                    checksum_sha256=part.checksum_sha256,
+                    confirmed=part.confirmed_at is not None,
+                )
+                for part in declarations
+            ]
+            await self.db.commit()
+            return MultipartProgress(
+                file=self.files.read(actor, role, file),
+                part_size=file.multipart_part_size,
+                parts=parts,
+                expires_at=utc(file.upload_expires_at),
+                can_resume=file.status == "pending"
+                and file.multipart_state == "active"
+                and datetime.now(UTC) < utc(file.upload_expires_at),
+                confirmed_bytes=file.size_bytes
+                if file.status == "uploaded"
+                else sum(part.size_bytes for part in parts if part.confirmed),
+            )
+        except ObjectNotFoundError:
+            raise HTTPException(
+                409, "Multipart session is missing; cancel and start again"
+            ) from None
+        except StorageError:
+            raise HTTPException(503, "Upload progress unavailable; retry") from None
+
+    async def resume(self, actor, file_id, payload: MultipartResume, ip=""):
+        await self.limit(actor, ip, "multipart-resume")
+        file, role = await self.own(actor, file_id)
+        declared = await self.parts(file)
+        if payload.checksums != [part.checksum_sha256 for part in declared]:
+            raise HTTPException(409, "Choose the original file content to resume")
+        if file.status != "uploaded":
+            self.active(file)
+        try:
+            if file.status != "uploaded":
+                info = await self.existing_object(file)
+                if info is not None:
+                    await self.finish(actor, role, file, info)
+                else:
+                    await self.reconcile_parts(file)
+            result = await self.ticket(actor, role, file)
+            await self.db.commit()
+            return result
+        except ObjectNotFoundError:
+            raise HTTPException(
+                409, "Multipart session is missing; cancel and start again"
+            ) from None
+        except StorageError:
+            raise HTTPException(503, "Cannot resume upload; retry") from None

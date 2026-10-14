@@ -204,7 +204,7 @@ For retry within the authorization window, the creator chooses the same file fro
 its pending row. Conditional writes prevent overwrites and completion reconciles lost
 acknowledgements. Grant lifetime is 15 minutes with a 5-minute completion grace.
 Expired pending names and abandoned objects await Phase 9 cleanup. Multipart transfers
-are implemented in Phase 8; reload resume remains Phase 9. Rate limits apply to grants/completions.
+are implemented in Phase 8; Phase 9 adds reload resume and automatic cleanup. Rate limits apply to grants/completions.
 
 Configure API-reachable S3_ENDPOINT and browser-reachable S3_PUBLIC_ENDPOINT for the
 same storage bucket, with exact-origin CORS and the signed PUT headers. Compose already
@@ -240,9 +240,10 @@ checksum metadata is explicitly a composite digest, distinct from a whole-file h
 Failed parts get up to three attempts. Retry the same selected file while authorization
 is valid to skip confirmed parts. **Cancel multipart transfer** or the pending file's
 cancel control requests provider abort; cancelled names remain reserved until cleanup.
-Browser-reload resume and automatic abandoned-upload cleanup are Phase 9.
+Phase 9 now adds browser-reload resume and automatic abandoned-upload cleanup below.
 
-Back up existing data before `alembic upgrade head` (008_multipart). Docker performs
+Phase 8 introduced 008_multipart; the current head is 009_upload_cleanup. Back up
+existing data before `alembic upgrade head`. Docker performs
 the migration on backend startup. Downgrade refuses to discard multipart records;
 restore a pre-upgrade backup when rollback cannot represent them safely. Local backup
 `.local/backups/cloudvault-before-phase8.sql` is ignored. Tests use disposable data only.
@@ -252,3 +253,34 @@ uploads, exact downloaded bytes and metadata. It keeps one unique development ac
 workspace and two files. Real multipart provider tests are
 `python -m pytest tests/test_multipart_integration.py -q` from backend with TEST_S3
 settings. Browser checks are `npm run test:e2e` with those settings from frontend.
+
+## Resuming and cleaning uploads (Phase 9)
+
+After reload or interruption, click **Resume upload** on your pending multipart file.
+CloudVault shows server-confirmed progress. Reselect the original file and click
+**Upload file**; its original chunk layout is checked, and only missing parts transfer.
+The original deadline still applies. If all parts arrived during the completion grace,
+**Verify completed upload** can finish without sending bytes. An expired session requires
+a fresh upload after cleanup releases its name.
+
+Compose includes upload-cleanup. It checks expired pending transfers every 60 seconds
+by default, after completion grace plus a 300-second settling delay. It aborts unfinished
+provider uploads, deletes abandoned objects and verifies absence before releasing names.
+Hidden references remain for repeated cleanup of late writes. Cancelled names are released
+after the original transfer deadline and safety delays, rather than immediately.
+
+For direct setups run `python -m app.jobs.cleanup_uploads` in a backend terminal with
+the same database/S3 settings. `--once` runs one maintenance tick. Configure
+UPLOAD_CLEANUP_INTERVAL_SECONDS and UPLOAD_CLEANUP_SETTLE_SECONDS as needed. The worker
+checks at most 50 File records and 50 initialization intents per tick; larger queues
+need multiple ticks. Provider failures preserve references and rotate attempts.
+
+Back up before upgrading to 009_upload_cleanup. The ignored local backup is
+`.local/backups/cloudvault-before-phase9.sql`. Downgrade refuses cleanup tombstones or
+initialization intents. Database backups cannot restore reclaimed object bytes; storage
+backups need a separate provider plan. Destructive tests continue to use disposable data.
+
+Current cleanup requires an unversioned bucket and reviewed maintenance permissions.
+MinIO is local-only; exact-key durable intents address its inventory limitations. Compose
+also configures local stale-upload expiry at 24 hours/hourly scanning. Production S3/R2
+lifecycle, IAM, version-aware cleanup, monitoring and backup/restore remain deployment gates.

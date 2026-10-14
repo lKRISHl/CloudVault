@@ -60,7 +60,7 @@ reservation identity, checksum/size verification, current permission checks and
 retry/reconciliation. 174 backend tests, 39 frontend tests and 12 real Chromium/
 SMTP/storage journeys pass; Docker is at 007_uploads with actual upload smoke.
 Uploads remain unscanned. Phases 7/8 add downloads and multipart transfers below;
-Phases 4–8 remain uncommitted.
+Phases 4–8 and the frontend redesign are committed as 670d2a0.
 
 ## Commercial Vision
 - **Free Tier**: Basic storage, standard search.
@@ -75,3 +75,10 @@ conditional composite completion and cancellation. Default maximum is 1 GiB with
 8 MiB chunks and a one-hour deadline. Schema 008_multipart preserves basic uploads.
 Reload-based resume and automated orphan cleanup are Phase 9; production provider,
 CI and deployment gates remain pending. Current verification is in CONTINUE.md.
+
+Phase 9 now implements reload-based multipart resume, actual saved progress and only
+missing-part transfer. Durable initialization intents and repeated maintenance of hidden
+cleanup references reclaim expired/abandoned uploads and names. 206 backend tests,
+53 frontend tests, 14 Chromium journeys and Docker checks pass at 009_upload_cleanup.
+Current cleanup requires an unversioned bucket; provider lifecycle/production gates
+remain. Phase 9 is uncommitted; Phase 10 filename search is next.

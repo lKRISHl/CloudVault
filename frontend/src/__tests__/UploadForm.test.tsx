@@ -32,6 +32,32 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Basic upload', () => {
+  it('leaves resume selection when progress reconciles an already completed upload', async () => {
+    const finished = vi.fn();
+    vi.spyOn(api, 'multipartProgress').mockResolvedValue({ file: { ...metadata, status: 'uploaded', size_bytes: 6 },
+      part_size: 5242880, parts: [], expires_at: '2030-01-01', confirmed_bytes: 6, can_resume: false });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <UploadForm folderId={null} retryId="file-id" multipartRetry finished={finished} />
+    </QueryClientProvider>);
+    await waitFor(() => expect(finished).toHaveBeenCalledOnce());
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('shows expired saved progress and prevents issuing a resumed transfer', async () => {
+    const resume = vi.spyOn(api, 'resumeMultipart');
+    vi.spyOn(api, 'multipartProgress').mockResolvedValue({ file: metadata,
+      part_size: 5242880, parts: [{ number: 1, size_bytes: 6, checksum_sha256: '', confirmed: false, headers: {} }],
+      expires_at: '2020-01-01', confirmed_bytes: 0, can_resume: false });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <UploadForm folderId={null} retryId="file-id" multipartRetry finished={() => {}} />
+    </QueryClientProvider>);
+    expect(await screen.findByText(/Saved progress: 0%/)).toBeVisible();
+    const user = userEvent.setup();
+    await act(async () => { await user.upload(screen.getByLabelText('File to upload'), file()); });
+    expect(screen.getByRole('button', { name: 'Upload file' })).toBeDisabled();
+    expect(resume).not.toHaveBeenCalled();
+  });
+
   it('hashes, transfers directly without account credentials and verifies completion', async () => {
     show(); const user = userEvent.setup();
     const picker = await screen.findByLabelText('File to upload');

@@ -1,7 +1,7 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { api, beginSessionChange, setAccessToken, uploadMultipartFile } from '../services/api';
-import type { FileMetadata, MultipartTicket } from '../types';
+import type { FileMetadata, MultipartProgress, MultipartTicket } from '../types';
 
 const size = 5 * 1024 * 1024;
 const signal = () => new AbortController().signal;
@@ -95,4 +95,28 @@ it('rejects oversize or cancelled transfers before initiation', async () => {
   const controller = new AbortController(); controller.abort();
   await expect(uploadMultipartFile(selected, null, 'request', size, size * 2, controller.signal, vi.fn())).rejects.toThrow('Upload stopped');
   expect(api.startMultipart).not.toHaveBeenCalled();
+});
+
+it('resumes an existing session using its original chunk size and only missing parts', async () => {
+  const original = vi.mocked(api.startMultipart).getMockImplementation()!;
+  vi.spyOn(api, 'multipartProgress').mockResolvedValue({ file: { declared_size_bytes: selected.size }, part_size: size } as MultipartProgress);
+  vi.spyOn(api, 'resumeMultipart').mockImplementation(async (_id, checksums) => {
+    const result = await original({ name: selected.name, folder_id: null, declared_size_bytes: selected.size,
+      declared_content_type: null, request_id: 'existing', part_size: size, checksums });
+    result.parts[0].confirmed = true; result.parts[0].upload_url = null;
+    return result;
+  });
+  await uploadMultipartFile(selected, null, 'unused-new-request', size * 2, size * 2, signal(), vi.fn(), undefined, 'multipart-id');
+  expect(api.startMultipart).not.toHaveBeenCalled();
+  expect(api.resumeMultipart).toHaveBeenCalledWith('multipart-id', expect.arrayContaining([expect.any(String)]), expect.any(AbortSignal));
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(selected.slice).toHaveBeenCalledWith(0, size);
+});
+
+it('rejects a different-sized reselected file and stale progress without transfer', async () => {
+  vi.spyOn(api, 'multipartProgress').mockResolvedValue({ file: { declared_size_bytes: 1 }, part_size: size } as MultipartProgress);
+  await expect(uploadMultipartFile(selected, null, 'request', size, size * 2, signal(), vi.fn(), undefined, 'existing')).rejects.toThrow('original file');
+  vi.mocked(api.multipartProgress).mockImplementation(async () => { beginSessionChange(); return { file: { declared_size_bytes: selected.size }, part_size: size } as MultipartProgress; });
+  await expect(uploadMultipartFile(selected, null, 'request', size, size * 2, signal(), vi.fn(), undefined, 'existing')).rejects.toThrow('Session changed');
+  expect(fetch).not.toHaveBeenCalled();
 });

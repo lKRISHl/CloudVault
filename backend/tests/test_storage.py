@@ -282,6 +282,7 @@ async def test_multipart_grants_and_operations_preserve_scope(storage):
             (storage.presign_part, ("id", 1, 1, "checksum", 300)),
             (storage.inspect_part, ("id", 1)),
             (storage.list_parts, ("id",)),
+            (storage.pending_for_object, ()),
             (storage.complete_multipart, ("id", [StoredPart(1, 1, "etag", "checksum")])),
             (storage.abort_multipart, ("id",)),
         ]:
@@ -327,3 +328,22 @@ async def test_multipart_pagination_and_missing_upload_are_safe(storage):
         assert "secret-provider-id" not in str(failure.value)
         stub.add_client_error("abort_multipart_upload", "NoSuchUpload", http_status_code=404)
         await storage.abort_multipart(ref, "id")
+
+
+@pytest.mark.asyncio
+async def test_initialization_inventory_is_exact_key_scoped(storage):
+    ref = reference(storage)
+    params = {"Bucket": storage.bucket, "Prefix": ref.key, "MaxUploads": 1000}
+    with Stubber(storage.client) as stub:
+        stub.add_response(
+            "list_multipart_uploads",
+            {
+                "Uploads": [
+                    {"Key": ref.key, "UploadId": "owned"},
+                    {"Key": ref.key + "-different", "UploadId": "foreign-prefix"},
+                ],
+                "IsTruncated": False,
+            },
+            params,
+        )
+        assert await storage.pending_for_object(ref) == ["owned"]

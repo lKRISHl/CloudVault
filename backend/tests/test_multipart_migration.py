@@ -11,7 +11,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.security import hash_password
-from app.models import File, Folder, Membership, Tenant, UploadPart, User, UserRole
+from app.models import File, Folder, Membership, Tenant, UploadIntent, UploadPart, User, UserRole
 from app.schemas.files import FileMetadataCreate
 from app.services.auth import AuthService
 from app.services.files import FileService
@@ -138,6 +138,44 @@ async def test_multipart_migration_preserves_basic_data_and_guards_part_records(
             assert (await db.get(UploadPart, (file.id, 1))).size_bytes == 123
             assert (await db.get(Folder, child.id)).parent_id == parent.id
             assert (await db.get(User, uid)).password_hash == original_hash
+            multipart = await db.get(File, file.id)
+            multipart.multipart_state = "aborted"
+            multipart.upload_cleanup_at = datetime.now(UTC)
+            await db.commit()
+            actor = await AuthService(db).get_user_in_tenant(uid, tid)
+            replacement = await FileService(db).reserve(
+                actor,
+                FileMetadataCreate(
+                    name="Preserved.pdf", folder_id=child.id, declared_size_bytes=123
+                ),
+            )
+            assert replacement.id != file.id
+        guarded = migrate("downgrade", "008_multipart")
+        assert (
+            guarded.returncode != 0 and "Cannot discard upload cleanup tombstones" in guarded.stderr
+        )
+        async with factory() as db:
+            assert (await db.get(File, file.id)).upload_cleanup_at is not None
+            assert (await db.get(File, replacement.id)).upload_cleanup_at is None
+            db.add(
+                UploadIntent(
+                    file_id=uuid4(),
+                    tenant_id=tid,
+                    object_id=uuid4(),
+                    created_by=uid,
+                    request_id=uuid4(),
+                    storage_bucket="cv-preserved",
+                    fingerprint="a" * 64,
+                    expires_at=datetime.now(UTC) + timedelta(hours=1),
+                )
+            )
+            await db.commit()
+        intent_guard = migrate("downgrade", "008_multipart")
+        assert (
+            intent_guard.returncode != 0
+            and "Cannot discard upload initialization intents" in intent_guard.stderr
+        )
+        assert migrate("check").returncode == 0
     finally:
         await engine.dispose()
         if admin:

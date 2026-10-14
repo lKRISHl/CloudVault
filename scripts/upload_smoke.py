@@ -18,7 +18,7 @@ def require(response, status):
 
 
 def main():
-    email = f"phase8-smoke-{uuid4().hex}@example.com"
+    email = f"phase9-smoke-{uuid4().hex}@example.com"
     body = b"CloudVault verified Docker upload"
     checksum = base64.b64encode(hashlib.sha256(body).digest()).decode()
     with httpx.Client(base_url="http://localhost:3000/api/v1", timeout=20) as api:
@@ -29,7 +29,7 @@ def main():
                     "email": email,
                     "password": uuid4().hex,
                     "full_name": "Upload Smoke",
-                    "tenant_name": "Phase 8 Upload Smoke " + uuid4().hex[:8],
+                    "tenant_name": "Phase 9 Upload Smoke " + uuid4().hex[:8],
                 },
             ),
             201,
@@ -122,6 +122,23 @@ def main():
                     ),
                     200,
                 )
+                if part["number"] == 1:
+                    saved = require(
+                        api.post(f"/files/{file_id}/multipart/progress"), 200
+                    )
+                    assert saved["confirmed_bytes"] == part_size and saved["can_resume"]
+                    resumed = require(
+                        api.post(
+                            f"/files/{file_id}/multipart/resume",
+                            json={"checksums": hashes},
+                        ),
+                        200,
+                    )
+                    assert (
+                        resumed["file"]["id"] == file_id
+                        and resumed["parts"][0]["upload_url"] is None
+                    )
+                    multipart["parts"][1] = resumed["parts"][1]
             completed = require(api.post(f"/files/{file_id}/multipart/complete"), 200)
             expected = base64.b64encode(
                 hashlib.sha256(
@@ -136,7 +153,7 @@ def main():
             received = transfer.get(download["download_url"])
             assert received.status_code == 200 and received.content == b"".join(chunks)
         print(
-            "Docker SMTP verification, basic/multipart upload/download and verified persistence passed"
+            "Docker SMTP, basic/multipart upload, saved progress/resume and download passed"
         )
         print("Unique smoke account/workspace/two files retained as development data")
 

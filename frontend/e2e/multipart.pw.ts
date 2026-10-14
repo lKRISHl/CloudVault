@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 
 test.skip(!process.env.TEST_S3_ENDPOINT, 'Multipart browser tests require a disposable S3 provider');
 
-test('multipart chunks are verified, downloaded intact, and failed transfers can be cancelled', async ({ page, request }) => {
+test('multipart uploads resume after reload with only missing chunks and can be cancelled', async ({ page, request }) => {
   test.setTimeout(90000);
   const email = `multipart-${Date.now()}@example.com`;
   await page.goto('/register');
@@ -60,9 +60,38 @@ test('multipart chunks are verified, downloaded intact, and failed transfers can
   await page.getByLabel('File to upload').setInputFiles({ name: 'Partial.bin', mimeType: 'application/octet-stream', buffer: body });
   await page.getByRole('button', { name: 'Upload file', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Part transfer failed');
+  await page.unroute('http://localhost:9000/**');
+  await page.reload();
+  await page.getByRole('button', { name: 'Resume upload Partial.bin', exact: true }).click();
+  await expect(page.getByText(/Saved progress: 99%/)).toBeVisible();
+  const sentBeforeResume = puts.length;
+  const wrong = Buffer.from(body); wrong[0] = 84;
+  await page.getByLabel('File to upload').setInputFiles({ name: 'Partial.bin', mimeType: 'application/octet-stream', buffer: wrong });
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('original file content');
+  expect(puts.length).toBe(sentBeforeResume);
+  await page.getByLabel('File to upload').setInputFiles({ name: 'Partial.bin', mimeType: 'application/octet-stream', buffer: body });
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click();
+  const resumed = page.getByRole('region', { name: 'Files' }).getByRole('listitem').filter({ hasText: 'Partial.bin' });
+  await expect(resumed.getByRole('button', { name: 'Download Partial.bin', exact: true })).toBeVisible();
+  expect(puts.length - sentBeforeResume).toBe(1);
+  expect(puts.at(-1)).toContain('partNumber=2');
+  const resumedDownload = page.waitForEvent('download');
+  await resumed.getByRole('button', { name: 'Download Partial.bin', exact: true }).click();
+  const resumedBytes = await readFile((await (await resumedDownload).path())!);
+  expect(createHash('sha256').update(resumedBytes).digest('hex')).toBe(createHash('sha256').update(body).digest('hex'));
+  await page.getByLabel('Use multipart upload').check();
+  await page.route('http://localhost:9000/**', async route => {
+    if (route.request().method() === 'PUT' && route.request().url().includes('partNumber=2')) {
+      await route.fulfill({ status: 503, headers: { 'Access-Control-Allow-Origin': 'http://127.0.0.1:43000' }, body: 'Provider outage' });
+    } else await route.continue();
+  });
+  await page.getByLabel('File to upload').setInputFiles({ name: 'Cancelled.bin', mimeType: 'application/octet-stream', buffer: body });
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Part transfer failed');
   await page.getByRole('button', { name: 'Cancel multipart transfer', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Multipart upload cancelled');
-  const cancelled = page.getByRole('region', { name: 'Files' }).getByRole('listitem').filter({ hasText: 'Partial.bin' });
+  const cancelled = page.getByRole('region', { name: 'Files' }).getByRole('listitem').filter({ hasText: 'Cancelled.bin' });
   await expect(cancelled).toContainText('Cancelled');
-  await expect(cancelled.getByRole('button', { name: 'Download Partial.bin' })).toHaveCount(0);
+  await expect(cancelled.getByRole('button', { name: 'Download Cancelled.bin' })).toHaveCount(0);
 });

@@ -6,10 +6,47 @@ from app.api.folders import WorkspaceUser
 from app.api.storage import UploadStorage
 from app.api.users import Database
 from app.schemas.files import FileRead
-from app.schemas.multipart import MultipartStart, MultipartTicket, PartTicket
+from app.schemas.multipart import (
+    MultipartProgress,
+    MultipartResume,
+    MultipartStart,
+    MultipartTicket,
+    PartTicket,
+)
 from app.services.multipart import MultipartService
 
 router = APIRouter()
+
+
+@router.post("/{file_id}/multipart/progress", response_model=MultipartProgress)
+async def progress(
+    file_id: UUID,
+    actor: WorkspaceUser,
+    db: Database,
+    storage: UploadStorage,
+    response: Response,
+    request: Request,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await MultipartService(db, storage).progress(
+        actor, file_id, request.client.host if request.client else ""
+    )
+
+
+@router.post("/{file_id}/multipart/resume", response_model=MultipartTicket)
+async def resume(
+    file_id: UUID,
+    payload: MultipartResume,
+    actor: WorkspaceUser,
+    db: Database,
+    storage: UploadStorage,
+    response: Response,
+    request: Request,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await MultipartService(db, storage).resume(
+        actor, file_id, payload, request.client.host if request.client else ""
+    )
 
 
 @router.post("/multipart/uploads", response_model=MultipartTicket, status_code=201)

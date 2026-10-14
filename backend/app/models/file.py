@@ -32,6 +32,10 @@ class File(Base):
         CheckConstraint("declared_size_bytes >= 0", name="ck_files_declared_size"),
         CheckConstraint("status IN ('pending', 'uploaded')", name="ck_files_status"),
         CheckConstraint(
+            "upload_cleanup_at IS NULL OR (status = 'pending' AND object_id IS NOT NULL)",
+            name="ck_files_cleanup",
+        ),
+        CheckConstraint(
             "(object_id IS NULL AND storage_bucket IS NULL AND upload_expires_at IS NULL "
             "AND expected_checksum_sha256 IS NULL AND upload_request_id IS NULL) OR "
             "(object_id IS NOT NULL AND storage_bucket IS NOT NULL "
@@ -68,17 +72,32 @@ class File(Base):
         UniqueConstraint(
             "tenant_id", "created_by", "upload_request_id", name="uq_files_upload_request"
         ),
-        UniqueConstraint("tenant_id", "folder_id", "name_key", name="uq_files_sibling_name"),
+        Index(
+            "uq_files_sibling_name",
+            "tenant_id",
+            "folder_id",
+            "name_key",
+            unique=True,
+            postgresql_where=text("folder_id IS NOT NULL AND upload_cleanup_at IS NULL"),
+            sqlite_where=text("folder_id IS NOT NULL AND upload_cleanup_at IS NULL"),
+        ),
         Index(
             "uq_files_root_name",
             "tenant_id",
             "name_key",
             unique=True,
-            postgresql_where=text("folder_id IS NULL"),
-            sqlite_where=text("folder_id IS NULL"),
+            postgresql_where=text("folder_id IS NULL AND upload_cleanup_at IS NULL"),
+            sqlite_where=text("folder_id IS NULL AND upload_cleanup_at IS NULL"),
         ),
         Index("ix_files_children", "tenant_id", "folder_id", "name", "id"),
         Index("ix_files_creator", "tenant_id", "created_by"),
+        Index(
+            "ix_files_upload_cleanup",
+            "status",
+            "storage_bucket",
+            "upload_expires_at",
+            "upload_cleanup_checked_at",
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
@@ -109,6 +128,12 @@ class File(Base):
     multipart_part_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     multipart_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     multipart_state: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    upload_cleanup_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    upload_cleanup_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

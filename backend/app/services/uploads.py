@@ -39,6 +39,7 @@ class UploadService:
             .where(
                 File.id == file_id,
                 File.tenant_id == actor.tenant_id,
+                File.upload_cleanup_at.is_(None),
             )
             .with_for_update()
             .execution_options(populate_existing=True)
@@ -95,6 +96,8 @@ class UploadService:
         )
         try:
             if existing:
+                if existing.upload_cleanup_at is not None:
+                    raise HTTPException(410, "Upload expired and was cleaned; start a new upload")
                 if any(
                     (
                         existing.name != payload.name,

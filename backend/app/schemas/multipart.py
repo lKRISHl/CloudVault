@@ -34,3 +34,18 @@ class MultipartTicket(BaseModel):
     part_size: int
     parts: list[PartTicket]
     expires_at: datetime
+
+
+class MultipartResume(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    checksums: list[str] = Field(min_length=1, max_length=1024)
+
+    @field_validator("checksums")
+    @classmethod
+    def digests(cls, values):
+        return MultipartStart.digests(values)
+
+
+class MultipartProgress(MultipartTicket):
+    confirmed_bytes: int
+    can_resume: bool

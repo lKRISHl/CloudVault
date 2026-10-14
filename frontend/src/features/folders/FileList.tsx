@@ -24,7 +24,9 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
   return <section aria-label="Files" className="file-section space-y-3">
     <h2 className="section-title">Files <span>Workspace library</span></h2>
     <p>Uploaded files can be downloaded by workspace members. Files remain unscanned; open only content you trust.</p>
-    {writable && <UploadForm key={retryId ?? 'new-upload'} folderId={folderId} retryId={retryId} finished={() => setRetryId(null)} />}
+    {writable && <UploadForm key={retryId ?? 'new-upload'} folderId={folderId} retryId={retryId}
+      multipartRetry={query.data?.items.some(file => file.id === retryId && file.upload_method === 'multipart') ?? false}
+      finished={() => setRetryId(null)} />}
     {cancelError && <p role="alert">{cancelError}</p>}
     {query.isPending && <p>Loading file metadata…</p>}
     {query.error && <>
@@ -40,6 +42,7 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
       {file.status === 'uploaded' && <DownloadButton id={file.id} name={file.name} />}
       {writable && file.status === 'pending' && file.upload_method !== 'multipart' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Retry upload {file.name}</button>}
       {writable && file.status === 'pending' && file.upload_method === 'multipart' && file.multipart_state === 'active' && file.created_by === user?.id && <button className="border rounded px-3 py-2" disabled={cancelId !== null} onClick={() => void cancel(file.id)}>Cancel multipart upload {file.name}</button>}
+      {writable && file.status === 'pending' && file.upload_method === 'multipart' && file.multipart_state === 'active' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Resume upload {file.name}</button>}
     </li>)}</ul>
     {query.data?.items.length === 0 && <div className="empty-state"><Icon name="file" /><strong>No file metadata here.</strong><p>Your uploaded files will appear here. Choose a file above to get started.</p></div>}
     <button className="border rounded px-3 py-2 disabled:opacity-50" disabled={!offset || query.isFetching} onClick={() => setOffset(Math.max(0, offset - 25))}>Previous files</button>
