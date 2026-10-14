@@ -46,9 +46,32 @@ Phase 3 adds a real folder browser with creation, rename, destination-based move
 breadcrumbs/pagination and a shared-workspace permission foundation. Parent edges
 and resource access stay tenant-scoped; concurrent writes preserve an acyclic tree.
 113 backend tests, 28 frontend tests and 11 Chromium journeys pass, plus migrations
-and actual Docker folder operations. File metadata (Phase 4) is next and unstarted.
+and actual Docker folder operations. Phase 3 is committed as 5c5bccd.
+
+Phase 4 adds tenant-scoped pending file metadata with folder/creator integrity,
+declared size/type, normalized names and indexes. Internal reservations check current
+membership and parent authority; public listing/details and the folder browser show
+metadata without claiming actual uploads. 131 backend tests on SQLite/PostgreSQL,
+31 frontend tests, 11 Chromium journeys and Docker at 006_files pass. Phase 5 adds an internal tenant-scoped S3 adapter with UUID-only object keys, private
+local bucket provisioning, bounded conditional writes/reads and safe failure handling.
+158 backend tests pass on SQLite/PostgreSQL with real MinIO contract checks; the
+rebuilt Docker stack passes application-adapter object smoke. Phase 6 adds actual browser-to-private-storage presigned uploads with persistent
+reservation identity, checksum/size verification, current permission checks and
+retry/reconciliation. 174 backend tests, 39 frontend tests and 12 real Chromium/
+SMTP/storage journeys pass; Docker is at 007_uploads with actual upload smoke.
+Uploads remain unscanned. Phases 7/8 add downloads and multipart transfers below;
+Phases 4–8 remain uncommitted.
 
 ## Commercial Vision
 - **Free Tier**: Basic storage, standard search.
 - **Pro Tier**: Increased limits, basic AI summaries.
 - **Team/Enterprise**: Advanced RBAC, semantic search, unlimited collaboration, custom domains.
+
+
+Phase 7 now supports actual member-authorized downloads of completed uploads through private, short-lived attachment URLs. Files remain unscanned; private ACLs, sharing, versioning, scanning and AI remain later phases. Development storage is on D:\CloudVault-Dev.
+
+Phase 8 adds bounded multipart hashing/direct transfer, provider-verified parts,
+conditional composite completion and cancellation. Default maximum is 1 GiB with
+8 MiB chunks and a one-hour deadline. Schema 008_multipart preserves basic uploads.
+Reload-based resume and automated orphan cleanup are Phase 9; production provider,
+CI and deployment gates remain pending. Current verification is in CONTINUE.md.

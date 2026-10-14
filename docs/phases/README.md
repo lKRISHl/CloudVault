@@ -15,3 +15,9 @@ and interview questions. Record verification gaps explicitly.
 - [Phase 2A — Account Lifecycle and Email Delivery](phase2a.md)
 - [Phase 2B — Multiple Organizations and Membership Lifecycle](phase2b.md)
 - [Phase 3 — Folder System](phase3.md)
+
+- [Phase 4 — File Metadata](phase4.md)
+- [Phase 5 — Object Storage](phase5.md)
+- [Phase 6 — Basic Upload](phase6.md)
+- [Phase 7 — Basic Download](phase7.md)
+- [Phase 8 — Chunked/Multipart Uploads](phase8.md)

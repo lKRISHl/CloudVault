@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 3 implementation and local verification are complete: 113 backend tests, 28 frontend component tests, 11 Chromium journeys, PostgreSQL migrations/concurrency and the updated Docker folder app. Evidence is recorded in CONTINUE.md; remote CI and production email-provider verification remain pending. Phase 4 has not started.
+Current state: Phase 8 implementation and local verification are complete. Multipart uploads, verified completion/cancellation and downloads pass database/provider/browser/Docker checks. Schema is 008_multipart. Evidence and test counts are in CONTINUE.md; remote CI and production provider checks remain pending.
 
-Next planned implementation: Phase 4, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 9, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
@@ -116,7 +116,7 @@ Implemented policy: verified active members read workspace folders and create at
 
 ## PHASE 4 — File Metadata
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-14. See docs/phases/phase4.md. Tenant-scoped pending records, folder relationships, provenance, indexes, listing/detail APIs and UI pass SQLite/PostgreSQL, migration and browser checks. Phase 4 established pending declarations only; Phase 6 now adds public upload reservations and verified uploaded state. Downloads remain Phase 7. Remote CI pending.
 
 - file model
 - metadata
@@ -126,7 +126,7 @@ Status: Not started.
 
 ## PHASE 5 — Object Storage
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-14. See docs/phases/phase5.md. Private local bucket, tenant-scoped S3 adapter/UUID keys, bounded internal object operations, safe errors and real disposable-bucket tests pass. Phase 5 established the internal adapter; Phase 6 now connects public uploads and persisted object references, while downloads remain Phase 7. Phase 5 required no migration. Remote CI and production-provider verification pending.
 
 - MinIO
 - S3 abstraction
@@ -136,7 +136,7 @@ Status: Not started.
 
 ## PHASE 6 — Basic Upload
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-14. See docs/phases/phase6.md. Creator/workspace/parent-authorized reservations, signed size/checksum/conditional direct PUT, completion verification, retry/reconciliation and browser upload UI pass database/provider/browser/Docker checks. Default cap 100 MiB, grant 15 minutes, completion grace 5 minutes. Uploaded does not mean scanned; downloads remain Phase 7, multipart/resume/abandoned cleanup Phases 8/9. Remote CI/production provider checks pending.
 
 - upload flow
 - presigned uploads
@@ -155,12 +155,14 @@ Status: Not started.
 
 ## PHASE 8 — Chunked/Multipart Uploads
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-14. See docs/phases/phase8.md. 197 backend tests on SQLite/PostgreSQL with real MinIO, 49 frontend tests, 14 Chromium journeys and rebuilt Docker SMTP/basic/multipart upload/download smoke pass. Schema is 008_multipart. Remote CI and production provider checks remain pending.
 
 - multipart upload
 - chunk management
 - part tracking
 - failure handling
+
+Scope: bounded chunk hashing/direct transfer, signed per-part size/SHA-256, server-verified provider receipts, composite checksum completion, same-form retries and explicit cancellation. Default maximum 1 GiB with 8 MiB parts and a one-hour session. Reload-based resume and automated abandoned-upload cleanup remain Phase 9.
 
 ## PHASE 9 — Resumable Uploads
 

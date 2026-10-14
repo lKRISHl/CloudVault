@@ -58,6 +58,27 @@
 - UUID/tenant/user-scoped query state and Phase 2B stale-response protections isolate workspace changes. Queries do not retry client errors; transient/network failures receive bounded retries and folder views expose manual retry.
 - Account deletion retains organization-owned folder metadata with a pseudonymous creator reference; deletion does not erase shared organizational content. Nonempty folder migration downgrade is refused; restore a pre-upgrade backup for rollback.
 
+## Phase 4 File Metadata Controls
+- File UUIDs and folder paths are tenant-scoped; foreign or missing resources return 404. Verified active membership is required even for read access. Internal creation rejects identity/status injection and requires parent write authority.
+- Database composite foreign keys, sibling/root uniqueness, pending-state and nonnegative-size checks back service validation. Reservations use the tenant write lock, preventing name and parent-authority races with folder/organization changes.
+- Size and MIME fields are explicitly declared/unverified. Pending metadata never grants download, preview, AI or scan clearance. Public creation and download URLs are absent until actual object validation exists.
+- Creator deletion preserves organization-owned metadata and pseudonymous identity references. Populated downgrade is refused; use a pre-upgrade backup. Scoped query keys and existing session-generation checks guard stale workspace responses.
+
+## Phase 5 Storage Controls
+- Object keys contain validated tenant/file/object UUIDs, never filenames or client-provided paths. Every adapter operation rejects foreign tenant references before contacting the provider. Internal callers must still authorize membership/resource access through services.
+- Local bucket provisioning disables anonymous access. Real tests deny anonymous GET/listing; Docker smoke checks application bucket listing denial. Production IAM/public-access controls need provider-specific review; local root credentials are development-only.
+- Storage credentials are redacted, custom endpoints require complete credentials and a clean HTTP(S) origin, and production requires HTTPS/non-default local password. Native AWS credentials may use the SDK chain.
+- Internal transfers are capped at 1 MiB. Writes conditionally reject replacement; reads check actual size/generation and reject oversized/truncated bodies. Streams close on failure/cancellation; SDK calls run outside the event loop. Errors do not expose raw provider messages.
+- No public storage access is added. Presigned authorization, completion validation, CORS, scanning, lifecycle/cleanup and versioned deletion remain later work. Ambiguous acknowledgements and cancellation can leave completed writes that require reconciliation.
+
+## Phase 6 Upload Controls
+- Upload initiation derives creator/tenant/object identity server-side and requires verified membership plus parent write authority. Completion/reticketing is creator-only, tenant-scoped and rechecks current parent authority. Role demotion/removal cannot restore access through old JWT claims.
+- Signed PUT binds object key, byte count, canonical SHA-256, generic content type and conditional creation. Actual provider HEAD size/checksum/type must match before uploaded state is committed; clients cannot submit verified completion facts. Database checks also reject incomplete/forged uploaded state.
+- Separate public endpoint signing preserves Signature V4 host validity. Local CORS allows configured origins only; private bucket policy remains. Storage requests omit app cookies/Authorization and referrer. Grant responses use no-store; URLs remain temporary in-memory capabilities.
+- Default cap 100 MiB, URL 15 minutes plus 5-minute completion grace and persistent grant/completion rate limits bound basic attempts. Uploaded files remain unscanned; no downloads/previews are added here. Declared MIME is never trusted as detected content type.
+- Already issued capabilities cannot be immediately revoked by app logout/removal; provider writes may finish until expiry, while completion fails without current authority. Ambiguous acknowledgement/abort/expired pending data needs reconciliation and later abandoned cleanup. Production requires maintained provider checks, reviewed IAM/CORS/encryption and quotas/security controls.
+- Migration 007 preserves metadata and refuses loss of upload references on downgrade; restore backups. Real tests use disposable databases/owned buckets, and the Windows browser harness has explicit validated bucket teardown. No destructive test points at application data.
+
 ## Responsible Disclosure Policy
 Development MinIO binaries are built from pinned official source revisions with
 upstream licenses preserved. The community repositories are archived and unmaintained;
@@ -65,3 +86,15 @@ production storage requires a maintained S3 provider/deployment review. A succes
 development storage smoke check does not certify production security.
 
 *(Placeholder: Details on how to report vulnerabilities will be added prior to production release.)*
+
+## Phase 7 download boundary
+
+Uploaded objects are offered through short-lived, no-store attachment GET capabilities after current membership, tenant metadata and provider HEAD integrity checks. Pending/missing/changed objects fail closed. Current shared-workspace read access includes members without write rights; private ACLs remain Phase 12. Generic octet-stream and attachment headers are presentation controls, not malware safety. URLs remain reusable until expiry and are not version-pinned; out-of-band replacement after HEAD remains a provider/versioning limitation. Native browser delivery does not establish completion telemetry. Do not persist/log signed URL values.
+
+## Phase 8 multipart boundary
+
+Multipart control remains creator-only with current verified membership and parent write authority; manager access cannot take over someone else's upload. Provider upload IDs/object references remain private. Signed part URLs bind number, size and SHA-256; confirmations inspect actual provider parts rather than trusting client receipts. Conditional completion and final HEAD verify declared integrity. Part grants/confirmations use separate persistent budgets (4096 per identity, 16384 per IP per configured rate window); initiation/completion/cancellation retain normal account limits.
+
+Default limits are 1 GiB, 8 MiB parts, at most 1024 parts, and a one-hour upload deadline. Configuration allows up to 5 GiB and 5–32 MiB parts; the part-count bound still applies. Part grants last at most the configured basic URL duration or remaining session time, and never extend the session. Confirmation/completion allow the existing five-minute grace. Basic uploads retain their 100 MiB cap and full-buffer hashing; multipart hashing uses bounded chunks. These bounds are not aggregate quotas or malware scanning.
+
+Part capabilities are reusable until expiry and may survive app permission revocation; completion checks current authority. Abort requests provider cancellation but cannot prove immediate cleanup of concurrent in-flight parts. Aborted/pending names remain reserved; automatic orphan cleanup and reload resume belong to Phase 9. Unknown provider-create acknowledgement can leave an untracked multipart upload; production must configure and verify provider abort-incomplete lifecycle rules. Composite checksums are explicitly identified, never represented as whole-file hashes. Production S3/R2 and browser compatibility remain deployment gates.

@@ -1,4 +1,4 @@
-import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace, Folder, FolderPage } from '../types';
+import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace, Folder, FolderPage, FilePage, FileMetadata, UploadTicket, DownloadTicket, MultipartTicket, MultipartStart, PartTicket } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -125,6 +125,17 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
 }
 
 export const api = {
+  uploadConfiguration: () => fetchApi<{ max_bytes: number; enabled: boolean; multipart_max_bytes?: number; multipart_part_size?: number }>(`${API_V1}/files/upload-configuration`),
+  startUpload: (payload: { name: string; folder_id: string | null; declared_size_bytes: number; declared_content_type: string | null; checksum_sha256: string; request_id: string }) => fetchApi<UploadTicket>(`${API_V1}/files/uploads`, { method: 'POST', body: JSON.stringify(payload) }),
+  retryUpload: (id: string, checksum_sha256: string) => fetchApi<UploadTicket>(`${API_V1}/files/${id}/upload-url`, { method: 'POST', body: JSON.stringify({ checksum_sha256 }) }),
+  downloadTicket: (id: string, signal?: AbortSignal) => fetchApi<DownloadTicket>(`${API_V1}/files/${id}/download-url`, { method: 'POST', signal }),
+  startMultipart: (payload: MultipartStart, signal?: AbortSignal) => fetchApi<MultipartTicket>(`${API_V1}/files/multipart/uploads`, { method: 'POST', body: JSON.stringify(payload), signal }),
+  multipartPartUrl: (id: string, number: number, signal?: AbortSignal) => fetchApi<PartTicket>(`${API_V1}/files/${id}/multipart/parts/${number}/url`, { method: 'POST', signal }),
+  confirmPart: (id: string, number: number, signal?: AbortSignal) => fetchApi<PartTicket>(`${API_V1}/files/${id}/multipart/parts/${number}/confirm`, { method: 'POST', signal }),
+  completeMultipart: (id: string, signal?: AbortSignal) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/multipart/complete`, { method: 'POST', signal }),
+  abortMultipart: (id: string) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/multipart/abort`, { method: 'POST' }),
+  completeUpload: (id: string) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/complete`, { method: 'POST' }),
+  files: (folder_id: string | null = null, offset = 0) => fetchApi<FilePage>(`${API_V1}/files?offset=${offset}&limit=25${folder_id ? `&folder_id=${encodeURIComponent(folder_id)}` : ''}`),
   folders: (parent_id: string | null = null, offset = 0) => fetchApi<FolderPage>(`${API_V1}/folders?offset=${offset}&limit=25${parent_id ? `&parent_id=${encodeURIComponent(parent_id)}` : ''}`),
   createFolder: (name: string, parent_id: string | null) => fetchApi<Folder>(`${API_V1}/folders`, {
     method: 'POST', body: JSON.stringify({ name, parent_id }),
@@ -225,3 +236,108 @@ export const api = {
     method: 'DELETE', body: JSON.stringify({ password, confirmation }),
   }),
 };
+
+export async function uploadBrowserFile(file: File, folderId: string | null, requestId: string,
+  retryId: string | null, signal: AbortSignal, progress: (message: string) => void) {
+  const epoch = sessionEpoch;
+  const current = () => { if (signal.aborted || sessionEpoch !== epoch) throw new Error('Upload interrupted by navigation or workspace change.'); };
+  current(); progress('Checking file…');
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
+  const checksum = btoa(String.fromCharCode(...digest)); current();
+  if (retryId) {
+    try {
+      const completed = await api.completeUpload(retryId); current();
+      if (completed.checksum_sha256 !== checksum || completed.size_bytes !== file.size) throw new Error('Choose the same file content to retry this upload.');
+      return completed;
+    }
+    catch (error) { current(); if (!(error instanceof ApiRequestError) || error.status !== 409) throw error; }
+  }
+  const ticket = retryId ? await api.retryUpload(retryId, checksum) : await api.startUpload({
+    name: file.name, folder_id: folderId, declared_size_bytes: file.size,
+    declared_content_type: /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+$/.test(file.type) ? file.type : null,
+    checksum_sha256: checksum, request_id: requestId,
+  });
+  current();
+  if (ticket.file.declared_size_bytes !== file.size) throw new Error('Choose the same file content to retry this upload.');
+  progress('Transferring file…');
+  try {
+    // Object storage never receives CloudVault cookies or bearer credentials.
+    const result = await fetch(ticket.upload_url, { method: 'PUT', body: file, headers: ticket.headers,
+      credentials: 'omit', referrerPolicy: 'no-referrer', signal });
+    current();
+    if (!result.ok && result.status !== 412) throw new Error('Object transfer failed.');
+  } catch (error) {
+    current();
+    // A lost response can follow a successful write. Reconcile through the API.
+    try { const completed = await api.completeUpload(ticket.file.id); current(); return completed; }
+    catch { throw error; }
+  }
+  progress('Verifying upload…'); current();
+  const completed = await api.completeUpload(ticket.file.id); current(); return completed;
+}
+
+export async function downloadBrowserFile(id: string, signal?: AbortSignal) {
+  const epoch = sessionEpoch;
+  const ticket = await api.downloadTicket(id, signal);
+  if (signal?.aborted || epoch !== sessionEpoch) throw new ApiRequestError('Session changed; try again', 409);
+  // Native navigation streams to the browser download manager, without buffering file bytes in the SPA.
+  const link = document.createElement('a');
+  link.href = ticket.download_url;
+  link.referrerPolicy = 'no-referrer';
+  link.rel = 'noopener noreferrer';
+  link.download = ticket.file.name;
+  document.body.append(link);
+  try { link.click(); } finally { link.remove(); }
+}
+
+export async function uploadMultipartFile(file: File, folderId: string | null, requestId: string,
+  partSize: number, maxBytes: number, signal: AbortSignal, progress: (message: string) => void, started?: (id: string) => void) {
+  const epoch = sessionEpoch;
+  const current = () => { if (signal.aborted) throw new DOMException('Upload stopped', 'AbortError'); if (epoch !== sessionEpoch) throw new ApiRequestError('Session changed; try again', 409); };
+  if (!file.size || file.size > maxBytes || partSize < 5 * 1024 * 1024 || partSize > 32 * 1024 * 1024) throw new Error('File exceeds multipart limits.');
+  const count = Math.ceil(file.size / partSize);
+  if (count > 1024) throw new Error('Too many upload parts.');
+  const checksums: string[] = []; const digests: Uint8Array[] = [];
+  for (let index = 0; index < count; index++) {
+    current(); progress(`Checking part ${index + 1} of ${count}…`);
+    const bytes = await file.slice(index * partSize, (index + 1) * partSize).arrayBuffer(); current();
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)); current();
+    checksums.push(btoa(String.fromCharCode(...digest))); digests.push(digest);
+  }
+  const combined = new Uint8Array(count * 32); digests.forEach((digest, index) => combined.set(digest, index * 32));
+  const expected = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', combined)))); current();
+  const ticket = await api.startMultipart({ name: file.name, folder_id: folderId, declared_size_bytes: file.size,
+    declared_content_type: /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+$/.test(file.type) ? file.type : null,
+    request_id: requestId, part_size: partSize, checksums }, signal); current();
+  started?.(ticket.file.id);
+  if (ticket.file.status === 'uploaded') {
+    if (ticket.file.checksum_sha256 !== expected || ticket.file.size_bytes !== file.size || ticket.file.checksum_kind !== 'sha256-composite') throw new Error('Completed file does not match selected content.');
+    return ticket.file;
+  }
+  if (ticket.part_size !== partSize || ticket.parts.length !== count || ticket.file.declared_size_bytes !== file.size) throw new Error('Invalid multipart plan.');
+  for (let index = 0; index < count; index++) {
+    let part = ticket.parts[index]; const body = file.slice(index * partSize, (index + 1) * partSize);
+    if (part.number !== index + 1 || part.size_bytes !== body.size || part.checksum_sha256 !== checksums[index]) throw new Error('Invalid upload part declaration.');
+    if (part.confirmed) continue;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      current(); progress(`Uploading part ${index + 1} of ${count}…`);
+      let failure: unknown;
+      try {
+        if (!part.upload_url) throw new Error('Part authorization is missing.');
+        const result = await fetch(part.upload_url, { method: 'PUT', body, headers: part.headers, credentials: 'omit', referrerPolicy: 'no-referrer', signal }); current();
+        if (!result.ok) throw new Error(`Part transfer failed (${result.status}).`);
+      } catch (error) { failure = error; current(); }
+      try { await api.confirmPart(ticket.file.id, part.number, signal); current(); break; }
+      catch (error) {
+        current();
+        if (attempt === 2) throw failure ?? error;
+        part = await api.multipartPartUrl(ticket.file.id, part.number, signal); current();
+        if (part.number !== index + 1 || part.size_bytes !== body.size || part.checksum_sha256 !== checksums[index]) throw new Error('Part authorization changed.');
+      }
+    }
+  }
+  current(); progress('Verifying multipart completion…');
+  const completed = await api.completeMultipart(ticket.file.id, signal); current();
+  if (completed.checksum_sha256 !== expected || completed.size_bytes !== file.size || completed.checksum_kind !== 'sha256-composite') throw new Error('Completed file verification changed.');
+  return completed;
+}

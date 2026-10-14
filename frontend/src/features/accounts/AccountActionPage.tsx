@@ -1,3 +1,4 @@
+import { AuthLayout } from '../../components/AuthLayout';
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -30,7 +31,7 @@ export function AccountActionPage() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to complete account action'); }
     finally { setPending(false); }
   }
-  return <main className="max-w-md mx-auto p-6 space-y-4">
+  return <AuthLayout><div className="w-full max-w-md space-y-4 auth-form">
     <h1 className="text-2xl font-semibold">{purpose === 'reset' ? 'Reset password' : purpose === 'email_change' ? 'Confirm email change' : 'Verify email'}</h1>
     {message ? <p role="status">{message}</p> : !valid ? <p role="alert">This account link is incomplete.</p>
       : purpose === 'email_change' && !user ? <p>Sign in to the account that requested this change.
@@ -50,5 +51,5 @@ export function AccountActionPage() {
         </form>}
     <Link to={user ? '/app/security' : '/login'} className="text-blue-600 underline">{user ? 'Account security' : 'Sign in'}</Link>
     <Link to="/account/recover" className="block text-blue-600 underline">Request another email</Link>
-  </main>;
+  </div></AuthLayout>;
 }

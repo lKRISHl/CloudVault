@@ -36,6 +36,8 @@ async function create(page: Page, name: string) {
 test('folders support nested browsing, rename, safe destination moves and workspace isolation', async ({ page, request }) => {
   const email = `folders-owner-${suffix}@example.com`;
   await register(page, request, email, 'Folder Team');
+  await expect(page.getByText('No file metadata here.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Files' })).toContainText('Files remain unscanned');
   await create(page, 'Projects');
   await create(page, 'Archive');
   await page.getByRole('button', { name: 'Open folder Projects', exact: true }).click();

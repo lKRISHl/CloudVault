@@ -1,6 +1,7 @@
 """Verify the local Compose UI/API and an actual S3 object round trip."""
 
 import subprocess
+import urllib.error
 import urllib.request
 
 
@@ -14,6 +15,14 @@ def main():
         with urllib.request.urlopen(url, timeout=15) as response:
             assert response.status == 200, url
         print(f"HTTP OK: {url}")
+
+    try:
+        urllib.request.urlopen("http://localhost:9000/cloudvault?list-type=2", timeout=15)
+    except urllib.error.HTTPError as error:
+        assert error.code == 403, "Unexpected anonymous bucket response"
+    else:
+        raise RuntimeError("Development bucket permits anonymous listing")
+    print("Anonymous development bucket listing denied")
 
     # A unique object in the development bucket; trap removes it even on failure.
     subprocess.run(
@@ -36,6 +45,11 @@ def main():
                 'echo "S3 upload/download/delete OK"'
             ),
         ],
+        check=True,
+        timeout=60,
+    )
+    subprocess.run(
+        ["docker", "compose", "exec", "-T", "backend", "python", "-m", "app.jobs.check_storage"],
         check=True,
         timeout=60,
     )

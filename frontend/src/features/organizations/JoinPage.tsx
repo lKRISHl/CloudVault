@@ -1,3 +1,4 @@
+import { AuthLayout } from '../../components/AuthLayout';
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -33,8 +34,8 @@ export function JoinPage() {
     }
   }
 
-  return <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-    <div className="max-w-md w-full bg-white border rounded-xl p-6 space-y-4">
+  return <AuthLayout>
+    <div className="max-w-md w-full auth-form space-y-4">
       <h1 className="text-2xl font-semibold">Join your organization</h1>
       <p>{user ? `Accept this invitation as ${user.email}. Your other memberships remain available.` : 'Create an account or sign in with the invited email.'}</p>
       {isLoading && <p>Restoring session…</p>}
@@ -58,5 +59,5 @@ export function JoinPage() {
       {user ? <Link className="text-blue-600 underline" to="/app/security">Account security and email</Link> :
         <Link className="text-blue-600 underline" to="/login" state={{ returnTo: `/join${location.hash}` }}>Sign in to accept this invitation</Link>}
     </div>
-  </main>;
+  </AuthLayout>;
 }

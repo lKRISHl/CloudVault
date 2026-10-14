@@ -121,3 +121,46 @@ export interface FolderPage {
   limit: number;
   has_more: boolean;
 }
+
+export interface FileMetadata {
+  upload_method?: 'basic' | 'multipart';
+  checksum_kind?: 'sha256' | 'sha256-composite';
+  multipart_part_size?: number | null;
+  multipart_count?: number | null;
+  multipart_state?: 'active' | 'completed' | 'aborted' | null;
+  id: string;
+  tenant_id: string;
+  folder_id: string | null;
+  created_by: string;
+  name: string;
+  declared_size_bytes: number;
+  declared_content_type: string | null;
+  status: 'pending' | 'uploaded';
+  size_bytes?: number | null;
+  checksum_sha256?: string | null;
+  content_type?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  can_write: boolean;
+}
+
+export interface FilePage {
+  items: FileMetadata[];
+  offset: number;
+  limit: number;
+  has_more: boolean;
+}
+
+export interface UploadTicket {
+  file: FileMetadata;
+  upload_url: string;
+  headers: Record<string, string>;
+  expires_at: string;
+}
+
+export interface DownloadTicket { file: FileMetadata; download_url: string; expires_at: string }
+
+export interface PartTicket { number: number; size_bytes: number; checksum_sha256: string; confirmed: boolean; expires_at?: string | null; upload_url?: string | null; headers: Record<string, string> }
+export interface MultipartTicket { file: FileMetadata; part_size: number; parts: PartTicket[]; expires_at: string }
+export interface MultipartStart { name: string; folder_id: string | null; declared_size_bytes: number; declared_content_type: string | null; request_id: string; part_size: number; checksums: string[] }

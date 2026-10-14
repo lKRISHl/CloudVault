@@ -11,6 +11,7 @@ import { SecurityPage } from '../features/accounts/SecurityPage';
 import { RecoveryPage } from '../features/accounts/RecoveryPage';
 import { AccountActionPage } from '../features/accounts/AccountActionPage';
 import { FoldersPage } from '../features/folders/FoldersPage';
+import { AppShell } from '../components/AppShell';
 import { ApiRequestError } from '../services/api';
 
 function ProtectedRoute() {
@@ -66,10 +67,12 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
             </Route>
             <Route element={<ProtectedRoute />}>
+              <Route element={<AppShell />}>
               <Route path="/app" element={<HomePage />} />
               <Route path="/app/settings" element={<SettingsPage />} />
               <Route path="/app/security" element={<SecurityPage />} />
               <Route path="/app/folders" element={<FoldersPage />} />
+              </Route>
             </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />

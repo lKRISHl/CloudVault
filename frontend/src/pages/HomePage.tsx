@@ -2,44 +2,17 @@ import { HealthStatus } from '../components/ui/HealthStatus';
 import { useAuth } from '../auth/AuthContext';
 import { Link } from 'react-router-dom';
 import { WorkspaceSwitcher } from '../features/organizations/WorkspaceSwitcher';
+import { Icon } from '../components/ui/Icon';
 
 export function HomePage() {
-  const { user, logout } = useAuth();
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="max-w-3xl w-full flex flex-col items-center space-y-12">
-        <div className="text-center space-y-4">
-          <h1 className="text-6xl font-extrabold tracking-tight text-gray-900">
-            Cloud<span className="text-blue-600">Vault</span>
-          </h1>
-          <p className="text-xl text-gray-500 font-light tracking-wide">
-            AI-Native Cloud File Storage
-          </p>
-          {user && (
-            <p className="text-sm text-gray-600">
-              Signed in as <span className="font-medium">{user.full_name}</span> · {user.tenant?.name ?? 'No workspace selected'}
-            </p>
-          )}
-        </div>
-
-        <div className="w-full max-w-md space-y-4">
-          <WorkspaceSwitcher />
-          <Link to="/app/folders" className="block text-center text-blue-600 underline">Browse folders</Link>
-          <Link to="/app/security" className="block text-center text-blue-600 underline">Account security and email</Link>
-          <Link to="/app/settings" className="block text-center text-blue-600 underline">
-            Profile and organization
-          </Link>
-          <HealthStatus />
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="w-full border border-gray-200 bg-white rounded-lg py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  const { user } = useAuth();
+  return <main>
+    <div className="overview-hero"><div><span className="eyebrow">A SPACE TO MAKE THINGS HAPPEN</span><h1>Welcome, {user?.full_name.split(' ')[0]}.</h1><p>Your files and your team, with a little more room to breathe. Pick up where you left off.</p></div><Link className="primary-button" aria-label="Browse folders" to="/app/folders">Browse folders →</Link></div>
+    <div className="overview-grid"><div className="space-y-5"><WorkspaceSwitcher /><HealthStatus /></div><div className="space-y-4">
+      <Link className="quick-link" to="/app/folders"><span className="folder-icon"><Icon name="folder" /></span><div><strong>Your workspace library</strong><small>Organize folders and upload your files</small></div><span>↗</span></Link>
+      <Link className="quick-link" aria-label="Profile and organization" to="/app/settings"><span className="file-icon"><Icon name="settings" /></span><div><strong>Profile and organization</strong><small>Manage your workspace and its members</small></div><span>↗</span></Link>
+      <Link className="quick-link" aria-label="Account security and email" to="/app/security"><span className="upload-icon"><Icon name="shield" /></span><div><strong>Account security and email</strong><small>Verification, sessions and recovery</small></div><span>↗</span></Link>
+      <p className="muted-copy">Signed in as {user?.full_name} · {user?.tenant?.name ?? 'No workspace selected'}</p>
+    </div></div>
+  </main>;
 }

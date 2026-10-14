@@ -1,4 +1,5 @@
 from app.models.account import AccountToken, EmailOutbox, LoginSession, RateLimit
+from app.models.file import File
 from app.models.folder import Folder
 from app.models.invitation import Invitation
 from app.models.membership import Membership
@@ -7,6 +8,7 @@ from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 
 __all__ = [
+    "File",
     "Folder",
     "RefreshToken",
     "Tenant",
@@ -19,3 +21,5 @@ __all__ = [
     "LoginSession",
     "RateLimit",
 ]
+
+from app.models.upload_part import UploadPart  # noqa: F401

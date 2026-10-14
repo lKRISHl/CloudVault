@@ -158,4 +158,4 @@ creator loses global access and their identity becomes pseudonymous; managers re
 **Why reject populated downgrade?** Removing the table would silently destroy user
 content; a backup restore is the deliberate rollback path instead.
 
-Next phase: Phase 4 — File Metadata, only on explicit instruction. Phase 3 is uncommitted.
+Next phase: Phase 4 — File Metadata, only on explicit instruction. Phase 3 was committed as 5c5bccd; current progress is recorded in CONTINUE.md.

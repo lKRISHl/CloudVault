@@ -1,1 +1,132 @@
 @import "tailwindcss";
+
+:root { font-family: 'Segoe UI', sans-serif; color: #292735; background: #f7f7fa; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, a, input, select { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; transition: background .15s, box-shadow .15s; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+a, button, input, select { outline-offset: 4px; }
+:focus-visible { outline: 3px solid #8b72e6; }
+input:not([type=file]), select { min-height: 42px; border-color: #dddde7; border-radius: 9px; background: #fff; }
+input[type=file] { max-width: 100%; font-size: 13px; margin-top: 10px; }
+input[type=file]::file-selector-button { background: #fff; border: 1px solid #d8cee9; border-radius: 8px; padding: 10px 14px; color: #554078; margin-right: 12px; cursor: pointer; }
+h1, h2, h3 { letter-spacing: -.025em; }
+.vault-shell { display: flex; min-height: 100vh; }
+.vault-sidebar { width: 252px; flex-shrink: 0; background: #fff; border-right: 1px solid #e8e7ee; padding: 30px 20px 20px; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+.vault-brand { display: flex; gap: 9px; align-items: center; font-size: 22px; font-weight: 750; letter-spacing: -.8px; text-decoration: none; }
+.brand-mark { display: grid; place-items: center; width: 35px; height: 35px; background: #7357c9; color: white; border-radius: 11px; }
+.brand-dot { color: #8a65d6; margin-left: -8px; }
+.workspace-label { margin: 34px 0 28px; display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid #e8e7ee; border-radius: 12px; background: #faf9fc; min-width: 0; }
+.workspace-monogram, .account-avatar { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: #ebe5f9; color: #6c51ad; font-weight: 650; }
+.workspace-label div { min-width: 0; }
+.workspace-label small, .sidebar-account small { display: block; color: #8b8498; font-size: 10px; letter-spacing: 1px; }
+.workspace-label strong { display: block; font-size: 13px; overflow-wrap: anywhere; margin-top: 3px; }
+.nav-caption { color: #9992a5; font-size: 10px; letter-spacing: 1.8px; margin: 0 12px 12px; font-weight: 650; }
+.vault-nav { display: grid; gap: 5px; }
+.vault-nav a { display: flex; align-items: center; gap: 12px; padding: 12px; color: #777082; text-decoration: none; border-radius: 9px; font-size: 13px; font-weight: 550; }
+.vault-nav a:hover { background: #f7f5fc; }
+.vault-nav a.active { color: #684ab6; background: #eee8fb; }
+.sidebar-note { margin-top: auto; padding: 20px 12px; color: #95889f; font-size: 12px; }
+.sidebar-note svg { color: #9a82c6; margin-bottom: 12px; }
+.sidebar-note strong { display: block; color: #635a70; margin-bottom: 6px; }
+.sidebar-account { display: flex; align-items: center; gap: 9px; border-top: 1px solid #eeeaf3; padding-top: 20px; }
+.sidebar-account div { min-width: 0; flex: 1; }
+.sidebar-account strong { display: block; font-size: 12px; overflow-wrap: anywhere; }
+.sidebar-account small { text-transform: capitalize; margin-top: 3px; letter-spacing: 0; }
+.sidebar-account button { font-size: 20px; color: #8b8498; padding: 8px; }
+.vault-main { flex: 1; min-width: 0; }
+.vault-topbar { height: 78px; padding: 0 42px; border-bottom: 1px solid #e8e7ee; display: flex; justify-content: space-between; align-items: center; font-size: 12px; gap: 14px; color: #9991a3; background: #fff; }
+.vault-topbar strong { color: #655e70; font-weight: 500; overflow-wrap: anywhere; }
+.identity-chip { background: #f2eff8; color: #6c588b; padding: 7px 12px; border-radius: 20px; white-space: nowrap; font-size: 11px; }
+.vault-content { padding: 36px 42px; max-width: 1400px; margin: auto; }
+.vault-content main { min-height: auto; background: transparent; padding: 0; max-width: none; }
+.vault-content h1 { font-size: 32px; font-weight: 650; }
+.vault-content h2 { color: #3c334e; }
+.vault-content section.border, .content-card { background: #fff; border: 1px solid #e8e5ee; border-radius: 14px; box-shadow: 0 3px 10px #29273503; }
+.vault-content button.border, .folder-page button.border { border: 1px solid #e2deeb; background: #fff; color: #685b7c; border-radius: 8px; font-size: 12px; font-weight: 550; padding: 9px 13px; }
+.vault-content button.border:hover:not(:disabled) { background: #f5f1fc; border-color: #c8b8e7; }
+.vault-content a.text-blue-600, .auth-form a { color: #7153b5; }
+.page-heading { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; }
+.page-heading h1 { margin: 8px 0; }
+.page-heading p, .muted-copy { color: #888091; font-size: 13px; }
+.eyebrow { font-size: 10px; font-weight: 650; letter-spacing: 2px; color: #9380b4; }
+.page-emblem { display: grid; place-items: center; width: 62px; height: 62px; background: #eee8f8; color: #8e72b8; border-radius: 20px; }
+.page-emblem svg { width: 30px; height: 30px; }
+.folder-create { display: flex; align-items: flex-end; gap: 14px; padding: 20px; }
+.folder-create label { flex: 1; font-size: 12px; color: #786e85; }
+.folder-create input { margin-top: 6px; }
+.folder-create button { margin-bottom: 0; min-height: 42px; }
+.folder-open { display: flex; align-items: center; gap: 13px; color: #4e435f; font-weight: 550; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+.folder-icon, .file-icon { width: 40px; height: 40px; display: inline-grid; place-items: center; border-radius: 11px; background: #fff1d9; color: #c79644; flex-shrink: 0; }
+.file-icon { background: #ebeefc; color: #7d8ccc; }
+.folder-list:empty, .file-list:empty { display: none; }
+.folder-list li:hover, .file-list li:hover { background: #fbfafe; }
+.section-title { font-size: 20px; display: flex; align-items: center; gap: 12px; padding-top: 14px; }
+.section-title span { font-size: 11px; color: #a099aa; letter-spacing: 0; font-weight: 400; }
+.file-section > p { color: #8b8395; font-size: 12px; }
+.file-row p:not(:first-child) { color: #8b8295; font-size: 12px; margin-top: 5px; padding-left: 53px; overflow-wrap: anywhere; }
+.file-name { display: flex; align-items: center; gap: 13px; font-size: 14px; overflow-wrap: anywhere; }
+.status-badge { margin-left: auto; border-radius: 20px; padding: 5px 9px; font-size: 10px; font-weight: 550; color: #9b783e; background: #fff4df; }
+.status-badge.uploaded { background: #eaf4ef; color: #54826b; }
+.upload-panel { padding: 22px; background: #f2eef9; border: 1px dashed #c6b9de; border-radius: 14px; color: #847291; font-size: 12px; }
+.upload-heading { display: flex; align-items: center; gap: 13px; }
+.upload-heading h3 { color: #5e477c; font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+.upload-icon { display: grid; place-items: center; background: #e6dcf4; color: #8b69bb; border-radius: 11px; height: 42px; width: 42px; flex-shrink: 0; }
+.primary-button, .auth-form button[type=submit] { background: #7357be; color: white; border: 0; border-radius: 9px; padding: 12px 18px; font-size: 13px; font-weight: 550; box-shadow: 0 4px 9px #7357be19; }
+.primary-button:hover:not(:disabled), .auth-form button[type=submit]:hover:not(:disabled) { background: #6145ab; }
+.empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 32px 20px; border: 1px solid #eae6ef; border-radius: 14px; background: #ffffff90; gap: 8px; }
+.empty-state svg { width: 28px; height: 28px; color: #b9aace; margin-bottom: 4px; }
+.empty-state strong { font-size: 13px; color: #71637f; }
+.empty-state p { font-size: 12px; color: #aaa0b4; }
+[role=alert] { color: #ad4149; background: #fff0f0; padding: 12px; border-radius: 9px; font-size: 13px; }
+[role=status] { color: #40765c; background: #ecf7f0; padding: 12px; border-radius: 9px; font-size: 13px; }
+.auth-layout { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; background: #fff; }
+.auth-story { background: #f0eaf8; padding: 42px 58px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+.auth-story-copy { margin: auto 0; padding: 60px 0; max-width: 450px; }
+.auth-story h2 { font-size: clamp(48px, 5.5vw, 82px); line-height: 1.06; font-weight: 650; color: #443355; margin: 22px 0; letter-spacing: -4px; }
+.auth-story h2 em { color: #9173b6; font-family: Georgia, serif; font-weight: 400; }
+.auth-story-copy > p { max-width: 320px; font-size: 15px; line-height: 1.8; color: #9684a4; }
+.auth-footer { color: #a38db6; font-size: 11px; }
+.auth-form-side { display: flex; justify-content: center; align-items: center; padding: 48px; }
+.auth-form-heading h1 { font-size: 30px; }
+.auth-form-heading h1 span { color: #7357be; }
+.auth-form-heading p { font-size: 13px; color: #9d94a8; }
+.auth-form { padding: 0; }
+.auth-form h2 { font-size: 22px; margin-bottom: 24px; }
+.auth-form input { height: 46px; }
+.auth-form label span { font-size: 12px; color: #7f748b; }
+.auth-form button[type=submit] { margin-top: 12px; height: 46px; }
+.auth-art { margin-top: 38px; max-width: 340px; }
+.art-folder, .art-file { display: flex; gap: 12px; align-items: center; background: #ffffffc9; border: 1px solid #fff; border-radius: 14px; padding: 18px; font-size: 12px; color: #79618f; box-shadow: 0 14px 40px #72538e0a; }
+.art-folder svg { color: #c79a55; }
+.art-pill { margin-left: auto; font-size: 9px; background: #ede7f6; padding: 5px 8px; border-radius: 12px; }
+.art-file { margin-top: 9px; margin-left: 20px; transform: rotate(-2deg); }
+.art-file small { display: block; margin-top: 4px; color: #b3a4bf; font-size: 10px; }
+.art-file > span { margin-left: auto; }
+.skip-link { position: absolute; left: 10px; top: -100px; z-index: 10; background: white; padding: 12px; }
+.skip-link:focus { top: 10px; }
+.overview-hero { padding: 34px; border-radius: 20px; background: #ebe5f6; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.overview-hero h1 { margin: 10px 0; }
+.overview-hero p { color: #8f7d9f; max-width: 440px; font-size: 14px; line-height: 1.7; }
+.overview-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; margin-top: 28px; }
+.quick-link { display: flex; align-items: center; gap: 14px; padding: 22px; background: #fff; border: 1px solid #e8e5ee; border-radius: 14px; text-decoration: none; }
+.quick-link strong { display: block; font-size: 14px; color: #5d4d71; }
+.quick-link small { display: block; color: #9a8da6; margin-top: 5px; font-size: 12px; }
+.quick-link > span:last-child { margin-left: auto; color: #9e83bd; }
+@media (max-width: 1000px) { .vault-sidebar { width: 215px; padding: 24px 14px; } .vault-content { padding: 28px 24px; } .vault-topbar { padding: 0 24px; } .auth-story { padding: 32px; } .auth-form-side { padding: 32px; } .overview-grid { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .vault-shell { flex-direction: column; } .vault-sidebar { position: static; width: 100%; height: auto; padding: 18px; border-right: 0; border-bottom: 1px solid #e8e7ee; } .workspace-label, .nav-caption, .sidebar-note, .sidebar-account { display: none; } .vault-nav { display: flex; flex-wrap: wrap; margin-top: 16px; gap: 3px; } .vault-nav a { padding: 8px; font-size: 11px; gap: 5px; } .vault-nav svg { width: 16px; height: 16px; } .vault-content { padding: 24px 16px; } .vault-topbar { padding: 0 16px; height: 56px; } .folder-create { flex-direction: column; align-items: stretch; } .folder-list li { gap: 8px; } .folder-open { flex-basis: 100%; } .auth-layout { grid-template-columns: 1fr; } .auth-story { padding: 24px; } .auth-story-copy, .auth-footer { display: none; } .auth-form-side { padding: 32px 24px; } .overview-hero { flex-direction: column; align-items: flex-start; padding: 24px; } .file-row p:not(:first-child) { padding-left: 0; } .file-name { flex-wrap: wrap; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Keep account actions available on compact screens. */
+@media (max-width: 700px) { .sidebar-account { display: flex; margin-top: 12px; padding-top: 12px; } }
+.auth-story-copy > p { color: #746382; }
+.auth-form-heading p, .empty-state p { color: #7e718c; }
+.vault-topbar { color: #7e738d; }
+
+.folder-list > li, .file-list > li { border-color: #e8e5ee; }
+nav[aria-label="Folder breadcrumbs"] button { display: inline-flex; align-items: center; gap: 8px; }
+nav[aria-label="Folder breadcrumbs"] .folder-icon { width: 20px; height: 20px; background: transparent; }
+nav[aria-label="Folder breadcrumbs"] .folder-icon svg { width: 17px; height: 17px; }
+.auth-form h1 { font-size: 26px; font-weight: 650; color: #443355; }
+.auth-form button.border { color: #6a518e; border-color: #ddd2eb; background: #f4effb; border-radius: 8px; }

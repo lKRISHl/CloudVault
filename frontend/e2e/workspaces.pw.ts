@@ -45,6 +45,8 @@ async function accept(page: Page, link: string) {
   await page.goto(link);
   await page.getByRole('button', { name: 'Join organization' }).click();
   await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole('heading', { name: 'Your workspaces' })).toBeVisible();
+  await expect(page.getByText('Loading workspaces…', { exact: true })).toHaveCount(0);
 }
 
 async function transfer(page: Page, email: string) {
@@ -66,7 +68,7 @@ test('existing identity joins, switches with scoped permissions, and is removed/
   await register(other, request, member, 'Existing Member', 'Personal Team');
   const oldLink = await invite(page, request, member);
   await accept(other, oldLink);
-  await other.goto('/app/settings');
+  await other.getByRole('link', { name: 'Profile and organization' }).click();
   await expect(other.getByText('Workspace Owner', { exact: true })).toBeVisible();
   await expect(other.getByRole('button', { name: 'Save organization' })).toHaveCount(0);
   await other.goto('/app');
@@ -82,13 +84,16 @@ test('existing identity joins, switches with scoped permissions, and is removed/
   await revoked.getByLabel('Password', { exact: true }).fill(password);
   await revoked.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(revoked.getByText(/^Current workspace:/)).toBeVisible();
-  if (await revoked.getByRole('button', { name: 'Switch to Primary Team' }).count()) {
+  if (await revoked.getByText('Current workspace: Personal Team', { exact: true }).isVisible()) {
     await revoked.getByRole('button', { name: 'Switch to Primary Team' }).click();
   }
   await expect(revoked.getByText('Current workspace: Primary Team', { exact: true })).toBeVisible();
   await page.goto('/app/settings');
   page.on('dialog', (dialog) => dialog.accept());
+  const removed = page.waitForResponse((response) => response.request().method() === 'DELETE'
+    && response.url().includes('/organizations/current/members/') && response.status() === 204);
   await page.getByRole('button', { name: `Remove ${member}` }).click();
+  await removed;
   await expect(page.getByText('Existing Member', { exact: true })).toHaveCount(0);
   await revoked.goto('/app/settings');
   await expect(revoked.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
@@ -100,7 +105,7 @@ test('existing identity joins, switches with scoped permissions, and is removed/
   await expect(other.getByRole('alert')).toContainText('new reactivation invitation');
   const restoredLink = await invite(page, request, member, 'admin');
   await accept(other, restoredLink);
-  await other.goto('/app/settings');
+  await other.getByRole('link', { name: 'Profile and organization' }).click();
   await expect(other.getByRole('button', { name: 'Save organization' })).toBeVisible();
   await expect(other.getByRole('heading', { name: 'Transfer ownership' })).toHaveCount(0);
   await revoked.goto('/app/settings');
@@ -141,11 +146,14 @@ test('workspace creation, ownership transfer and deletion across memberships wor
   await page.getByRole('button', { name: 'Switch to Original Team' }).click();
   await expect(page.getByText('Current workspace: Original Team', { exact: true })).toBeVisible();
   await page.goto('/app/settings');
+  await expect(page.getByRole('button', { name: 'Save organization' })).toBeVisible();
+  await expect(page.locator('#workspace-content').getByText('Transfer Owner', { exact: true })).toBeVisible();
   await expect(page.getByText('Transfer Member', { exact: true })).toHaveCount(0);
   await page.goto('/app');
   await page.getByRole('button', { name: 'Switch to Additional Team' }).click();
   await expect(page.getByText('Current workspace: Additional Team', { exact: true })).toBeVisible();
   await page.goto('/app/settings');
+  await expect(page.locator('#workspace-content').getByText('Transfer Owner', { exact: true })).toBeVisible();
   await expect(page.getByText('Transfer Member', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Transfer ownership' })).toBeVisible();
   await context.close();

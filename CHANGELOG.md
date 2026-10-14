@@ -4,13 +4,54 @@ All notable changes to CloudVault will be documented in this file.
 
 ## [Unreleased] - 2026-10-14
 
+### Phase 8 — Chunked/Multipart Uploads
+- Add creator/tenant/parent-authorized multipart initiation, signed chunk grants,
+  independently verified part receipts, conditional completion and explicit cancellation.
+- Hash bounded browser slices, transfer directly without account credentials, reconcile
+  acknowledgements and retry failed parts up to three times. Same-form retries skip
+  confirmed parts; cancelled rows remain visible with reserved names.
+- Persist transfer mode/state/private provider identity and part receipts through
+  008_multipart, preserving basic uploads and refusing destructive rollback.
+- Identify SHA-256 composite checksums explicitly and adapt downloads to provider suffixes.
+- Default to 1 GiB maximum, 8 MiB chunks and one-hour deadline; configure bounded limits
+  through Compose/environment and separate part-grant/confirmation rate budgets.
+- Verify 197 backend tests on SQLite/PostgreSQL with real storage, 49 frontend tests,
+  14 browser journeys, lint/build, schema alignment and Docker real SMTP/basic/multipart
+  upload/download smoke. Save an ignored pre-upgrade database backup.
+- Recover test-server memory/Docker interruptions and rerun complete checks successfully.
+  Phase 9 reload resume/automated cleanup is next; remote CI/production gates remain.
+
+### Phase 6 — Basic Upload
+- Add creator/workspace/parent-authorized pending reservations and signed length/checksum/conditional direct PUT.
+- Persist object identity and verified completion metadata; enforce upload state constraints, idempotency, expiry, retry and persistent rate limits.
+- Add upload selection/stages/errors/retry and verified/unscanned file listing, with session-generation guards and no app credentials sent to storage.
+- Add public signing endpoint and private exact-origin local storage CORS; migration 007_uploads preserves legacy metadata and guards reference loss.
+- Verify 174 backend tests on SQLite/PostgreSQL with real MinIO, 39 frontend tests, 12 Chromium/SMTP/storage journeys, lint/build, migrations and actual Docker API upload smoke.
+- Save an ignored pre-upgrade backup and add reliable disposable browser-bucket teardown; fix the upload test destination-render wait. Docker smoke demo data remains.
+- Phase 7 remains unstarted. Phases 4–6 remain uncommitted; remote CI and production provider verification remain pending.
+
+### Phase 5 — Object Storage
+- Add tenant-scoped S3 protocol/adapter, UUID-only storage keys, safe provider errors and Boto3 dependency.
+- Add private bucket provisioning and complete/redacted/validated storage configuration with production HTTPS checks.
+- Add conditional small writes, actual metadata inspection, bounded reads with generation/length checks and reliable stream cleanup, plus idempotent local deletion.
+- Add configured-adapter Docker smoke and three real disposable-bucket contract tests; CI definitions include these checks.
+- Verify 158 backend tests on SQLite/PostgreSQL with actual MinIO, Ruff, Docker rebuild/schema/private-access/storage smoke. Recover an initial Docker export interruption and rerun affected tests separately from builds.
+- Phase 5 completion preceded Phase 6; current progress is recorded above. No remote CI or production provider verification was run.
+
+### Phase 4 — File Metadata
+- Add tenant-isolated pending file metadata, declared size/type, folder/creator relationships, normalized names, uniqueness and listing/provenance indexes.
+- Add internal authorized reservations and paginated read/list APIs; no fake uploads, public metadata creation or download URLs.
+- Add pending metadata listing to the folder browser with empty/error/retry and separate pagination states.
+- Preserve files across folder moves and creator deletion; add populated downgrade protection and an ignored pre-upgrade backup.
+- Verify 131 backend tests on SQLite/PostgreSQL, 31 frontend tests, 11 Chromium journeys, migrations, lint/build and rebuilt Docker at 006_files. Fix an existing browser test race while waiting for workspace listings. Phase 4 remains uncommitted; Phase 5 progress is recorded above.
+
 ### Phase 3 — Folder System
 - Add tenant-scoped folders with parent/tenant integrity, stable identifiers, normalized sibling names, child-list indexes and timestamps.
 - Add create/rename/move/list/detail services and API, breadcrumbs/pagination, depth/cycle protection and concurrent structural serialization.
 - Add shared-workspace permissions: verified active members read, creators/owners/admins write; destination parents require write authority.
 - Add folder browser and move destination picker, with visible failures/retry and tenant/user-scoped queries. Avoid automatically retrying missing/forbidden resources.
 - Preserve organization folders after creator account deletion; guard populated folder downgrade and save a local pre-upgrade backup.
-- Verify 113 backend tests on SQLite/PostgreSQL, 28 frontend tests, 11 Chromium journeys, real migrations and updated Docker folder/storage operations. Phase 4 remains unstarted.
+- Verify 113 backend tests on SQLite/PostgreSQL, 28 frontend tests, 11 Chromium journeys, real migrations and updated Docker folder/storage operations. Phase 3 was committed as 5c5bccd before Phase 4.
 
 ### Phase 2B — Multiple Organizations and Membership Lifecycle
 - Separate global user identity from per-organization roles; migrate existing accounts/passwords and bind valid sessions to their prior workspace.
@@ -98,3 +139,11 @@ All notable changes to CloudVault will be documented in this file.
 - Project documentation (AGENTS.md, ARCHITECTURE.md, etc.)
 - GitHub Actions CI pipeline
 - Environment configuration with Pydantic Settings
+
+### Frontend visual design
+- Add shared workspace navigation and overview, split authentication layout, responsive controls, SVG icons, content rows, upload/empty/error styling, and desktop/mobile browser verification. See docs/frontend-design.md and ADR-023.
+
+### Phase 7 — Basic Download
+- Add current-member authorized, tenant-scoped download tickets for verified uploaded files; provider integrity checks, post-inspection/signing membership checks, grant rate limits and safe error responses.
+- Add signed attachment GET with safe Unicode filenames, octet-stream and no-store responses, default five-minute expiry, and native browser download controls with stale-session protection.
+- Add real signed GET/tampering and Chromium byte/filename/credential checks. No new database migration. See docs/phases/phase7.md and ADR-024.

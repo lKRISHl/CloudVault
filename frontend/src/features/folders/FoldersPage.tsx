@@ -1,9 +1,11 @@
+import { Icon } from '../../components/ui/Icon';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
 import type { Folder } from '../../types';
+import { FileList } from './FileList';
 
 const button = 'border rounded px-3 py-2 disabled:opacity-50';
 const input = 'block border rounded p-2 w-full';
@@ -26,7 +28,7 @@ function MoveDestination({ folder, pending, choose, cancel }: {
     {query.error && <button className={button} disabled={query.isFetching} onClick={() => void query.refetch()}>Retry destination</button>}
     {query.isPending && <p>Loading destination…</p>}
     <ul>{query.data?.items.map((item) => <li key={item.id} className="p-2">
-      <button className={button} disabled={pending || item.id === folder.id} aria-label={`Open destination ${item.name}`} onClick={() => browse(item.id)}>{item.name}</button>
+      <button className={button} disabled={pending || item.id === folder.id} aria-label={`Open destination ${item.name}`} onClick={() => browse(item.id)}><span className="folder-icon"><Icon name="folder" /></span><span>{item.name}</span></button>
     </li>)}</ul>
     <button className={button} disabled={!offset || query.isFetching || pending} onClick={() => setOffset(Math.max(0, offset - 25))}>Previous destinations</button>
     <button className={button} disabled={!query.data?.has_more || query.isFetching || pending} onClick={() => setOffset(offset + 25)}>Next destinations</button>
@@ -59,35 +61,36 @@ export function FoldersPage() {
   function browse(id: string | null) { setSelected(null); setMode(null); setMessage(''); setParams(id ? { folder: id } : {}); }
   const submit = (event: FormEvent, action: () => void) => { event.preventDefault(); setMessage(''); action(); };
   const writable = enabled && (!parent || query.data?.parent?.can_write);
-  return <main className="max-w-4xl mx-auto p-6 space-y-6">
+  return <main className="folder-page space-y-6">
     <Link to="/app" className="text-blue-600 underline">Back to workspace</Link>
-    <h1 className="text-2xl font-semibold">Folders</h1>
-    <p>Workspace: {user?.tenant?.name ?? 'No workspace selected'}</p>
-    <p>Workspace members can browse. Folder creators, owners and admins can organize folders.</p>
+    <div className="page-heading"><div><span className="eyebrow">YOUR CONTENT, ORGANIZED</span><h1>Folders</h1><p>A little structure. A lot more room to create.</p></div><span className="page-emblem"><Icon name="folder" /></span></div>
+
+    <p className="muted-copy">Workspace members can browse. Folder creators, owners and admins can organize folders.</p>
     {!enabled && <p role="alert">Select a workspace and verify your email in account security to use folders.</p>}
     <nav aria-label="Folder breadcrumbs" className="flex flex-wrap gap-2">
       <button className={button} onClick={() => browse(null)}>All folders</button>
-      {query.data?.breadcrumbs.map((item) => <button key={item.id} className={button} onClick={() => browse(item.id)}>{item.name}</button>)}
+      {query.data?.breadcrumbs.map((item) => <button key={item.id} className={button} onClick={() => browse(item.id)}><span className="folder-icon"><Icon name="folder" /></span><span>{item.name}</span></button>)}
     </nav>
     {message && <p role="status">{message}</p>}
     {errors.map((error, index) => <p role="alert" key={index}>{error instanceof Error ? error.message : 'Folder request failed'}</p>)}
     {query.error && <button className={button} disabled={query.isFetching} onClick={() => void query.refetch()}>Retry folders</button>}
     {query.isPending && enabled && <p>Loading folders…</p>}
-    {writable && <form onSubmit={(event) => submit(event, () => create.mutate())} className="border rounded-xl p-5 bg-white space-y-3">
+    {writable && <form onSubmit={(event) => submit(event, () => create.mutate())} className="content-card folder-create space-y-3">
       <label className="block">Folder name<input className={input} required maxLength={255} value={name} onChange={(event) => setName(event.target.value)} /></label>
       <button className={button} disabled={create.isPending}>Create folder</button>
     </form>}
-    <ul className="border rounded divide-y bg-white">{query.data?.items.map((item) => <li key={item.id} className="p-4 flex flex-wrap gap-3 items-center">
-      <button className="flex-1 text-left text-blue-600 underline" aria-label={`Open folder ${item.name}`} onClick={() => browse(item.id)}>{item.name}</button>
+    <ul className="folder-list content-card divide-y">{query.data?.items.map((item) => <li key={item.id} className="p-4 flex flex-wrap gap-3 items-center">
+      <button className="folder-open flex-1 text-left" aria-label={`Open folder ${item.name}`} onClick={() => browse(item.id)}><span className="folder-icon"><Icon name="folder" /></span><span>{item.name}</span></button>
       {item.can_write ? <>
         <button className={button} aria-label={`Rename ${item.name}`} onClick={() => open(item, 'rename')}>Rename</button>
         <button className={button} aria-label={`Move ${item.name}`} onClick={() => open(item, 'move')}>Move</button>
       </> : <span>Read only</span>}
     </li>)}</ul>
-    {query.data?.items.length === 0 && <p>No folders here.</p>}
+    {query.data?.items.length === 0 && <div className="empty-state"><Icon name="folder" /><strong>No folders here.</strong><p>Create a folder to give your next project a home.</p></div>}
+    {enabled && query.isSuccess && <FileList key={`${user?.tenant?.id}/${parent}`} folderId={parent} writable={!!writable} />}
     <button className={button} disabled={!offset || query.isFetching} onClick={() => setParams({ ...(parent ? { folder: parent } : {}), offset: String(Math.max(0, offset - 25)) })}>Previous folders</button>
     <button className={button} disabled={!query.data?.has_more || query.isFetching} onClick={() => setParams({ ...(parent ? { folder: parent } : {}), offset: String(offset + 25) })}>Next folders</button>
-    {selected && mode === 'rename' && <section role="dialog" aria-label="Rename folder" className="border rounded-xl p-5 bg-white space-y-3">
+    {selected && mode === 'rename' && <section role="dialog" aria-label="Rename folder" className="content-card folder-create space-y-3">
       <h2 className="text-lg font-semibold">Rename {selected.name}</h2>
       <form onSubmit={(event) => submit(event, () => rename.mutate())} className="space-y-3">
         <label className="block">New folder name<input className={input} required maxLength={255} value={editName} onChange={(event) => setEditName(event.target.value)} /></label>

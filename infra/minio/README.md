@@ -24,3 +24,17 @@ restore local development; they do not establish production storage suitability.
 Choose and review a maintained S3-compatible deployment/provider before production.
 See [upstream server](https://github.com/minio/minio) and
 [upstream client](https://github.com/minio/mc).
+
+Phase 5 setup explicitly sets anonymous bucket access to none. Compose passes the
+complete S3 endpoint/credential/bucket/region configuration to backend and dispatcher.
+The application adapter uses Signature V4 and UUID-only scoped keys. Docker smoke
+checks anonymous listing denial and runs `app.jobs.check_storage` for an actual
+put/head/bounded-read/delete round trip with cleanup. Integration tests create their
+own uniquely named disposable buckets; they do not clear the application bucket.
+
+Phase 6 adds MINIO_API_CORS_ALLOW_ORIGIN for localhost app/development and the
+127.0.0.1 disposable browser origin. API uses the internal endpoint for HEAD and
+S3_PUBLIC_ENDPOINT for browser signatures; both target the same bucket. Browser
+PUT binds size, SHA-256, generic content type and If-None-Match. Public GET/list
+remains denied. Provider checksum/conditional support is tested on this local build;
+production S3/R2 needs its own compatibility and IAM/CORS verification.

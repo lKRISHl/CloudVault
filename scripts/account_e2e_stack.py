@@ -11,9 +11,11 @@ import threading
 from email import message_from_bytes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from uuid import uuid4
 
 BACKEND = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND))
+STORAGE_MANIFEST = BACKEND.parent / ".local" / "e2e-storage.json"
 messages = []
 messages_lock = threading.Lock()
 
@@ -102,6 +104,7 @@ def main():
             {
                 "DATABASE_URL": f"sqlite+aiosqlite:///{Path(directory) / 'accounts.db'}",
                 "ENVIRONMENT": "development",
+                "DEBUG": "false",
                 "SECRET_KEY": "cloudvault-disposable-e2e-secret-not-for-production",
                 "SMTP_HOST": "127.0.0.1",
                 "SMTP_PORT": "41025",
@@ -111,23 +114,120 @@ def main():
                 "CORS_ORIGINS": '["http://127.0.0.1:43000"]',
             }
         )
+        storage_client = None
+        test_bucket = None
+        if os.environ.get("TEST_S3_ENDPOINT"):
+            import boto3
+            from botocore.config import Config as S3Config
+
+            test_bucket = "cv-browser-upload-" + uuid4().hex
+            storage_client = boto3.client(
+                "s3",
+                endpoint_url=os.environ["TEST_S3_ENDPOINT"],
+                aws_access_key_id=os.environ["TEST_S3_ACCESS_KEY"],
+                aws_secret_access_key=os.environ["TEST_S3_SECRET_KEY"],
+                region_name="us-east-1",
+                config=S3Config(
+                    signature_version="s3v4", s3={"addressing_style": "path"}
+                ),
+            )
+            if STORAGE_MANIFEST.exists():
+                raise RuntimeError(
+                    "Clean up the prior disposable storage test bucket first"
+                )
+            STORAGE_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+            STORAGE_MANIFEST.write_text(
+                json.dumps(
+                    {"bucket": test_bucket, "endpoint": os.environ["TEST_S3_ENDPOINT"]}
+                )
+            )
+            storage_client.create_bucket(Bucket=test_bucket)
+            os.environ.update(
+                {
+                    "S3_ENDPOINT": os.environ["TEST_S3_ENDPOINT"],
+                    "S3_PUBLIC_ENDPOINT": os.environ["TEST_S3_ENDPOINT"],
+                    "S3_ACCESS_KEY": os.environ["TEST_S3_ACCESS_KEY"],
+                    "S3_SECRET_KEY": os.environ["TEST_S3_SECRET_KEY"],
+                    "S3_BUCKET_NAME": test_bucket,
+                }
+            )
+        else:
+            # Ordinary account journeys must not inherit an application bucket.
+            for name in (
+                "S3_ENDPOINT",
+                "S3_PUBLIC_ENDPOINT",
+                "S3_ACCESS_KEY",
+                "S3_SECRET_KEY",
+                "S3_BUCKET_NAME",
+            ):
+                os.environ.pop(name, None)
         from alembic import command
         from alembic.config import Config
 
         config = Config(str(BACKEND / "alembic.ini"))
         config.set_main_option("script_location", str(BACKEND / "migrations"))
-        command.upgrade(config, "head")
-        smtp = socketserver.ThreadingTCPServer(("127.0.0.1", 41025), SMTPInbox)
-        http = ThreadingHTTPServer(("127.0.0.1", 48025), InboxHTTP)
-        for server in (smtp, http):
-            threading.Thread(target=server.serve_forever, daemon=True).start()
+        smtp = http = None
         try:
+            command.upgrade(config, "head")
+            smtp = socketserver.ThreadingTCPServer(("127.0.0.1", 41025), SMTPInbox)
+            http = ThreadingHTTPServer(("127.0.0.1", 48025), InboxHTTP)
+            for server in (smtp, http):
+                threading.Thread(target=server.serve_forever, daemon=True).start()
             asyncio.run(serve())
         finally:
             for server in (smtp, http):
-                server.shutdown()
-                server.server_close()
+                if server:
+                    server.shutdown()
+                    server.server_close()
+            if storage_client:
+                try:
+                    cleanup_storage()
+                finally:
+                    storage_client.close()
+
+
+def cleanup_storage():
+    if not STORAGE_MANIFEST.exists():
+        return
+    import re
+
+    import boto3
+    from botocore.config import Config as S3Config
+    from botocore.exceptions import ClientError
+
+    manifest = json.loads(STORAGE_MANIFEST.read_text())
+    bucket = manifest["bucket"]
+    if not re.fullmatch(r"cv-browser-upload-[0-9a-f]{32}", bucket):
+        raise RuntimeError("Refusing to clean an unrecognized storage test bucket")
+    if manifest["endpoint"] != os.environ.get("TEST_S3_ENDPOINT"):
+        raise RuntimeError("Test storage endpoint changed; refusing cleanup")
+    client = boto3.client(
+        "s3",
+        endpoint_url=manifest["endpoint"],
+        aws_access_key_id=os.environ["TEST_S3_ACCESS_KEY"],
+        aws_secret_access_key=os.environ["TEST_S3_SECRET_KEY"],
+        region_name="us-east-1",
+        config=S3Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+    )
+    try:
+        try:
+            for page in client.get_paginator("list_multipart_uploads").paginate(Bucket=bucket):
+                for upload in page.get("Uploads", []):
+                    client.abort_multipart_upload(Bucket=bucket, Key=upload["Key"], UploadId=upload["UploadId"])
+            for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket):
+                for item in page.get("Contents", []):
+                    client.delete_object(Bucket=bucket, Key=item["Key"])
+            client.delete_bucket(Bucket=bucket)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") != "NoSuchBucket":
+                raise
+        STORAGE_MANIFEST.unlink(missing_ok=True)
+    finally:
+        client.close()
 
 
 if __name__ == "__main__":
-    main()
+    if "--cleanup-storage" in sys.argv:
+        cleanup_storage()
+    else:
+        main()

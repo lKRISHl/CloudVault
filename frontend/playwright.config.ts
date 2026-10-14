@@ -5,6 +5,7 @@ export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.pw.ts',
   workers: 1,
+  globalTeardown: './e2e/storage-teardown.ts',
   timeout: 45000,
   use: { baseURL: 'http://127.0.0.1:43000', browserName: 'chromium', headless: true },
   webServer: [

@@ -1,3 +1,4 @@
+import { AuthLayout } from '../components/AuthLayout';
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -27,9 +28,9 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+    <AuthLayout>
       <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
+        <div className="auth-form-heading space-y-2">
           <h1 className="text-5xl font-extrabold tracking-tight text-gray-900">
             Cloud<span className="text-blue-600">Vault</span>
           </h1>
@@ -38,7 +39,7 @@ export function LoginPage() {
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+        <form onSubmit={onSubmit} className="auth-form space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Sign in</h2>
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">{error}</p>
@@ -81,6 +82,6 @@ export function LoginPage() {
           </p>
         </form>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

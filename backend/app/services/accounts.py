@@ -75,13 +75,25 @@ class AccountService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def limit(self, category: str, ip: str, identity: str = "") -> None:
+    async def limit(
+        self,
+        category: str,
+        ip: str,
+        identity: str = "",
+        *,
+        max_identity: int | None = None,
+        max_ip: int | None = None,
+    ) -> None:
         now = datetime.now(UTC)
         window = int(now.timestamp()) // settings.RATE_LIMIT_WINDOW_SECONDS
         insert = pg_insert if self.db.bind.dialect.name == "postgresql" else sqlite_insert
         for label, value, maximum in (
-            ("ip", ip, settings.RATE_LIMIT_IP_MAX),
-            ("account", identity.lower(), settings.RATE_LIMIT_MAX),
+            ("ip", ip, max_ip if max_ip is not None else settings.RATE_LIMIT_IP_MAX),
+            (
+                "account",
+                identity.lower(),
+                max_identity if max_identity is not None else settings.RATE_LIMIT_MAX,
+            ),
         ):
             if not value:
                 continue

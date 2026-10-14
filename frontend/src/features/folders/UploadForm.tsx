@@ -1,0 +1,70 @@
+import { Icon } from '../../components/ui/Icon';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../auth/AuthContext';
+import { api, uploadBrowserFile, uploadMultipartFile } from '../../services/api';
+
+export function UploadForm({ folderId, retryId, finished }: {
+  folderId: string | null; retryId: string | null; finished: () => void;
+}) {
+  const { user } = useAuth();
+  const cache = useQueryClient();
+  const config = useQuery({ queryKey: ['upload-config', user?.tenant?.id, user?.id], queryFn: api.uploadConfiguration });
+  const [file, setFile] = useState<File | null>(null);
+  const [activeMultipartId, setActiveMultipartId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const cancelRequested = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [multipart, setMultipart] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const requestId = useRef(crypto.randomUUID());
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
+  async function cancelMultipart() {
+    if (!activeMultipartId) return;
+    cancelRequested.current = true; controller.current?.abort(); setCancelling(true); setError('');
+    try {
+      await api.abortMultipart(activeMultipartId);
+      await cache.invalidateQueries({ queryKey: ['files', user?.tenant?.id, user?.id] });
+      setActiveMultipartId(null); setFile(null); formRef.current?.reset(); requestId.current = crypto.randomUUID();
+      setMessage('Multipart upload cancelled. Its name remains reserved until cleanup.');
+    } catch (failure) { setMessage(''); setError(failure instanceof Error ? failure.message : 'Cancellation failed.'); }
+    finally { setCancelling(false); }
+  }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    if (!file || !config.data?.enabled) return;
+    setError(''); setMessage('');
+    const useMultipart = !retryId && (multipart || file.size > config.data.max_bytes);
+    const maximum = useMultipart ? config.data.multipart_max_bytes ?? 0 : config.data.max_bytes;
+    if (file.size > maximum) { setError(`File exceeds the ${useMultipart ? 'multipart' : 'basic upload'} size limit.`); return; }
+    cancelRequested.current = false; setBusy(true); controller.current = new AbortController();
+    try {
+      if (useMultipart) await uploadMultipartFile(file, folderId, requestId.current, config.data.multipart_part_size ?? 8 * 1024 * 1024, maximum, controller.current.signal, setMessage, setActiveMultipartId);
+      else await uploadBrowserFile(file, folderId, requestId.current, retryId, controller.current.signal, setMessage);
+      await cache.invalidateQueries({ queryKey: ['files', user?.tenant?.id, user?.id] });
+      form.reset(); setFile(null); requestId.current = crypto.randomUUID();
+      setActiveMultipartId(null); setMessage('File uploaded and verified.'); finished();
+    } catch (failure) {
+      await cache.invalidateQueries({ queryKey: ['files', user?.tenant?.id, user?.id] });
+      if (!cancelRequested.current) { setMessage(''); setError(failure instanceof Error ? failure.message : 'Upload failed.'); }
+    } finally { setBusy(false); }
+  }
+  return <form ref={formRef} onSubmit={(event) => void submit(event)} className="upload-panel space-y-3">
+    <div className="upload-heading"><span className="upload-icon"><Icon name="upload" /></span><div><h3>{retryId ? 'Resume your upload' : 'Bring your work here'}</h3><p>{retryId ? 'Choose the original file to retry this pending upload.' : 'Upload a file to this folder.'}</p></div></div>
+    {config.data && <p>Maximum file size: {config.data.max_bytes.toLocaleString()} bytes. Uploads remain unscanned.</p>}
+    {!!config.data?.multipart_max_bytes && !retryId && <><p>Multipart limit: {config.data.multipart_max_bytes.toLocaleString()} bytes. Larger files use chunked upload automatically.</p><label className="flex items-center gap-2"><input type="checkbox" checked={multipart} disabled={busy} onChange={event => setMultipart(event.target.checked)} />Use multipart upload</label></>}
+    {config.data && !config.data.enabled && <p>Uploads are not configured.</p>}
+    {config.error && <p role="alert">Unable to load upload settings.</p>}
+    {config.error && <button type="button" className="border rounded px-3 py-2" disabled={config.isFetching} onClick={() => void config.refetch()}>Retry upload settings</button>}
+    <label className="block">File to upload<input className="block" type="file" disabled={busy || !config.data?.enabled}
+      onChange={(event) => { setFile(event.target.files?.[0] ?? null); setActiveMultipartId(null); requestId.current = crypto.randomUUID(); setMessage(''); setError(''); }} /></label>
+    <button className="primary-button" disabled={busy || cancelling || !file || !config.data?.enabled}>{busy ? 'Uploading…' : 'Upload file'}</button>
+    {activeMultipartId && <button type="button" className="border rounded px-3 py-2" disabled={cancelling} onClick={() => void cancelMultipart()}>{cancelling ? 'Cancelling…' : 'Cancel multipart transfer'}</button>}
+    {message && <p role="status">{message}</p>}
+    {error && <p role="alert">{error} You can retry with the same file while its upload authorization is valid.</p>}
+  </form>;
+}

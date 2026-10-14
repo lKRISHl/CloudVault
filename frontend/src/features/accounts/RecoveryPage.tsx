@@ -1,3 +1,4 @@
+import { AuthLayout } from '../../components/AuthLayout';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -14,7 +15,7 @@ export function RecoveryPage() {
     catch (err) { setError(err instanceof Error ? err.message : 'Unable to request email'); }
     finally { setPending(false); }
   }
-  return <main className="max-w-md mx-auto p-6 space-y-4">
+  return <AuthLayout><div className="w-full max-w-md space-y-4 auth-form">
     <h1 className="text-2xl font-semibold">Recover or verify your account</h1>
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
     <form onSubmit={submit} className="space-y-4">
@@ -27,5 +28,5 @@ export function RecoveryPage() {
       <button className="border rounded px-4 py-2" disabled={pending}>Request email</button>
     </form>
     <Link to="/login" className="text-blue-600 underline">Back to sign in</Link>
-  </main>;
+  </div></AuthLayout>;
 }

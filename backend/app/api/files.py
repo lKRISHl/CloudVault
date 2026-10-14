@@ -1,0 +1,93 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Query, Request, Response
+
+from app.api.folders import WorkspaceUser
+from app.api.multipart import router as multipart_router
+from app.api.storage import UploadStorage
+from app.api.users import Database
+from app.schemas.downloads import DownloadTicket
+from app.schemas.files import FilePage, FileRead
+from app.schemas.uploads import UploadConfiguration, UploadProof, UploadStart, UploadTicket
+from app.services.downloads import DownloadService
+from app.services.files import FileService
+from app.services.uploads import UploadService
+
+router = APIRouter()
+router.include_router(multipart_router)
+
+
+@router.get("/upload-configuration", response_model=UploadConfiguration)
+async def upload_configuration(actor: WorkspaceUser, db: Database):
+    return await UploadService(db).configuration(actor)
+
+
+@router.post("/uploads", response_model=UploadTicket, status_code=201)
+async def start_upload(
+    payload: UploadStart,
+    actor: WorkspaceUser,
+    db: Database,
+    storage: UploadStorage,
+    response: Response,
+    request: Request,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await UploadService(db, storage).start(
+        actor, payload, request.client.host if request.client else ""
+    )
+
+
+@router.post("/{file_id}/upload-url", response_model=UploadTicket)
+async def retry_upload(
+    file_id: UUID,
+    payload: UploadProof,
+    actor: WorkspaceUser,
+    db: Database,
+    storage: UploadStorage,
+    response: Response,
+    request: Request,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await UploadService(db, storage).retry(
+        actor, file_id, payload.checksum_sha256, request.client.host if request.client else ""
+    )
+
+
+@router.post("/{file_id}/complete", response_model=FileRead)
+async def complete_upload(
+    file_id: UUID, actor: WorkspaceUser, db: Database, storage: UploadStorage, request: Request
+):
+    return await UploadService(db, storage).complete(
+        actor, file_id, request.client.host if request.client else ""
+    )
+
+
+@router.get("", response_model=FilePage)
+async def children(
+    actor: WorkspaceUser,
+    db: Database,
+    folder_id: UUID | None = None,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=25, ge=1, le=100),
+):
+    return await FileService(db).children(actor, folder_id, offset, limit)
+
+
+@router.post("/{file_id}/download-url", response_model=DownloadTicket)
+async def download_url(
+    file_id: UUID,
+    actor: WorkspaceUser,
+    db: Database,
+    storage: UploadStorage,
+    response: Response,
+    request: Request,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await DownloadService(db, storage).ticket(
+        actor, file_id, request.client.host if request.client else ""
+    )
+
+
+@router.get("/{file_id}", response_model=FileRead)
+async def details(file_id: UUID, actor: WorkspaceUser, db: Database):
+    return await FileService(db).details(actor, file_id)

@@ -20,6 +20,8 @@ describe('Folder browser', () => {
       const url = String(input); const method = options?.method ?? 'GET';
       const body = options?.body ? JSON.parse(String(options.body)) : {};
       if (url.endsWith('/auth/refresh')) return response(session);
+      if (url.endsWith('/files/upload-configuration')) return response({ max_bytes: 104857600, enabled: false });
+      if (url.includes('/files?')) return response({ items: [], offset: 0, limit: 25, has_more: false });
       if (url.includes('/folders?')) {
         const parentId = new URL(url, window.location.origin).searchParams.get('parent_id');
         const parent = folders.find((folder) => folder.id === parentId) ?? null;
