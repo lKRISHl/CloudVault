@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 2B implementation and local verification are complete: 92 backend tests, 24 frontend component tests, 9 Chromium journeys, PostgreSQL migrations/concurrency and the updated Docker stack. Evidence is recorded in CONTINUE.md; remote CI and production email-provider verification remain pending. Phase 3 has not started.
+Current state: Phase 3 implementation and local verification are complete: 113 backend tests, 28 frontend component tests, 11 Chromium journeys, PostgreSQL migrations/concurrency and the updated Docker folder app. Evidence is recorded in CONTINUE.md; remote CI and production email-provider verification remain pending. Phase 4 has not started.
 
-Next planned implementation: Phase 3, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 4, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
@@ -53,13 +53,13 @@ Status: Implementation complete; local Docker/PostgreSQL runtime verification pa
 - basic roles
 - tenant isolation foundation
 
-Implemented scope: full-name profiles, organizations using existing tenants, explicit memberships, owner/admin/member management, member removal, and private invitations for new accounts. One organization per account remains the documented scope; granular resource permissions belong to Phase 12.
+Implemented scope: full-name profiles, organizations using existing tenants, explicit memberships, owner/admin/member management, member removal, and private invitations for new accounts. Phase 2B extends this to multiple organizations and verified existing accounts; granular resource permissions belong to Phase 12.
 
 ## PHASE 2A — Email, Account Recovery + Session Lifecycle
 
 Status: Implemented and locally verified, including real-browser/SMTP journeys and PostgreSQL/Docker checks. Remote CI and production provider verification remain pending.
 
-Current scope: one organization per account; verified non-owners can delete their profile/access, while owners are protected until Phase 2B ownership transfer. Production email transport requires operator configuration; SMTP is at-least-once under ambiguous acknowledgement, while account actions remain single-use.
+Account lifecycle scope: verified users can delete profile/access after transferring ownership in every organization through Phase 2B. Production email transport requires operator configuration; SMTP is at-least-once under ambiguous acknowledgement, while account actions remain single-use.
 
 Dependencies: Phase 2. Implement before multi-organization onboarding and public customer use.
 
@@ -104,13 +104,15 @@ Completion criteria:
 
 ## PHASE 3 — Folder System
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-14. Folder hierarchy, mutation permissions, concurrent moves, tenant constraints, migrations, Chromium and Docker folder checks pass. See docs/phases/phase3.md. Remote CI pending.
 
 - create folder
 - rename
 - move
 - hierarchy
 - folder permissions foundation
+
+Implemented policy: verified active members read workspace folders and create at root; folder creators/owners/admins modify folders and create within writable parents. Granular private/shared viewer/editor ACLs remain Phase 12. Names are normalized and case-insensitively unique per parent. Maximum depth is 64. Folder deletion/trash is Phase 13.
 
 ## PHASE 4 — File Metadata
 

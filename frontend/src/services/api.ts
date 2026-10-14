@@ -1,4 +1,4 @@
-import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace } from '../types';
+import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace, Folder, FolderPage } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -24,7 +24,7 @@ export function getAccessToken() {
   return accessToken;
 }
 
-class ApiRequestError extends Error {
+export class ApiRequestError extends Error {
   status: number;
 
   constructor(message: string, status: number) {
@@ -125,6 +125,16 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
 }
 
 export const api = {
+  folders: (parent_id: string | null = null, offset = 0) => fetchApi<FolderPage>(`${API_V1}/folders?offset=${offset}&limit=25${parent_id ? `&parent_id=${encodeURIComponent(parent_id)}` : ''}`),
+  createFolder: (name: string, parent_id: string | null) => fetchApi<Folder>(`${API_V1}/folders`, {
+    method: 'POST', body: JSON.stringify({ name, parent_id }),
+  }),
+  renameFolder: (id: string, name: string) => fetchApi<Folder>(`${API_V1}/folders/${id}`, {
+    method: 'PATCH', body: JSON.stringify({ name }),
+  }),
+  moveFolder: (id: string, parent_id: string | null) => fetchApi<Folder>(`${API_V1}/folders/${id}/move`, {
+    method: 'POST', body: JSON.stringify({ parent_id }),
+  }),
   getHealth: () => fetchApi<HealthResponse>(`${API_V1}/health`),
   getReadiness: () => fetchApi<ReadinessResponse>(`${API_V1}/health/ready`),
   register: (payload: RegisterPayload) =>

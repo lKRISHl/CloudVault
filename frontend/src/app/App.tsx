@@ -10,6 +10,8 @@ import { JoinPage } from '../features/organizations/JoinPage';
 import { SecurityPage } from '../features/accounts/SecurityPage';
 import { RecoveryPage } from '../features/accounts/RecoveryPage';
 import { AccountActionPage } from '../features/accounts/AccountActionPage';
+import { FoldersPage } from '../features/folders/FoldersPage';
+import { ApiRequestError } from '../services/api';
 
 function ProtectedRoute() {
   const { user, isLoading } = useAuth();
@@ -48,7 +50,9 @@ function GuestRoute() {
 }
 
 function App() {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: {
+    retry: (count, error) => count < 2 && !(error instanceof ApiRequestError && error.status < 500),
+  } } }));
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -65,6 +69,7 @@ function App() {
               <Route path="/app" element={<HomePage />} />
               <Route path="/app/settings" element={<SettingsPage />} />
               <Route path="/app/security" element={<SecurityPage />} />
+              <Route path="/app/folders" element={<FoldersPage />} />
             </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />

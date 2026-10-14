@@ -51,6 +51,13 @@
 - The email maintenance job removes expired rate counters and obsolete token/session/invitation/outbox records according to the documented 30-day technical retention policy. Previously delivered messages in recipients' mailboxes cannot be recalled.
 - PostgreSQL-backed backend tests and migration checks pass locally. MFA, cross-tab coordination, token-family replay response, independent security assessment, remote CI, and real production email-provider verification remain future/pending work.
 
+## Phase 3 Folder Controls
+- Folder parent/tenant composite foreign keys, sibling/root name uniqueness and self-parent checks enforce structural constraints. Every folder lookup is tenant-scoped; unrelated folder/parent UUIDs return 404. Client-supplied tenant/creator fields are rejected.
+- Verified active members read shared workspace folders; creator or current owner/admin authority is required for writes, including destination/parent writes. Private/shared resource ACLs remain Phase 12 work.
+- Structural writes lock before reading the graph, preventing concurrent moves from forming a cycle. Self/descendant moves, duplicate names and depth above 64 are rejected. Names reject path separators, dot-only paths and control/surrogate characters.
+- UUID/tenant/user-scoped query state and Phase 2B stale-response protections isolate workspace changes. Queries do not retry client errors; transient/network failures receive bounded retries and folder views expose manual retry.
+- Account deletion retains organization-owned folder metadata with a pseudonymous creator reference; deletion does not erase shared organizational content. Nonempty folder migration downgrade is refused; restore a pre-upgrade backup for rollback.
+
 ## Responsible Disclosure Policy
 Development MinIO binaries are built from pinned official source revisions with
 upstream licenses preserved. The community repositories are archived and unmaintained;

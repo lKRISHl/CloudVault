@@ -81,7 +81,10 @@ test('existing identity joins, switches with scoped permissions, and is removed/
   await revoked.getByLabel('Email', { exact: true }).fill(member);
   await revoked.getByLabel('Password', { exact: true }).fill(password);
   await revoked.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await revoked.getByRole('button', { name: 'Switch to Primary Team' }).click();
+  await expect(revoked.getByText(/^Current workspace:/)).toBeVisible();
+  if (await revoked.getByRole('button', { name: 'Switch to Primary Team' }).count()) {
+    await revoked.getByRole('button', { name: 'Switch to Primary Team' }).click();
+  }
   await expect(revoked.getByText('Current workspace: Primary Team', { exact: true })).toBeVisible();
   await page.goto('/app/settings');
   page.on('dialog', (dialog) => dialog.accept());

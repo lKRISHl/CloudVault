@@ -191,6 +191,10 @@ async def test_removal_preserves_other_workspace_and_owner_reactivation_never_re
             json={"email": "other@example.com", "password": REGISTER_PAYLOAD["password"]},
         )
     ).json()
+    # SQLite timestamp ties have a deterministic UUID tie-breaker; explicitly
+    # select the unaffected workspace rather than assume the default selection.
+    if separate["user"]["tenant"]["id"] != other["user"]["tenant"]["id"]:
+        separate = await switch(client, separate, other["user"]["tenant"]["id"])
     assert separate["user"]["tenant"]["name"] == "Other"
     admin, _ = await add_member(client, owner, "admin@example.com", "admin")
     assert (

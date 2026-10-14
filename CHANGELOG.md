@@ -4,6 +4,14 @@ All notable changes to CloudVault will be documented in this file.
 
 ## [Unreleased] - 2026-10-14
 
+### Phase 3 — Folder System
+- Add tenant-scoped folders with parent/tenant integrity, stable identifiers, normalized sibling names, child-list indexes and timestamps.
+- Add create/rename/move/list/detail services and API, breadcrumbs/pagination, depth/cycle protection and concurrent structural serialization.
+- Add shared-workspace permissions: verified active members read, creators/owners/admins write; destination parents require write authority.
+- Add folder browser and move destination picker, with visible failures/retry and tenant/user-scoped queries. Avoid automatically retrying missing/forbidden resources.
+- Preserve organization folders after creator account deletion; guard populated folder downgrade and save a local pre-upgrade backup.
+- Verify 113 backend tests on SQLite/PostgreSQL, 28 frontend tests, 11 Chromium journeys, real migrations and updated Docker folder/storage operations. Phase 4 remains unstarted.
+
 ### Phase 2B — Multiple Organizations and Membership Lifecycle
 - Separate global user identity from per-organization roles; migrate existing accounts/passwords and bind valid sessions to their prior workspace.
 - Add verified existing-user invitation acceptance, workspace listing/creation/switching, and scoped removal/reactivation without disabling other memberships.
@@ -11,7 +19,7 @@ All notable changes to CloudVault will be documented in this file.
 - Complete deletion across all memberships; require ownership transfer in every owned organization first.
 - Reject stale frontend responses and cross-workspace retries; preserve independent public account actions during session restoration.
 - Verify 92 backend tests on SQLite/PostgreSQL, 24 frontend component tests, 9 Chromium/SMTP journeys, migrations, lint/build, and updated Docker/storage runtime.
-- Save an ignored pre-upgrade local database backup. Phase 3 remains unstarted; no commit/push/remote CI was performed for Phase 2B.
+- Save an ignored pre-upgrade local database backup. Phase 2B was committed as 35d4b58 before Phase 3; no push/remote CI was performed.
 
 ## [Unreleased] - 2026-10-13
 

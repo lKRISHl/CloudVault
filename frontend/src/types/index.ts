@@ -101,3 +101,23 @@ export interface Workspace {
   tenant: Tenant;
   role: 'owner' | 'admin' | 'member';
 }
+
+export interface Folder {
+  id: string;
+  tenant_id: string;
+  parent_id: string | null;
+  created_by: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  can_write: boolean;
+}
+
+export interface FolderPage {
+  parent: Folder | null;
+  breadcrumbs: Folder[];
+  items: Folder[];
+  offset: number;
+  limit: number;
+  has_more: boolean;
+}

@@ -40,7 +40,13 @@ recovery/email-change workflows, immediate session revocation, and protected pro
 deletion. Development delivery is tested against a real local SMTP inbox. Production
 provider verification and remote CI remain pending. Phase 2B passes 92 backend tests,
 24 frontend component tests, 9 real Chromium/SMTP journeys, PostgreSQL migrations and
-concurrency checks, and the updated Docker/storage smoke. Phase 3 is next and unstarted.
+concurrency checks, and the updated Docker/storage smoke. Phase 2B is committed as 35d4b58.
+
+Phase 3 adds a real folder browser with creation, rename, destination-based moves,
+breadcrumbs/pagination and a shared-workspace permission foundation. Parent edges
+and resource access stay tenant-scoped; concurrent writes preserve an acyclic tree.
+113 backend tests, 28 frontend tests and 11 Chromium journeys pass, plus migrations
+and actual Docker folder operations. File metadata (Phase 4) is next and unstarted.
 
 ## Commercial Vision
 - **Free Tier**: Basic storage, standard search.

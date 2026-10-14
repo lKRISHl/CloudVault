@@ -25,6 +25,7 @@ export function HomePage() {
 
         <div className="w-full max-w-md space-y-4">
           <WorkspaceSwitcher />
+          <Link to="/app/folders" className="block text-center text-blue-600 underline">Browse folders</Link>
           <Link to="/app/security" className="block text-center text-blue-600 underline">Account security and email</Link>
           <Link to="/app/settings" className="block text-center text-blue-600 underline">
             Profile and organization

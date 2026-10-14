@@ -82,6 +82,7 @@ includes the dispatcher automatically. Queued email is not the same as delivered
 - [Phase 2 Explanation](docs/phases/phase2.md)
 - [Phase 2A Explanation](docs/phases/phase2a.md)
 - [Phase 2B Explanation](docs/phases/phase2b.md)
+- [Phase 3 Explanation](docs/phases/phase3.md)
 
 ## Profiles and Organizations
 
@@ -138,6 +139,26 @@ appropriate `SMTP_HOST`/`SMTP_PORT`, and provider-specific username/password/fro
 configuration. Local SMTP success does not verify production delivery. Queued payloads
 are encrypted with a key derived from `SECRET_KEY`; rotating that key makes old pending
 payloads unreadable, so coordinate worker/backend configuration and resend affected links.
+
+## Folder Browser
+
+Open **Browse folders** from the workspace, or `/app/folders`. Create folders at
+root or within a writable folder, open them to browse children, use breadcrumbs,
+rename folders, and move them with the destination browser.
+
+All verified active workspace members can read these shared folders. Creators,
+owners and admins can rename/move a folder; creating a child or moving into another
+folder also requires permission on that parent. Granular private/shared ACLs arrive
+in Phase 12. Folder deletion/trash arrives in Phase 13.
+
+Names are trimmed, Unicode-normalized and case-insensitively unique among siblings;
+path separators, control characters and dot-only names are rejected. The tree has
+a maximum depth of 64; self/descendant moves and duplicate destination names fail
+without changing the hierarchy. File metadata/uploads are the next phases.
+
+Migration `005_folders` preserves current accounts and memberships. Back up before
+upgrading; downgrade refuses to discard a populated folder table. The running Docker
+app is migrated. Local pre-upgrade backups are ignored under `.local/backups/`.
 
 ## License
 MIT License - Copyright (c) 2026 CloudVault Contributors

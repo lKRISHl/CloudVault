@@ -1,7 +1,7 @@
 # CloudVault Architecture
 
 ## Overview
-CloudVault uses a modular monolith. Phase 2B separates global accounts from organization memberships and adds explicit session workspace selection.
+CloudVault uses a modular monolith. Global accounts use organization memberships and explicit session workspace selection; Phase 3 adds tenant-scoped folder hierarchy and permission services.
 
 ```text
 [Frontend Client (React/Vite)] 
@@ -38,7 +38,7 @@ CloudVault uses a modular monolith. Phase 2B separates global accounts from orga
 - Frontend routes `/app/settings` and `/join` provide management and invitation onboarding. Query caches are scoped to tenant/user and cleared when authentication changes. Invitation secrets are placed in the URL fragment and cleared after acceptance.
 - Workspace listing/creation/switching is available on `/app`. Switching revokes the current session, issues a replacement bound to the selected membership and preserves the absolute expiry; other browser sessions retain their selected workspace. Login selects the earliest active membership deterministically, or an account-only session if none remain. Frontend changes cancel/clear queries and reject stale responses; a shared cookie cannot silently retry an old workspace mutation in a new workspace.
 - Migration `004_workspaces` preserves existing accounts, passwords, memberships and valid sessions. Former removal disables become revoked membership tombstones with account-only recovery; identities disabled with intact memberships remain disabled. Downgrade refuses multi-workspace/workspace-less data or incompatible invitation history instead of deleting it.
-- File/folder permissions are planned for subsequent phases.
+- Phase 3 supplies a shared-workspace folder permission foundation; granular resource ACLs and files arrive in subsequent phases.
 
 ## Account Lifecycle (Phase 2A)
 
@@ -50,6 +50,16 @@ CloudVault uses a modular monolith. Phase 2B separates global accounts from orga
 - Migration `003_accounts` preserves identities/passwords, marks addresses unverified, and revokes legacy refresh cookies. Legacy access tokens lack the required session claim and are rejected; existing users must sign in and verify their address.
 - `/account/recover`, `/account/action`, and `/app/security` provide recovery, verification/email confirmation, delivery status, and session management. Action secrets use URL fragments; successful actions clear those fragments.
 - Verified deletion redacts profile identifiers, removes all memberships/recovery tokens, and revokes all access while retaining reference-safe identity tombstones. Ownership in every organization must first be transferred through Phase 2B's ownership flow.
+
+## Folder Hierarchy (Phase 3)
+
+- `folders` stores metadata only: stable UUID, tenant, nullable parent, creator, normalized display/name key and timestamps. A composite parent/tenant foreign key prevents cross-tenant edges; root/child uniqueness enforces names per parent and a check prevents direct self-parent links.
+- Adjacency-list hierarchy keeps ordinary moves to one parent update while preserving descendants' IDs. Ancestor traversal checks cycles and builds breadcrumbs; a bounded recursive CTE computes subtree height before moves. Depth is limited to 64.
+- All folder reads/writes require verified active membership. Members read shared folders and create at root. Folder creators and organization owners/admins modify folders; parent writes require the same authority. `can_write` is informational UI state; server policy rechecks every mutation.
+- PostgreSQL tenant-row locks serialize structural writes per organization. SQLite test/development requests acquire its writer lock with BEGIN IMMEDIATE before reading the mutable graph. Name indexes and cycle/depth checks remain authoritative in both environments.
+- Creator account deletion preserves organization-owned folder metadata with its pseudonymous identity reference; active organization managers can maintain it. Deletion/trash and granular permissions belong to Phases 13 and 12 respectively.
+- `/api/v1/folders` lists children/breadcrumbs with bounded pagination and creates folders; UUID routes read/rename/move. `/app/folders` provides browsing and destination selection. Queries are scoped by tenant/user/parent/page; missing/forbidden resources do not undergo automatic retries.
+- Migration `005_folders` adds the table without changing identities/memberships; downgrade refuses nonempty folders. Seeded preservation and populated downgrade protection are verified on PostgreSQL and SQLite.
 
 ## Configuration Management
 Configuration is managed using `pydantic-settings` on the backend, reading from environment variables. The `.env` file serves as the source of truth for the local development environment.
