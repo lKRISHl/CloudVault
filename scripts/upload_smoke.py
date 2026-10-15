@@ -148,14 +148,14 @@ def main():
                     )
                     multipart["parts"][1] = resumed["parts"][1]
             completed = require(api.post(f"/files/{file_id}/multipart/complete"), 200)
-            expected = base64.b64encode(
+            multipart_checksum = base64.b64encode(
                 hashlib.sha256(
                     b"".join(base64.b64decode(value) for value in hashes)
                 ).digest()
             ).decode()
             assert (
                 completed["checksum_kind"] == "sha256-composite"
-                and completed["checksum_sha256"] == expected
+                and completed["checksum_sha256"] == multipart_checksum
             )
             download = require(api.post(f"/files/{file_id}/download-url"), 200)
             received = transfer.get(download["download_url"])
@@ -382,6 +382,98 @@ def main():
         assert require(api.get(f"/files/{fid}/versions"), 200)["retained_bytes"] == len(
             body
         ) + len(replacement)
+        version_payload = {
+            "request_id": str(uuid4()),
+            "base_generation": restored_version["version_generation"],
+            "declared_size_bytes": sum(map(len, chunks)),
+            "declared_content_type": "application/octet-stream",
+            "checksum_sha256": multipart_checksum,
+            "part_size": part_size,
+            "checksums": hashes,
+        }
+        version_root = f"/files/{fid}/versions"
+        multi_version = require(
+            api.post(version_root + "/multipart", json=version_payload), 201
+        )
+        vid = multi_version["version"]["id"]
+        with httpx.Client(timeout=30) as transfer:
+            first_part = multi_version["parts"][0]
+            assert (
+                transfer.put(
+                    first_part["upload_url"],
+                    headers=first_part["headers"],
+                    content=chunks[0],
+                ).status_code
+                == 200
+            )
+            require(api.post(version_root + f"/{vid}/parts/1/confirm"), 200)
+            assert (
+                require(api.get(version_root + f"/{vid}/progress"), 200)[
+                    "confirmed_bytes"
+                ]
+                == part_size
+            )
+            resumed = require(
+                api.post(version_root + f"/{vid}/resume", json={"checksums": hashes}),
+                200,
+            )
+            assert (
+                resumed["parts"][0]["confirmed"]
+                and not resumed["parts"][0]["upload_url"]
+            )
+            last_part = resumed["parts"][1]
+            assert (
+                transfer.put(
+                    last_part["upload_url"],
+                    headers=last_part["headers"],
+                    content=chunks[1],
+                ).status_code
+                == 200
+            )
+            selected = require(api.post(version_root + f"/{vid}/complete"), 200)
+            assert selected["checksum_kind"] == "sha256-composite"
+            grant = require(api.post(version_root + f"/{vid}/download-url"), 200)
+            assert transfer.get(grant["download_url"]).content == b"".join(chunks)
+            reverted = require(
+                api.post(
+                    version_root + f"/{original['id']}/restore",
+                    json={"base_generation": selected["version_generation"]},
+                ),
+                200,
+            )
+            assert reverted["current_version"] == 1
+        assert (
+            api.post(
+                version_root + f"/{version['version']['id']}/prune",
+                json={"confirmation": "DELETE"},
+            ).status_code
+            == 202
+        )
+        assert (
+            api.post(
+                version_root + f"/{version['version']['id']}/download-url"
+            ).status_code
+            == 404
+        )
+        version_payload.update(
+            request_id=str(uuid4()), base_generation=reverted["version_generation"]
+        )
+        abandoned = require(
+            api.post(version_root + "/multipart", json=version_payload), 201
+        )
+        abandoned_id = abandoned["version"]["id"]
+        assert api.post(version_root + f"/{abandoned_id}/cancel").status_code == 202
+        assert api.post(version_root + f"/{abandoned_id}/complete").status_code == 410
+        require(
+            api.put(
+                f"/files/{fid}/version-policy",
+                json={"keep_last": 1, "confirmation": "PRUNE"},
+            ),
+            200,
+        )
+        assert require(api.get(version_root), 200)["retained_bytes"] == len(body) + len(
+            replacement
+        ) + sum(map(len, chunks))
         trashed = require(api.post(f"/files/{fid}/trash"), 201)
         assert api.get(f"/files/{fid}").status_code == 404
         page = require(api.get("/trash"), 200)
@@ -404,7 +496,7 @@ def main():
         folder_trash = require(api.post(f"/folders/{empty['id']}/trash"), 201)
         assert api.post(f"/trash/{folder_trash['id']}/restore").status_code == 204
         print(
-            "Docker SMTP/transfers/search/sharing/ACL, versions and trash/restore/purge queue passed"
+            "Docker SMTP/transfers/search/sharing/ACL, version multipart/resume/cancel/prune/policy and trash/restore/purge queue passed"
         )
         print("Unique smoke accounts/workspace/two files retained as development data")
 

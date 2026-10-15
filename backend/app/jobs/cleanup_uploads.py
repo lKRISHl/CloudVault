@@ -7,11 +7,11 @@ import re
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select, text
 
 from app.core.config import settings
 from app.core.database import async_session_maker
-from app.models import File, FileVersion, UploadIntent
+from app.models import File, FileVersion, Tenant, UploadIntent
 from app.services.upload_cleanup import UploadCleanupService
 from app.services.uploads import utc
 from app.storage.base import ObjectRef, StorageError
@@ -55,6 +55,15 @@ async def sweep_orphans(inventory, factory, marker=None, now=None):
                 and file.object_id == ref.object_id
                 and file.multipart_upload_id == upload["UploadId"]
             ):
+                continue
+            retained_version = await db.scalar(
+                select(FileVersion.id).where(
+                    FileVersion.tenant_id == ref.tenant_id,
+                    FileVersion.file_id == ref.file_id,
+                    FileVersion.object_id == ref.object_id,
+                )
+            )
+            if retained_version is not None:
                 continue
         scoped = S3ObjectStorage(settings, ref.tenant_id)
         try:
@@ -156,13 +165,45 @@ async def tick(factory=async_session_maker, marker=None):
                 await scoped.close()
         marker = await sweep_orphans(inventory, factory, marker, now)
         from app.services.version_cleanup import VersionCleanupService
+        from app.services.version_policy import apply_policy
+
+        async with factory() as db:
+            policies = list(
+                await db.execute(
+                    select(File.id, File.tenant_id)
+                    .where(
+                        File.version_keep_last.is_not(None),
+                        File.trash_id.is_(None),
+                        File.status == "uploaded",
+                    )
+                    .order_by(File.version_policy_checked_at.asc().nullsfirst(), File.id)
+                    .limit(25)
+                )
+            )
+        for file_id, tenant_id in policies:
+            async with factory() as db:
+                if db.bind.dialect.name == "sqlite":
+                    await db.execute(text("BEGIN IMMEDIATE"))
+                await db.scalar(select(Tenant.id).where(Tenant.id == tenant_id).with_for_update())
+                file = await db.scalar(
+                    select(File).where(File.id == file_id, File.tenant_id == tenant_id)
+                )
+                if file:
+                    await apply_policy(db, file, now)
+                await db.commit()
 
         async with factory() as db:
             expired_versions = list(
                 await db.execute(
                     select(FileVersion.id, FileVersion.tenant_id)
                     .where(
-                        FileVersion.status == "pending",
+                        or_(
+                            FileVersion.status == "pending",
+                            and_(
+                                FileVersion.prune_requested_at.is_not(None),
+                                FileVersion.prune_not_before <= now,
+                            ),
+                        ),
                         FileVersion.storage_bucket == settings.S3_BUCKET_NAME,
                         FileVersion.upload_expires_at <= UploadCleanupService.cutoff(now),
                     )

@@ -22,6 +22,7 @@ class FileMetadataCreate(FolderName):
 class FileRead(BaseModel):
     current_version: int = 1
     version_generation: int = 1
+    version_keep_last: int | None = None
     id: UUID
     tenant_id: UUID
     folder_id: UUID | None

@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 14A — Version Transfers, Resume/Cancel and Pruning (2026-10-15)
+- Multipart replacements with bounded hashing, durable pre-provider candidates/part receipts, missing-part resume and lost-acknowledgement reconciliation; current content remains available until verified activation.
+- Reload resume using secret-free scoped manifests or server history, original-file validation, pause and durable cancellation with safe cleanup.
+- Creator/manager history deletion and keep-last policy, current protection and irreversible intent; cleanup preserves issued upload/download windows and counts bytes until confirmed absence.
+- Migration 015_version_transfers preserves existing snapshots and guards rollback. Local verification/evidence and inherited limitation checkpoints are recorded in docs/phases/phase14a.md and CONTINUE.md; aggregate quota/audit retention remain Phase 19/20.
+
 ## Planning — Earlier Phase Limitations (2026-10-15)
 - Consolidated historical limitations into docs/LIMITATIONS_BACKLOG.md with resolved work, 36 open closure items, four product decisions and intentional constraints.
 - Scheduled Phase 14A version completion and 14B library recovery before previews, 18A collaboration completion, 22A navigation/pagination, and explicit acceptance work in existing phases. No runtime implementation or new verification is implied.

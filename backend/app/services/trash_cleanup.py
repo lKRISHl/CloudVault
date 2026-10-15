@@ -94,6 +94,11 @@ class TrashCleanupService:
                             + settings.UPLOAD_CLEANUP_SETTLE_SECONDS
                         )
                         > now
+                        or (
+                            versions
+                            and version.prune_not_before is not None
+                            and utc(version.prune_not_before) > now
+                        )
                     ):
                         continue
                     try:

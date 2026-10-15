@@ -30,6 +30,17 @@ class File(Base):
             name="fk_files_folder_tenant",
         ),
         CheckConstraint("declared_size_bytes >= 0", name="ck_files_declared_size"),
+        CheckConstraint(
+            "version_keep_last IS NULL OR version_keep_last BETWEEN 1 AND 1000",
+            name="ck_files_version_policy",
+        ),
+        Index(
+            "ix_files_version_policy",
+            "version_policy_checked_at",
+            "id",
+            postgresql_where=text("version_keep_last IS NOT NULL"),
+            sqlite_where=text("version_keep_last IS NOT NULL"),
+        ),
         CheckConstraint("status IN ('pending', 'uploaded')", name="ck_files_status"),
         CheckConstraint("visibility IN ('workspace', 'private')", name="ck_files_visibility"),
         CheckConstraint(
@@ -143,6 +154,8 @@ class File(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     current_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     version_generation: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    version_keep_last: Mapped[int | None] = mapped_column(Integer)
+    version_policy_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
     folder_id: Mapped[UUID | None] = mapped_column(nullable=True)
     trash_id: Mapped[UUID | None] = mapped_column(ForeignKey("trash_entries.id"), index=True)

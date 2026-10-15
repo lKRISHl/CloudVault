@@ -127,6 +127,7 @@ export interface FolderPage {
 export interface FileMetadata {
   current_version?: number;
   version_generation?: number;
+  version_keep_last?: number | null;
   can_manage?: boolean;
   visibility?: 'workspace' | 'private';
   upload_method?: 'basic' | 'multipart';
@@ -187,7 +188,9 @@ export interface ShareLink {
 }
 export interface SharedFile { name: string; size_bytes: number; expires_at: string; allow_download: boolean; grants_remaining: number | null }
 export interface TrashEntry { id: string; resource_id: string; kind: 'files' | 'folders'; name: string; trashed_at: string; retain_until: string; not_before: string; purge_requested_at: string | null }
-export interface FileVersion { id: string; number: number; created_by: string; created_at: string; completed_at: string | null; status: 'pending' | 'uploaded'; size_bytes: number | null; declared_size_bytes: number; checksum_sha256: string | null; checksum_kind: string; is_current: boolean; expires_at: string; can_complete: boolean }
+export interface FileVersion extends VersionTransferState { id: string; number: number; created_by: string; created_at: string; completed_at: string | null; status: 'pending' | 'uploaded'; size_bytes: number | null; declared_size_bytes: number; checksum_sha256: string | null; checksum_kind: string; is_current: boolean; expires_at: string; can_complete: boolean }
+export interface VersionTransferState { upload_method?: 'basic' | 'multipart'; multipart_state?: string | null; part_size?: number | null; cancelled_at?: string | null; prune_requested_at?: string | null; prune_not_before?: string | null }
+export interface VersionMultipartTicket { version: FileVersion & VersionTransferState; part_size: number; parts: PartTicket[]; expires_at: string; can_resume: boolean; confirmed_bytes: number }
 export interface VersionPage { file: FileMetadata; items: FileVersion[]; offset: number; has_more: boolean; retained_bytes: number; pending_bytes: number }
 export interface VersionStart { request_id: string; base_generation: number; declared_size_bytes: number; declared_content_type: string | null; checksum_sha256: string }
 export interface VersionTicket { version: FileVersion; upload_url: string | null; headers: Record<string, string>; expires_at: string }

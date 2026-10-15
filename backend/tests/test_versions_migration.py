@@ -124,6 +124,7 @@ async def test_versions_backfill_objects_empty_rollback_and_retained_reference_g
             refused.returncode != 0
             and "Version history or cleanup references exist" in refused.stderr
         )
+        assert migrate("upgrade", "head").returncode == 0
         assert migrate("check").returncode == 0
         async with factory() as db:
             assert len(list(await db.scalars(sa.select(FileVersion)))) == 2

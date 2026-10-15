@@ -49,4 +49,6 @@ does not need to request each fix again. Unfinished assigned checks prevent phas
 
 - [Phase 14 — File Versioning](phase14.md)
 
+- [Phase 14A — Version Transfers, Resume/Cancel and Pruning](phase14a.md)
+
 Current cross-phase status and follow-up schedule: [Limitations backlog](../LIMITATIONS_BACKLOG.md). Older phase reports retain their historical implementation scope.

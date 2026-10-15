@@ -1,6 +1,6 @@
 # CloudVault — Limitations and Closure Schedule
 
-Reviewed 2026-10-15 against the phase reports currently present (2, 2A, 2B, 3–14),
+Reviewed 2026-10-15 against the phase reports currently present (2, 2A, 2B, 3–14A),
 CONTINUE.md, SECURITY.md and DEVELOPMENT_PLAN.md. Phases 0/1 are represented by the
 roadmap/security notes; separate phase0/phase1 reports are not present. Selected current
 code checks confirm file moves/avatars are absent, readiness checks only the DB, and
@@ -20,7 +20,7 @@ follow-ups are additions. The current task collects/schedules work only.
 
 1. Commit the already verified Phase 14 implementation separately from new implementation.
    Keep this planning update reviewable; it does not authorize a push.
-2. Phase 14A: complete version transfers, resume/cancel and safe version pruning.
+2. Phase 14A: locally complete version transfers, resume/cancel and safe version pruning; L04 quota/audit integration remains 19/20. Evidence: [14A](phases/phase14a.md).
 3. Phase 14B: close core library movement/trash recovery gaps. Finish before Phase 15.
 4. Phases 15–18: safe previews, reliable jobs, scans and realtime synchronization.
 5. Phase 18A: collaboration/sharing completion and explicit MVP scope decisions, before 19.
@@ -59,7 +59,7 @@ certification. Production SMTP and storage verification must pass before public 
   delayed confirmed purge and basic version history/restore. This does not close the
   explicit transfer/pruning/recovery additions below.
 
-## Open implementation and verification work
+## Implementation and verification register
 
 Each ID includes its source, assigned checkpoint and the evidence required for closure.
 
@@ -75,16 +75,28 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   **When: 14A.** Add bounded multipart replacement hashing/receipts/composite verification,
   select the appropriate transfer mode, preserve old current bytes and reject stale
   activation. Verify actual large/empty-file paths, lost acknowledgements and ACL races.
+  **Closed locally in 14A:** actual multipart/empty replacement bytes, bounded hashing,
+  missing receipts, lost create/complete ACKs, stale generation, revoked private authority
+  and cancel/complete races pass. SQLite/PostgreSQL/provider/browser evidence: [14A §H](phases/phase14a.md#h-verification).
 - **L03 — Version reload resume, progress discovery and explicit cancellation absent.**
   Source: 14 §J. **When: 14A.** Persist a secret-free manifest; reselect/validate original
   content, resume missing parts within the original deadline, and reconcile aborts/cleanup.
   Verify reload, changed file, workspace switch, revoked authority and abort/complete races.
+  **Closed locally in 14A:** secret-free manifests/server discovery, original-file rejection,
+  reload with missing-part-only transfers, stale-session guards, revoked authority and
+  durable cancel/complete outcome verified; fixed deadlines and grace reconciliation pass.
+  See [14A §H](phases/phase14a.md#h-verification). Cross-tab synchronization remains L15.
 - **L04 — No version pruning/individual history deletion or bounded history policy.**
   Sources: 14 §D/J. **When: 14A core lifecycle; 19 usage reconciliation; 20 audit/metadata
   retention.** Add configurable retained-version rules and explicit deletion authority;
   never prune current content or unresolved authorizations. Commit intent before provider
   effects; retain exact retry refs, confirm absence, and verify restore/prune/trash races.
   Do not decrement retained usage just because a delete was requested.
+  **Core lifecycle closed locally in 14A:** confirmed manual/policy pruning, current/older-
+  restored-current protection, upload/download lease windows, restore/prune races, provider
+  failure and retained-byte reclamation verified. **Still open:** Phase 19 aggregate quota/
+  provider usage reconciliation and Phase 20 complete audit/metadata retention; per-file
+  totals/minimal change events do not close those checks. See [14A](phases/phase14a.md).
 - **L05 — Completed files cannot move between folders.** Sources: [4 §J](phases/phase4.md#j-limitations-and-operation),
   current files API (rename exists, move does not). **When: 14B.** Add file moves with
   source/destination/ancestor authority, conflict handling, share revocation and unchanged

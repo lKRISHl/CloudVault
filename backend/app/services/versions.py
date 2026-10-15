@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 
 from app.core.config import settings
-from app.models import File, FileVersion, FileVersionChange
+from app.models import File, FileVersion, FileVersionChange, VersionPart
 from app.models.file_version import CONTENT_FIELDS
 from app.schemas.versions import VersionDownload, VersionPage, VersionRead, VersionTicket
 from app.services.accounts import AccountService
@@ -65,8 +65,15 @@ class VersionService:
             },
             is_current=version.status == "uploaded" and version.number == file.current_version,
             expires_at=utc(version.upload_expires_at),
+            upload_method=version.upload_method,
+            multipart_state=version.multipart_state,
+            part_size=version.multipart_part_size,
+            cancelled_at=version.cancelled_at,
+            prune_requested_at=version.prune_requested_at,
+            prune_not_before=version.prune_not_before,
             can_complete=version.status == "pending"
             and version.cleaned_at is None
+            and version.cancelled_at is None
             and version.created_by == actor.id
             and version.base_generation == file.version_generation
             and utc(version.upload_expires_at)
@@ -84,7 +91,7 @@ class VersionService:
             )
             .execution_options(populate_existing=True)
         )
-        if version is None or version.cleaned_at or version.purged_at:
+        if version is None or version.cleaned_at or version.purged_at or version.prune_requested_at:
             raise HTTPException(404, "Version not found")
         return version
 
@@ -132,6 +139,13 @@ class VersionService:
         )
 
     async def ticket(self, actor, file, version):
+        if (
+            version.cancelled_at
+            or version.cleaned_at
+            or version.prune_requested_at
+            or version.purged_at
+        ):
+            raise HTTPException(410, "Version no longer available")
         if version.status == "uploaded":
             return VersionTicket(
                 version=self.read(version, file, actor), expires_at=utc(version.upload_expires_at)
@@ -158,10 +172,18 @@ class VersionService:
         )
 
     async def start(self, actor, file_id, payload, ip):
+        file, version = await self.reserve(actor, file_id, payload, ip)
+        result = await self.ticket(actor, file, version)
+        await self.db.commit()
+        return result
+
+    async def reserve(self, actor, file_id, payload, ip, multipart=False):
         await AccountService(self.db).limit("version-upload", ip, str(actor.id))
         file, _ = await self.access(actor, file_id, True)
-        if payload.declared_size_bytes > settings.UPLOAD_MAX_BYTES:
-            raise HTTPException(413, "Replacement versions use the basic upload size limit")
+        if payload.declared_size_bytes > (
+            settings.MULTIPART_MAX_BYTES if multipart else settings.UPLOAD_MAX_BYTES
+        ):
+            raise HTTPException(413, "Replacement exceeds transfer size limit")
         version = await self.db.scalar(
             select(FileVersion).where(
                 FileVersion.tenant_id == actor.tenant_id,
@@ -176,11 +198,15 @@ class VersionService:
                 or version.declared_size_bytes != payload.declared_size_bytes
                 or version.declared_content_type != payload.declared_content_type
                 or version.expected_checksum_sha256 != payload.checksum_sha256
+                or version.upload_method != ("multipart" if multipart else "basic")
+                or (multipart and version.multipart_part_size != payload.part_size)
             ):
                 raise HTTPException(409, "Request ID belongs to another version declaration")
         else:
             if file.version_generation != payload.base_generation:
                 raise HTTPException(409, "Current version changed; refresh and start again")
+            if multipart and payload.part_size != settings.MULTIPART_PART_BYTES:
+                raise HTTPException(409, "Chunk configuration changed; refresh upload settings")
             pending = await self.db.scalar(
                 select(func.count())
                 .select_from(FileVersion)
@@ -205,21 +231,47 @@ class VersionService:
                 object_id=uuid4(),
                 storage_bucket=settings.S3_BUCKET_NAME,
                 upload_expires_at=datetime.now(UTC)
-                + timedelta(seconds=settings.UPLOAD_URL_SECONDS),
+                + timedelta(
+                    seconds=settings.MULTIPART_UPLOAD_SECONDS
+                    if multipart
+                    else settings.UPLOAD_URL_SECONDS
+                ),
                 declared_size_bytes=payload.declared_size_bytes,
                 declared_content_type=payload.declared_content_type,
                 expected_checksum_sha256=payload.checksum_sha256,
                 status="pending",
-                upload_method="basic",
-                checksum_kind="sha256",
+                upload_method="multipart" if multipart else "basic",
+                checksum_kind="sha256-composite" if multipart else "sha256",
+                multipart_state="initializing" if multipart else None,
+                multipart_part_size=payload.part_size if multipart else None,
+                multipart_count=len(payload.checksums) if multipart else None,
             )
             self.db.add(version)
             await self.db.flush()
+            if multipart:
+                for index, checksum in enumerate(payload.checksums):
+                    self.db.add(
+                        VersionPart(
+                            version_id=version.id,
+                            number=index + 1,
+                            size_bytes=min(
+                                payload.part_size,
+                                payload.declared_size_bytes - index * payload.part_size,
+                            ),
+                            checksum_sha256=checksum,
+                        )
+                    )
+                await self.db.flush()
         if version.storage_bucket != settings.S3_BUCKET_NAME:
             raise HTTPException(503, "Version storage configuration changed")
-        result = await self.ticket(actor, file, version)
-        await self.db.commit()
-        return result
+        if (
+            version.cancelled_at
+            or version.cleaned_at
+            or version.prune_requested_at
+            or version.purged_at
+        ):
+            raise HTTPException(410, "Version no longer available")
+        return file, version
 
     async def activate(self, actor, file, version, reason):
         for key in CONTENT_FIELDS:
@@ -238,11 +290,29 @@ class VersionService:
             )
         )
         await PermissionService(self.db).invalidate_shares(actor, "files", file.id)
+        from app.services.version_policy import apply_policy
+
+        await apply_policy(self.db, file)
 
     async def complete(self, actor, file_id, version_id, ip):
+        method = await self.db.scalar(
+            select(FileVersion.upload_method).where(
+                FileVersion.id == version_id,
+                FileVersion.file_id == file_id,
+                FileVersion.tenant_id == actor.tenant_id,
+            )
+        )
+        if method == "multipart":
+            from app.services.version_multipart import VersionMultipartService
+
+            return await VersionMultipartService(self.db, self.storage, file_id).complete(
+                actor, version_id, ip
+            )
         await AccountService(self.db).limit("version-complete", ip, str(actor.id))
         file, role = await self.access(actor, file_id, True)
         version = await self.find(actor, file, version_id)
+        if version.cancelled_at:
+            raise HTTPException(410, "Version upload cancelled")
         if version.created_by != actor.id:
             raise HTTPException(403, "Only the version uploader can complete it")
         if version.status == "uploaded":
@@ -281,6 +351,39 @@ class VersionService:
         await self.db.commit()
         await self.db.refresh(file)
         return self.files.read(actor, role, file)
+
+    async def cancel(self, actor, file_id, version_id, ip):
+        await AccountService(self.db).limit("version-cancel", ip, str(actor.id))
+        file, _ = await self.access(actor, file_id, True)
+        version = await self.find(actor, file, version_id)
+        if version.created_by != actor.id:
+            raise HTTPException(403, "Only the version uploader can cancel it")
+        if version.status == "uploaded":
+            raise HTTPException(409, "Completed versions cannot be cancelled")
+        version.cancelled_at = version.cancelled_at or datetime.now(UTC)
+        if version.upload_method == "multipart":
+            version.multipart_state = "aborted"
+        await self.db.commit()  # Durable cancellation wins before any provider effect.
+        if version.upload_method == "multipart":
+            try:
+                ref = ObjectRef(file.tenant_id, file.id, version.object_id)
+                for upload_id in await self.storage.pending_for_object(ref):
+                    await self.storage.abort_multipart(ref, upload_id)
+            except StorageError:
+                pass  # Original deadline/cleanup references still protect every exact key.
+        return {"detail": "Cancellation recorded; storage cleanup follows the original deadline"}
+
+    async def retry(self, actor, file_id, version_id, checksum, ip):
+        await AccountService(self.db).limit("version-upload", ip, str(actor.id))
+        file, _ = await self.access(actor, file_id, True)
+        version = await self.find(actor, file, version_id)
+        if version.created_by != actor.id:
+            raise HTTPException(403, "Only the version uploader can retry it")
+        if version.upload_method != "basic" or version.expected_checksum_sha256 != checksum:
+            raise HTTPException(409, "Reselect the original basic-upload content")
+        result = await self.ticket(actor, file, version)
+        await self.db.commit()
+        return result
 
     async def checked(self, actor, file, version):
         if version.status != "uploaded":

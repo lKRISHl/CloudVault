@@ -20,7 +20,7 @@ beforeEach(() => {
   vi.spyOn(api, 'uploadConfiguration').mockResolvedValue({ enabled: true, max_bytes: 100 });
   vi.spyOn(api, 'restoreVersion').mockResolvedValue(page.file);
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); });
 
 it('shows scoped history and restores only after confirmation using the generation', async () => {
   const cache = show(); await screen.findByText('Report.txt');
@@ -56,4 +56,38 @@ it('reports history failures and provides a refresh control', async () => {
   vi.mocked(api.versions).mockRejectedValue(new Error('File not found'));
   show(); expect(await screen.findByRole('alert')).toHaveTextContent('File not found');
   expect(screen.getByRole('button', { name: 'Refresh versions' })).toBeEnabled();
+});
+
+it('requires explicit history deletion confirmation and reports queued cleanup', async () => {
+  vi.mocked(api.versions).mockResolvedValue({ ...page, file: { ...page.file, can_manage: true } });
+  vi.spyOn(api, 'pruneVersion').mockResolvedValue({ detail: 'Version deletion queued; bytes remain counted until confirmed cleanup' });
+  show(); await screen.findByText('Report.txt');
+  await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Delete version 1' })); });
+  expect(screen.getByRole('button', { name: 'Confirm history deletion' })).toBeDisabled();
+  await act(async () => { await userEvent.type(screen.getByLabelText('Type DELETE to remove history'), 'DELETE'); });
+  await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Confirm history deletion' })); });
+  expect(api.pruneVersion).toHaveBeenCalledWith('file', 'old', expect.any(AbortSignal));
+  expect(await screen.findByRole('status')).toHaveTextContent('bytes remain counted');
+});
+
+it('requires confirmation to apply a retention policy', async () => {
+  vi.mocked(api.versions).mockResolvedValue({ ...page, file: { ...page.file, can_manage: true } });
+  vi.spyOn(api, 'versionPolicy').mockResolvedValue({ ...page.file, version_keep_last: 1 });
+  show(); await screen.findByText('Report.txt');
+  expect(screen.getByRole('button', { name: 'Apply retention policy' })).toBeDisabled();
+  await act(async () => { await userEvent.type(screen.getByLabelText('Keep newest versions'), '1'); await userEvent.type(screen.getByLabelText('Type PRUNE to apply retention'), 'PRUNE'); });
+  await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Apply retention policy' })); });
+  expect(api.versionPolicy).toHaveBeenCalledWith('file', 1, expect.any(AbortSignal));
+  expect(await screen.findByRole('status')).toHaveTextContent('cannot be cancelled');
+});
+
+it('offers uploader resume/cancel controls and distinguishes cancellation from reclamation', async () => {
+  vi.mocked(api.versions).mockResolvedValue({ ...page, items: [{ ...page.items[0], status: 'pending', can_complete: true, upload_method: 'multipart' }] });
+  vi.spyOn(api, 'cancelVersion').mockResolvedValue({ detail: 'Cancellation recorded; storage cleanup follows the original deadline' });
+  show(); await screen.findByText('Report.txt');
+  await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Resume version 1' })); });
+  expect(await screen.findByRole('status')).toHaveTextContent('Reselect the original file');
+  await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Cancel version 1' })); });
+  expect(api.cancelVersion).toHaveBeenCalledWith('file', 'old', expect.any(AbortSignal));
+  expect(await screen.findByRole('status')).toHaveTextContent('original deadline');
 });

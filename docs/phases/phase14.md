@@ -1,7 +1,7 @@
 # Phase 14 — File Versioning
 
 Implemented and locally verified on 2026-10-15. Live schema: 014_versions, no Alembic drift. Running Docker app: http://localhost:3000/app/folders.
-Phase 13 is committed as c3df20f. Phase 14 changes remain uncommitted.
+Phase 14 implementation and limitation tracking are committed as 14a4485. This report records the Phase 14 baseline; Phase 14A extends its transfers and retention.
 
 ## A. What was built
 

@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 14 file versioning is implemented; local verification is complete. Immutable application snapshots preserve basic/multipart original content, replacement PUTs, historical downloads and optimistic restoration. All retained references participate in trash purge/accounting. Phase 13 is committed as c3df20f; Phase 14 remains uncommitted. Schema 014_versions. See CONTINUE.md. Remote CI/production provider/load gates remain pending.
+Current state: Phase 14A is implemented and locally verified: multipart replacement, bounded hashing, reload resume/cancellation, manual history pruning and keep-last retention. Current content, live authority, fixed deadlines and confirmed cleanup accounting remain protected. Phase 14 is committed as 14a4485; Phase 14A implementation and verification are included in this handoff commit. Live schema 015_version_transfers. See CONTINUE.md and docs/phases/phase14a.md. Remote CI/production provider/load gates remain pending.
 
-Next planned implementation: Phase 14A, then Phase 14B, before Phase 15. Phase 18A follows 18 and precedes 19; Phase 22A follows 22 and precedes 23. Phase 25A follows 25 and precedes 26. These follow-ups are planned, not implemented.
+Next planned implementation: Phase 14B, before Phase 15. Phase 18A follows 18 and precedes 19; Phase 22A follows 22 and precedes 23. Phase 25A follows 25 and precedes 26. These remaining follow-ups are planned, not implemented.
 
 ## Limitations ownership and closure
 
@@ -246,7 +246,7 @@ Immutable application versions use distinct object keys on an unversioned bucket
 
 ## PHASE 14A — Version Transfers, Resume/Cancel and Pruning
 
-Status: Planned; not implemented. Complete after committing verified Phase 14 and before Phase 14B/15.
+Status: Implemented and locally verified 2026-10-15; included in this handoff commit. L02/L03 and L04 core lifecycle acceptance pass. Evidence: docs/phases/phase14a.md. L04 aggregate quota/audit retention remain assigned to 19/20; external production/remote CI gates remain open.
 
 Closure ownership: L02–L04 (L04 accounting/audit integration continues in 19/20).
 

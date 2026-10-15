@@ -46,6 +46,13 @@ class FileVersion(Base):
         UniqueConstraint("storage_bucket", "object_id", name="uq_file_versions_object"),
         CheckConstraint("number >= 1 AND declared_size_bytes >= 0", name="ck_file_versions_size"),
         CheckConstraint("status IN ('pending', 'uploaded')", name="ck_file_versions_status"),
+        CheckConstraint("cancelled_at IS NULL OR status = 'pending'", name="ck_versions_cancelled"),
+        CheckConstraint(
+            "(prune_requested_at IS NULL AND prune_not_before IS NULL) OR "
+            "(status = 'uploaded' AND prune_requested_at IS NOT NULL "
+            "AND prune_not_before IS NOT NULL)",
+            name="ck_versions_prune",
+        ),
         CheckConstraint(
             "status = 'pending' OR (size_bytes = declared_size_bytes AND size_bytes IS NOT NULL "
             "AND checksum_sha256 = expected_checksum_sha256 AND checksum_sha256 IS NOT NULL "
@@ -85,6 +92,28 @@ class FileVersion(Base):
     cleaned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    prune_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    prune_not_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class VersionPart(Base):
+    __tablename__ = "version_parts"
+    __table_args__ = (
+        CheckConstraint("number BETWEEN 1 AND 1024", name="ck_version_parts_number"),
+        CheckConstraint("size_bytes BETWEEN 1 AND 33554432", name="ck_version_parts_size"),
+        CheckConstraint(
+            "(storage_etag IS NULL AND confirmed_at IS NULL) OR "
+            "(storage_etag IS NOT NULL AND confirmed_at IS NOT NULL)",
+            name="ck_version_parts_receipt",
+        ),
+    )
+    version_id: Mapped[UUID] = mapped_column(ForeignKey("file_versions.id"), primary_key=True)
+    number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    checksum_sha256: Mapped[str] = mapped_column(String(44))
+    storage_etag: Mapped[str | None] = mapped_column(String(255))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class FileVersionChange(Base):

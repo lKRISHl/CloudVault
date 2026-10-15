@@ -1,9 +1,11 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.files import FileRead
+from app.schemas.multipart import MultipartResume, PartTicket
 from app.schemas.uploads import UploadProof
 
 
@@ -21,6 +23,12 @@ class VersionRestore(BaseModel):
 
 
 class VersionRead(BaseModel):
+    upload_method: str = "basic"
+    multipart_state: str | None = None
+    part_size: int | None = None
+    cancelled_at: datetime | None = None
+    prune_requested_at: datetime | None = None
+    prune_not_before: datetime | None = None
     id: UUID
     number: int
     created_by: UUID
@@ -55,3 +63,31 @@ class VersionTicket(BaseModel):
 class VersionDownload(BaseModel):
     download_url: str
     expires_at: datetime
+
+
+class VersionMultipartStart(VersionStart):
+    part_size: int = Field(ge=5242880, le=33554432, strict=True)
+    checksums: list[str] = Field(min_length=1, max_length=1024)
+
+    @field_validator("checksums")
+    @classmethod
+    def digests(cls, values):
+        return MultipartResume.digests(values)
+
+
+class VersionMultipartTicket(BaseModel):
+    version: VersionRead
+    part_size: int
+    parts: list[PartTicket]
+    expires_at: datetime
+    can_resume: bool
+    confirmed_bytes: int
+
+
+class VersionDelete(BaseModel):
+    confirmation: Literal["DELETE"]
+
+
+class VersionPolicy(BaseModel):
+    keep_last: int | None = Field(default=None, ge=1, le=1000, strict=True)
+    confirmation: Literal["PRUNE"]
