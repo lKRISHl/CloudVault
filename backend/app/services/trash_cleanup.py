@@ -1,12 +1,13 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import exists, select, text
+from sqlalchemy import and_, exists, or_, select, text
 
 from app.core.config import settings
-from app.models import File, Tenant, TrashEntry
+from app.models import File, FileVersion, Tenant, TrashEntry
 from app.services.trash import file_scope, queue_purge
 from app.services.uploads import utc
-from app.storage.base import ObjectNotFoundError, ObjectRef, StorageError
+from app.services.version_cleanup import remove_object
+from app.storage.base import StorageError
 
 
 class TrashCleanupService:
@@ -68,35 +69,65 @@ class TrashCleanupService:
             )
             for file in files:
                 file.purge_checked_at = now
-                if (
-                    file.storage_bucket != settings.S3_BUCKET_NAME
-                    or not file.object_id
-                    or not file.upload_expires_at
-                    or utc(file.upload_expires_at)
-                    + timedelta(
-                        seconds=settings.UPLOAD_COMPLETION_GRACE_SECONDS
-                        + settings.UPLOAD_CLEANUP_SETTLE_SECONDS
+                versions = list(
+                    await self.db.scalars(
+                        select(FileVersion)
+                        .where(
+                            FileVersion.tenant_id == tenant_id,
+                            FileVersion.file_id == file.id,
+                        )
+                        .order_by(FileVersion.checked_at.asc().nullsfirst(), FileVersion.number)
+                        .limit(10)
                     )
-                    > now
-                ):
-                    continue
-                ref = ObjectRef(tenant_id, file.id, file.object_id)
-                try:
-                    for upload_id in await self.storage.pending_for_object(ref):
-                        await self.storage.abort_multipart(ref, upload_id)
-                    if await self.storage.pending_for_object(ref):
-                        raise StorageError("Multipart uploads still exist")
-                    await self.storage.delete(ref)
+                )
+                # Legacy rows without snapshots still retain their original exact reference.
+                for version in versions or [file]:
+                    if versions:
+                        version.checked_at = now
+                    if (
+                        version.storage_bucket != settings.S3_BUCKET_NAME
+                        or not version.object_id
+                        or not version.upload_expires_at
+                        or utc(version.upload_expires_at)
+                        + timedelta(
+                            seconds=settings.UPLOAD_COMPLETION_GRACE_SECONDS
+                            + settings.UPLOAD_CLEANUP_SETTLE_SECONDS
+                        )
+                        > now
+                    ):
+                        continue
                     try:
-                        await self.storage.inspect_upload(ref)
-                    except ObjectNotFoundError:
-                        pass
-                    else:
-                        raise StorageError("Object remains after deletion")
+                        await remove_object(self.storage, tenant_id, file.id, version)
+                        if versions:
+                            if version.status == "pending":
+                                version.cleaned_at = version.cleaned_at or now
+                            else:
+                                version.purged_at = version.purged_at or now
+                        else:
+                            file.object_purged_at = file.object_purged_at or now
+                    except StorageError:
+                        continue
+                await self.db.flush()
+                remaining = await self.db.scalar(
+                    select(
+                        exists().where(
+                            FileVersion.tenant_id == tenant_id,
+                            FileVersion.file_id == file.id,
+                            or_(
+                                and_(
+                                    FileVersion.status == "uploaded",
+                                    FileVersion.purged_at.is_(None),
+                                ),
+                                and_(
+                                    FileVersion.status == "pending",
+                                    FileVersion.cleaned_at.is_(None),
+                                ),
+                            ),
+                        )
+                    )
+                )
+                if versions and not remaining:
                     file.object_purged_at = file.object_purged_at or now
-                except StorageError:
-                    # Retain exact reference and rotate failed attempts; never report success early.
-                    continue
             await self.db.flush()
             outstanding = await self.db.scalar(
                 select(

@@ -7,6 +7,7 @@ from app.api.folders import WorkspaceUser
 from app.api.multipart import router as multipart_router
 from app.api.storage import UploadStorage
 from app.api.users import Database
+from app.api.versions import router as versions_router
 from app.schemas.downloads import DownloadTicket
 from app.schemas.files import FilePage, FileRead
 from app.schemas.folders import FolderName
@@ -19,6 +20,7 @@ from app.services.uploads import UploadService
 
 router = APIRouter()
 router.include_router(multipart_router)
+router.include_router(versions_router)
 
 
 @router.patch("/{file_id}", response_model=FileRead)

@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FileList } from '../features/folders/FileList';
 import { api, downloadBrowserFile, setAccessToken } from '../services/api';
@@ -10,7 +11,7 @@ const file = { id: 'file', tenant_id: 'workspace', folder_id: null, created_by: 
   declared_content_type: 'application/pdf', status: 'pending' as const, created_at: '', updated_at: '', can_write: false };
 function show(folderId: string | null = null) {
   const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={cache}><FileList folderId={folderId} /></QueryClientProvider>);
+  render(<QueryClientProvider client={cache}><MemoryRouter><FileList folderId={folderId} /></MemoryRouter></QueryClientProvider>);
   return cache;
 }
 afterEach(() => vi.restoreAllMocks());

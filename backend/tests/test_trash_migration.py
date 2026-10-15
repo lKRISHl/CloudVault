@@ -89,6 +89,7 @@ async def test_trash_migration_preserves_content_and_guards_history(tmp_path):
         assert (
             refused.returncode != 0 and "Trash history or purge references exist" in refused.stderr
         )
+        assert migrate("upgrade", "head").returncode == 0
         async with factory() as db:
             assert (await db.get(Folder, folder.id)).trash_id == entry.id
             await TrashService(db).restore(actor, entry.id, "migration")
@@ -96,6 +97,7 @@ async def test_trash_migration_preserves_content_and_guards_history(tmp_path):
         assert (
             refused.returncode != 0 and "Trash history or purge references exist" in refused.stderr
         )
+        assert migrate("upgrade", "head").returncode == 0
         assert migrate("check").returncode == 0
     finally:
         await engine.dispose()

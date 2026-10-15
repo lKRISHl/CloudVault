@@ -1,10 +1,20 @@
 # Changelog
 
+## Planning — Earlier Phase Limitations (2026-10-15)
+- Consolidated historical limitations into docs/LIMITATIONS_BACKLOG.md with resolved work, 36 open closure items, four product decisions and intentional constraints.
+- Scheduled Phase 14A version completion and 14B library recovery before previews, 18A collaboration completion, 22A navigation/pagination, and explicit acceptance work in existing phases. No runtime implementation or new verification is implied.
+
+## Phase 14 — File Versioning (2026-10-15)
+- Immutable tenant/file content snapshots, current version/generation, historical downloads, basic replacement uploads and optimistic restoration with live ACL/parent checks. Original basic/multipart completions and existing objects retain version 1.
+- Content changes revoke external links atomically; stale writers cannot overwrite newer/restored content. The Versions page shows uploader/time, sizes, current content, paging and restore confirmation.
+- All retained versions count once in per-file accounting and participate in delayed trash purge. Expired pending candidates retain exact cleanup refs; old multipart intents cannot delete retained originals. Bucket versioning remains disabled.
+- 014_versions backfills existing completed objects and guards rollback of additional history/cleanup refs. Replacement uploads use the basic size cap; aggregate quotas, multipart replacement and provider VersionId purge are not implemented. Verification is in CONTINUE.md/docs/phases/phase14.md.
+
 ## Phase 13 — Trash and Restore (2026-10-15)
 - Completed files/folder subtrees can move to 30-day trash, disappear from all live ACL/read/transfer paths and restore with original identities/ACLs. Independent older trash remains separate; names can be reused and restore conflicts roll back atomically.
 - Creators/managers manage scoped trash pages; pending transfers and other creators' subtrees require completion/cleanup or manager authority. Existing links revoke and never silently reactivate.
 - Explicit DELETE-confirmed purge commits irreversible state before storage deletion. Existing cleanup worker handles bounded trash batches, waits past upload authorizations, refuses versioned buckets and retains exact references for provider failures/late writes.
-- 013_trash preserves existing data and refuses downgrade with retained history. Phase 12 committed as cce1f62; Phase 13 is uncommitted. Verification/operational limits are recorded in CONTINUE.md.
+- 013_trash preserves existing data and refuses downgrade with retained history. Phase 13 committed as c3df20f. Verification/operational limits are recorded in CONTINUE.md.
 
 ## Phase 12 — Resource Permissions (2026-10-15)
 - Workspace/private file and folder visibility, explicit active-member viewer/editor grants and creator/manager permission controls. Existing data defaults to workspace visibility.

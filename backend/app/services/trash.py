@@ -5,7 +5,7 @@ from sqlalchemy import and_, exists, func, literal, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
-from app.models import File, Folder, TrashEntry, UserRole
+from app.models import File, FileVersion, Folder, TrashEntry, UserRole
 from app.schemas.trash import TrashPage, TrashRead
 from app.services.accounts import AccountService
 from app.services.folders import FolderService
@@ -131,6 +131,16 @@ class TrashService:
             )
         )
         deadline = max(now, utc(latest)) if latest else now
+        version_deadline = await self.db.scalar(
+            select(func.max(FileVersion.upload_expires_at)).where(
+                FileVersion.tenant_id == actor.tenant_id,
+                FileVersion.file_id.in_(
+                    select(File.id).where(File.tenant_id == actor.tenant_id, scope)
+                ),
+            )
+        )
+        if version_deadline:
+            deadline = max(deadline, utc(version_deadline))
         entry = TrashEntry(
             tenant_id=actor.tenant_id,
             root_id=resource_id,

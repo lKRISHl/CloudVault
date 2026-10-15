@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.database import async_session_maker
-from app.models import File, UploadIntent
+from app.models import File, FileVersion, UploadIntent
 from app.services.upload_cleanup import UploadCleanupService
 from app.services.uploads import utc
 from app.storage.base import ObjectRef, StorageError
@@ -129,7 +129,14 @@ async def tick(factory=async_session_maker, marker=None):
                             File.object_id == intent.object_id,
                         )
                     )
-                    if file is None:
+                    retained = await db.scalar(
+                        select(FileVersion.id).where(
+                            FileVersion.tenant_id == intent.tenant_id,
+                            FileVersion.file_id == intent.file_id,
+                            FileVersion.object_id == intent.object_id,
+                        )
+                    )
+                    if file is None and retained is None:
                         ref = ObjectRef(intent.tenant_id, intent.file_id, intent.object_id)
                         for upload_id in await scoped.pending_for_object(ref):
                             await scoped.abort_multipart(ref, upload_id)
@@ -148,6 +155,28 @@ async def tick(factory=async_session_maker, marker=None):
             finally:
                 await scoped.close()
         marker = await sweep_orphans(inventory, factory, marker, now)
+        from app.services.version_cleanup import VersionCleanupService
+
+        async with factory() as db:
+            expired_versions = list(
+                await db.execute(
+                    select(FileVersion.id, FileVersion.tenant_id)
+                    .where(
+                        FileVersion.status == "pending",
+                        FileVersion.storage_bucket == settings.S3_BUCKET_NAME,
+                        FileVersion.upload_expires_at <= UploadCleanupService.cutoff(now),
+                    )
+                    .order_by(FileVersion.checked_at.asc().nullsfirst(), FileVersion.id)
+                    .limit(50)
+                )
+            )
+        for version_id, tenant_id in expired_versions:
+            scoped = S3ObjectStorage(settings, tenant_id)
+            try:
+                async with factory() as db:
+                    await VersionCleanupService(db, scoped).sweep(version_id, tenant_id, now)
+            finally:
+                await scoped.close()
         from app.jobs.cleanup_trash import tick as trash_tick
 
         await trash_tick(factory)

@@ -9,6 +9,23 @@ Each report should explain what was built, why, architecture, important files,
 technical concepts, request flows, security, test results, decisions, limitations,
 and interview questions. Record verification gaps explicitly.
 
+## Required limitation handoff for every phase
+
+Every phase, including lettered follow-ups, must include a "Limitations requiring explicit
+work" section. Link existing L/P/D IDs instead of duplicating their tasks. For each new gap,
+record a stable ID, the missing behavior and impact, the exact implementation/verification
+work, an assigned phase or release checkpoint, acceptance checks and current status/evidence.
+Add new entries to [the shared backlog](../LIMITATIONS_BACKLOG.md), assign the work in
+DEVELOPMENT_PLAN.md and carry the next action into CONTINUE.md in the same handoff.
+
+Review inherited items too: close them only with evidence, keep future work visibly open,
+and distinguish product decisions and intentional boundaries from fixable gaps. If no new
+implementation gaps were identified, say so explicitly and list inherited open IDs. Never
+use only "future phases will handle it" or treat a scheduled item as implemented.
+
+Assigned limitation work is automatically included when development continues; the user
+does not need to request each fix again. Unfinished assigned checks prevent phase completion.
+
 ## Completed Implementations
 
 - [Phase 2 — Users and Organizations](phase2.md)
@@ -29,3 +46,7 @@ and interview questions. Record verification gaps explicitly.
 - [Phase 12 — Permissions / RBAC](phase12.md)
 
 - [Phase 13 — Trash and Restore](phase13.md)
+
+- [Phase 14 — File Versioning](phase14.md)
+
+Current cross-phase status and follow-up schedule: [Limitations backlog](../LIMITATIONS_BACKLOG.md). Older phase reports retain their historical implementation scope.

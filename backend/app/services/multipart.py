@@ -52,6 +52,8 @@ class MultipartService:
         if file is None:
             raise HTTPException(404, "File not found")
         await self.files.require_read(actor, role, file)
+        if file.version_generation > 1:
+            raise HTTPException(409, "Use version history for this file")
         if file.created_by != actor.id:
             raise HTTPException(403, "Only the upload creator can manage multipart uploads")
         if file.upload_method != "multipart":
@@ -347,6 +349,9 @@ class MultipartService:
             info.etag,
             datetime.now(UTC),
         )
+        from app.services.version_records import record_initial
+
+        await record_initial(self.db, file)
         await self.db.commit()
         await self.db.refresh(file)
         return self.files.read(actor, role, file)

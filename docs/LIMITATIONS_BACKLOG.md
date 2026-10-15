@@ -1,0 +1,316 @@
+# CloudVault — Limitations and Closure Schedule
+
+Reviewed 2026-10-15 against the phase reports currently present (2, 2A, 2B, 3–14),
+CONTINUE.md, SECURITY.md and DEVELOPMENT_PLAN.md. Phases 0/1 are represented by the
+roadmap/security notes; separate phase0/phase1 reports are not present. Selected current
+code checks confirm file moves/avatars are absent, readiness checks only the DB, and
+refresh rotation does not yet implement the documented token-family replay response.
+This is a documentation/scope reconciliation, not a new security audit or test run.
+
+Historical phase reports describe their original implementation. Their "later" paragraphs
+are not the live backlog. Use this register together with current CONTINUE.md instead.
+Repeated limitations are consolidated; a feature mentioned by several phases has one owner.
+
+"When" below means implementation order, not a promised date or effort estimate.
+Open items stay open until the acceptance check has recorded evidence. Assigning a phase
+does not implement or verify anything. Original phase numbers remain unchanged; lettered
+follow-ups are additions. The current task collects/schedules work only.
+
+## Execution order
+
+1. Commit the already verified Phase 14 implementation separately from new implementation.
+   Keep this planning update reviewable; it does not authorize a push.
+2. Phase 14A: complete version transfers, resume/cancel and safe version pruning.
+3. Phase 14B: close core library movement/trash recovery gaps. Finish before Phase 15.
+4. Phases 15–18: safe previews, reliable jobs, scans and realtime synchronization.
+5. Phase 18A: collaboration/sharing completion and explicit MVP scope decisions, before 19.
+6. Phases 19–22: quota enforcement, audit/metadata retention, content processing/search.
+7. Phase 22A: search/navigation and large-list pagination, before Phase 23.
+8. Phases 23–25A: permission-aware RAG, API, webhooks and billing/entitlements.
+9. Phases 26–33: execute compatibility/failure/security/operational/deployment/load/recovery
+   gates. Earlier safety checks are still required when each feature is introduced.
+
+The existing remote-CI gate is immediate, not postponed to Phase 30. It needs separately
+authorized push/dispatch. Provider selection starts in Phase 16, before Phase 26 integration
+certification. Production SMTP and storage verification must pass before public deployment.
+
+## Earlier limitations already closed
+
+- **R01 — One organization/account and incomplete ownership lifecycle:** Phase 2B adds
+  existing-account invitations, workspace switching, ownership transfer, reactivation and
+  organization-aware account deletion. Source: [2](phases/phase2.md), [2A](phases/phase2a.md),
+  [2B](phases/phase2b.md). Cross-tab synchronization is still L15.
+- **R02 — No real email/recovery/email change/session controls/invitation maintenance:**
+  Phase 2A implements these locally, including encrypted outbox/dispatcher and technical
+  maintenance. Production delivery and stronger recovery remain L26–L28.
+- **R03 — Metadata without real transfers or verified size/checksum:** Phases 5–8 provide
+  private storage, basic/multipart upload and checked native downloads. Sources: [4](phases/phase4.md),
+  [5](phases/phase5.md), [6](phases/phase6.md), [7](phases/phase7.md), [8](phases/phase8.md).
+- **R04 — No reload resume/expired or orphan transfer cleanup:** Phase 9 adds part-boundary
+  resume and durable exact-key maintenance. This does not close version replacement resume
+  (L03), production lifecycle verification (L20) or byte-level resume (D04).
+- **R05 — No filename search:** Phase 10 adds scoped metadata search/indexes. Rich search
+  and scalable navigation remain L16/L17/L18.
+- **R06 — No password-protected external sharing:** Phase 11 adds expiring file links,
+  passwords and grant limits. Folder/recipient/idempotency gaps remain L10–L12.
+- **R07 — No private file/folder viewer/editor controls:** Phase 12 implements local grants,
+  ancestor boundaries and filtered queries. Groups/resource ownership remain L13/L14.
+- **R08 — No deletion/recovery/version history:** Phases 13/14 implement trash/restore,
+  delayed confirmed purge and basic version history/restore. This does not close the
+  explicit transfer/pruning/recovery additions below.
+
+## Open implementation and verification work
+
+Each ID includes its source, assigned checkpoint and the evidence required for closure.
+
+### Before Phase 15: core file/version completion
+
+- **L01 — Remote CI has not executed.** Sources: roadmap immediate gate, every recent
+  phase report. **When: immediate after separately authorized push/dispatch; do not wait
+  for 30.** Close with a successful run tied to the tested commit, PostgreSQL migrations/
+  concurrency, real disposable storage and Docker smoke. If authorization/credentials are
+  absent, keep this explicitly open; local results do not replace remote evidence.
+- **L02 — Large replacement versions are basic-only/full-buffer hashing.** Sources:
+  [14 §J](phases/phase14.md#j-remaining-limits), [6 §J](phases/phase6.md#j-operation-and-limitations).
+  **When: 14A.** Add bounded multipart replacement hashing/receipts/composite verification,
+  select the appropriate transfer mode, preserve old current bytes and reject stale
+  activation. Verify actual large/empty-file paths, lost acknowledgements and ACL races.
+- **L03 — Version reload resume, progress discovery and explicit cancellation absent.**
+  Source: 14 §J. **When: 14A.** Persist a secret-free manifest; reselect/validate original
+  content, resume missing parts within the original deadline, and reconcile aborts/cleanup.
+  Verify reload, changed file, workspace switch, revoked authority and abort/complete races.
+- **L04 — No version pruning/individual history deletion or bounded history policy.**
+  Sources: 14 §D/J. **When: 14A core lifecycle; 19 usage reconciliation; 20 audit/metadata
+  retention.** Add configurable retained-version rules and explicit deletion authority;
+  never prune current content or unresolved authorizations. Commit intent before provider
+  effects; retain exact retry refs, confirm absence, and verify restore/prune/trash races.
+  Do not decrement retained usage just because a delete was requested.
+- **L05 — Completed files cannot move between folders.** Sources: [4 §J](phases/phase4.md#j-limitations-and-operation),
+  current files API (rename exists, move does not). **When: 14B.** Add file moves with
+  source/destination/ancestor authority, conflict handling, share revocation and unchanged
+  content/version keys. Verify cross-tenant, private-parent and concurrent move cases.
+- **L06 — Trash restore only supports the original active parent/conflict-free name.**
+  Source: [13 §J](phases/phase13.md#j-operations-and-limitations). **When: 14B.** Add explicit
+  writable destination/name selection and safe conflict recovery, preserving batch boundaries,
+  ACLs and versions. Verify name collisions, private destination, missing parent and rollback.
+- **L07 — Pending original transfers block containing-folder trash.** Sources: 13 §J,
+  9 §J. **When: 14B.** Add an explicit cancel-transfers-then-trash workflow with durable
+  cleanup references and race checks. Do not bypass deadlines, silently abandon objects or
+  claim immediate name/byte reclamation. Preserve the existing safe block until implemented.
+- **L08 — Legacy metadata lacking an upload reference cannot be completed/reticketed.**
+  Source: 6 §J. **When: 14B.** Provide an authorized remediation/discard path that never
+  invents stored bytes or drops cleanup refs. Verify old-schema seeded rows and name reuse.
+
+### Previews, jobs, collaboration and security boundaries
+
+- **L09 — Unscanned bytes, untrusted declared MIME, no safe inline preview.** Sources:
+  6/7/14 §J. **When: 15 safe bounded preview/detected-type handling; 17 quarantine/scanning.**
+  Verify hostile/oversized inputs, restricted rendering, ACL checks for derived artifacts,
+  fail-closed scan/release states and no inference that attachment/octet-stream means safe.
+- **L10 — Sharing covers files only; no folder links or recipient editing/upload.**
+  Source: [11 §J](phases/phase11.md#j-operations-and-limitations). **When: 18A folder-read
+  sharing; editing/upload remains decision P02.** Verify subtree/current-ancestor boundaries,
+  moves, revocation, new children and indirect disclosure before enabling folder links.
+- **L11 — Forwardable capability links do not verify a named recipient.** Source: 11 §J.
+  **When: 18A.** Add a distinct named-recipient flow with actual identity proof and current
+  permission enforcement. Keep anonymous capability semantics explicit; a password is not
+  proof of recipient identity. Test forwarding/wrong account/revocation/recovery.
+- **L12 — Share creation is not idempotent; ambiguous replies can create uncertainty.**
+  Source: 11 §J. **When: 18A.** Bind creation request IDs to publisher/file/options and return
+  a well-defined replay without weakening one-time raw-secret handling. Test lost replies,
+  changed options and concurrent retries. Grant counting remains D02.
+- **L13 — No per-resource ownership transfer.** Source: 12/current CONTINUE limits.
+  **When: 18A.** Define file/folder transfer authority, verified target membership, ancestor
+  boundaries, version provenance and link/grant consequences; test departure/transfer races.
+- **L14 — Member/grant candidate lookup requires paging; absent names show UUIDs.**
+  Sources: [2B §J](phases/phase2b.md#j-limitations-and-operation), [12 §J](phases/phase12.md#j-operations-and-limitations).
+  **When: 18A UX; 22A common pagination.** Add tenant-authorized lookup/search and accessible
+  selection without enumerating private/foreign identities. Groups/custom roles are P01.
+- **L15 — Cross-tab workspace/refresh coordination, realtime roster/ACL/cache events absent.**
+  Sources: 2A/2B/9/12 §J. **When: 18 client/realtime; 27 refresh-security verification.**
+  Coordinate shared-cookie changes and refresh ownership, reset scoped caches, reconnect
+  safely, and stop stale writes. Verify multiple tabs, logout, removal and rapid switches.
+  Previously received bytes/metadata cannot be remotely erased (D01).
+- **L16 — Filename search lacks recursive scope, fuzzy/accent-normalized matching and tags.**
+  Source: [10 §J](phases/phase10.md#j-operations-and-limitations). **When: 21 tags; 22A lexical
+  search/navigation.** Define search semantics and preserve resource/ancestor predicates
+  before page/count/context computation. Test deep private hierarchies and index plans.
+- **L17 — No extracted-content/semantic/AI search or RAG.** Sources: 4–14 later-work notes.
+  **When: 21 extraction, 22 semantic retrieval, 23 RAG.** Verify current permission checks on
+  source/derived chunks/citations, deletion/version invalidation and prompt-injection bounds.
+- **L18 — Offset paging is bounded, shifts concurrently and has no global total/snapshot.**
+  Sources: 10/12/14 §J; 3 list bounds. **When: 22A common cursor/keyset strategy, scoped counts
+  only where useful; 32 workload verification.** Cover files/search/history/large membership
+  lists. Define consistency rather than promising an immutable snapshot or unlimited paging.
+- **L19 — No aggregate storage reservation/quota enforcement.** Sources: 6/8/14 §J.
+  **When: 19; billing entitlements 25A.** Count current/history/trashed bytes once, pending
+  reservations and unknown/orphan reconciliation separately; enforce concurrent limits and
+  safe downgrade/over-quota behavior. Add bounded AI budgets before enabling AI in 21,
+  then integrate subscription metering in 25A.
+
+### Durable maintenance and production-provider evidence
+
+- **L20 — Provider lifecycle/orphan inventory and real waiting-period behavior unverified.**
+  Sources: [9 §J](phases/phase9.md#j-operations-and-limitations), 8/14 lifecycle notes.
+  **When: 16 reliable job/provider-lifecycle design; 26 failure and real-clock tests;
+  31 deployed provider verification.** Preserve durable exact-key intents, inventory cursors
+  and late-write refs; verify provider abort/delete retries and configured stale expiry/scan
+  timing. Local injected time does not establish a 24-hour provider lifecycle guarantee.
+- **L21 — Hidden tombstones, intents, revoked links, grants and change metadata grow.**
+  Sources: 9/11/12/13/14 §J. **When: 20 technical/audit retention implementation;
+  27 privacy/security review; 33 operational policy sign-off.** Classify retention purposes,
+  compact only when safe, and test that no live authorization, late-write cleanup identity
+  or restoration proof is lost. Content pruning is L04; legal erasure is L35.
+- **L22 — Community MinIO is local-only/archived; maintained production provider undecided.**
+  Sources: 2A onward. **When: select in 16, certify in 26/31 before public deployment.**
+  Record maintained S3/R2/provider choice and test checksums/composite HEAD, conditional PUT/
+  completion, pagination, public signer endpoints, clock/credential expiry and abort/delete.
+  Local MinIO results are not evidence for another provider.
+- **L23 — No provider VersionId purge or protection against out-of-band overwrite/delete.**
+  Sources: 5/7/9/13/14 §J. **When: 16 explicit provider/versioning decision; 26/31 enforce
+  and verify selected policy.** Default release policy remains unversioned immutable app keys.
+  If enabling bucket versioning, implement and test exact VersionId/delete-marker lifecycle
+  for every upload/prune/trash/orphan path first. Otherwise detect/refuse Enabled/Suspended
+  configuration and document independent object-backup controls; do not promise unused
+  provider-versioning support. Administrator-resistant object locking is decision P04.
+- **L24 — Production IAM/encryption/public-access/CORS/TLS/lifecycle not verified.**
+  Sources: 5/6/9 §J. **When: 27 policy/security review; 29 config; 31 actual provider checks.**
+  Use exact origins/private buckets, scoped application versus maintenance permissions,
+  credential/clock handling and secret rotation. Close with denied-public-access and real
+  transfer/purge tests on the chosen configuration, not configuration snippets alone.
+- **L25 — Readiness is DB-only; worker-running state does not prove storage/cleanup health.**
+  Sources: 5/6/9 §J; current health API. **When: 16 job health/backlog semantics; 28 dependency
+  probes/alerts.** Define feature-aware readiness and bounded non-destructive S3/Redis checks,
+  appropriate degraded responses, cleanup age/error alerts and tests for dependency failure.
+- **L26 — Production SMTP transport/domain/TLS/delivery failures not verified.**
+  Sources: 2A/2B §J. **When: 28 delivery monitoring, 31 actual provider verification before
+  customer mail.** Test configured sender/domain/transport, failure/retry behavior and alerting.
+  Keep generic recovery and single-use links. Ambiguous SMTP ACK duplicates remain D03.
+
+### Hardening and release gates
+
+- **L27 — MFA, inaccessible-mailbox recovery and legacy-account support policy absent.**
+  Source: [2A §J](phases/phase2a.md#j-limitations-and-operation). **When: 27, before public
+  release.** Implement MFA enrollment/challenge/recovery/revocation and safe recovery codes;
+  define support proof/audit rules for inaccessible addresses without bypassing verification.
+  Test lockout, lost factors, ownership abuse and session invalidation.
+- **L28 — Refresh rotation lacks explicit token-family compromise response.** Sources:
+  2A §J/SECURITY.md; current auth service. **When: 27, with 18 cross-tab coordination.**
+  Detect replay and revoke the appropriate session/family while defining legitimate
+  concurrent-tab behavior. Verify replay, logout, password recovery and race cases.
+- **L29 — Production rate/abuse/proxy/CPU/timing protections need review.** Sources:
+  2A/6/8/11/14 §J. **When: 27; tune with measured 32 workloads; final 33 gate.** Cover trusted
+  proxies/IP identity, malformed requests before budgets, recovery timing under load,
+  password hashing/public-capability CPU cost, per-link/IP group fairness and per-tenant
+  transfer/AI limits. Existing configured limits are not abuse certification.
+- **L30 — No independent broader security assessment or deployed threat-model evidence.**
+  Sources: completed reports/SECURITY.md. **When: 27; final release check 33.** Review auth,
+  IDOR/tenant isolation, SSRF, uploads/previews/AI and secrets; resolve release blockers and
+  record residual risks. Arrange independent review where required; self-tests do not count
+  as independent assessment.
+- **L31 — Safari/Firefox, provider outages and recovery/concurrency matrix not certified.**
+  Sources: 7 §J, 14 §H/J. **When: 26; actual deployed configuration recheck 31/33.** Run
+  browser/provider-specific transfers, versions/resume/sharing, partitions, lost ACKs,
+  retries, partial migrations and rollback/restore drills using disposable data.
+- **L32 — Observability, signed/query/body log redaction and retention incomplete.**
+  Sources: 10/11/12/14 notes. **When: 20 audit events; 27 redaction policy; 28 logging,
+  metrics/traces/alerts.** Verify secrets/URLs/passwords/document content are excluded,
+  sensitive search/body fields follow policy and storage/SMTP/job failures trigger alerts.
+- **L33 — Tenant writes serialize; search/ACL/deep hierarchy/history performance unmeasured.**
+  Sources: 2/3/8/10/12/14 notes. **When: 26 initial profiling/timeouts; 32 representative
+  workloads/optimization; 33 accepted targets.** Measure actual lock wait, common/short-term
+  search plans, index/migration cost, worker fairness/backlog and large-grant/version sets.
+  Optimize from evidence; synthetic index checks are not throughput benchmarks.
+- **L34 — Production images/configuration, complete CI/CD and hosted services absent.**
+  Sources: roadmap 29–31 and prior deployment gates. **When: 29 container/resource/config
+  hardening; 30 repeatable build/test/security/deployment pipeline; 31 HTTPS/domain/secrets/
+  managed services.** Separate local 4 GB WSL constraints from deployed capacity. Remote CI
+  evidence remains immediate L01, not deferred behind this pipeline work.
+- **L35 — Paired DB/object backup restore, deletion policy and incident runbooks unverified.**
+  Sources: 5–14 rollback/retention notes. **When: 26 restore/failure tests; configure in 31;
+  full timed drills/policy acceptance in 33.** Restore metadata and matching objects/versions,
+  choose recovery targets and measure results; define rollback after irreversible migrations,
+  legal/privacy retention, availability/cost/incident procedures. A local SQL dump alone does
+  not close this item or establish compliance.
+- **L36 — Download grants are not completed-delivery telemetry.** Sources: 7/11 §J.
+  **When: 20 explicit grant/audit events; 28 provider-log telemetry evaluation.** Label
+  attempted/issued/provider-observed events honestly, reconcile missing/duplicate signals
+  where supported and never equate a grant or native browser handoff to completed delivery.
+
+## Product-scope decisions with a fixed review point
+
+These are absent capabilities, not silently promised enterprise features. At the checkpoint,
+record an explicit include/exclude decision. If included, add implementation/acceptance work
+before claiming support; if excluded, document the boundary for the resume demo/MVP.
+
+- **P01 — Groups/custom resource roles:** decide in **18A**; existing workspace roles plus
+  viewer/editor grants remain supported. Include permission precedence, membership lifecycle
+  and ancestor semantics in any design. Source: 12/current limits.
+- **P02 — External folder editing/upload and delegated external collaboration:** decide in
+  **18A** after folder-read/named-recipient design. Do not imply anonymous read links grant
+  write, membership or AI access. Source: 11 §J.
+- **P03 — Profile avatar upload:** decide after scanning in **18A**; implement through safe
+  bounded storage/processing if included. Full-name-only profile remains the current scope.
+  Source: 2 §J.
+- **P04 — Provider object lock/version pinning and strict one-use/immediately revocable
+  download access:** decide provider requirements in **16** and delivery architecture in
+  **27**, before release. Strict revocation/one-use semantics need a separately designed
+  mediation/delivery model and tradeoff review; ordinary presigned URLs cannot acquire them
+  through a UI change. Sources: 5/7/11/14.
+
+## Intentional constraints and unavoidable semantics
+
+- **D01 — Received bytes/metadata cannot be recalled.** Phase 18 prevents new stale views/
+  requests where possible; it cannot erase another person's saved data. ACLs remain current
+  authorization boundaries; trusted managers' private access and required ancestor reads
+  are explicit policy, not unfinished bugs.
+- **D02 — Presigned URLs are reusable until expiry; link passwords/capabilities can be
+  forwarded.** Issued-grant counters may advance on a lost response and are not delivery
+  counts. Phase 27 reviews TTL/policies; P04 decides any alternative architecture. Public
+  share page intentionally forgets its fragment on reload; reopening the full link is
+  currently required rather than persisting a bearer secret in browser storage.
+- **D03 — SMTP acknowledgement can be ambiguous.** Single-use account actions avoid repeated
+  effects, but exactly-once email arrival cannot be guaranteed. L26 verifies provider
+  behavior/monitoring without promising that duplicates become impossible.
+- **D04 — Transfer limits/deadlines, original-file reselection and part-boundary resume are
+  deliberate bounds.** Default 100 MiB basic, 1 GiB multipart/8 MiB parts/1024 parts/one hour;
+  configured ceilings and grace remain documented. No automatic deadline extension or
+  within-part byte resume is promised. L02/L03 extend versions; 32 validates/tunes bounds.
+- **D05 — Depth 64/page caps and tenant serialization protect current correctness.** L18/L33
+  address navigation/scaling from measurements; no unlimited hierarchy/page/throughput claim.
+- **D06 — Cleanup waits original expiry/grace/settle and provider confirmation.** Names/bytes
+  need not free immediately after cancellation/purge; queued purge is irreversible. L20/L25
+  make maintenance reliable/observable, not instantaneous or guaranteed at an exact time.
+- **D07 — Guarded downgrade and organization-owned content retention are protective policy.**
+  Creator departure/account deletion does not erase shared organization content. Old schemas
+  may not represent current memberships/ACLs/trash/version refs. L21/L35 define safe retention
+  and paired recovery rather than removing guards or claiming total metadata/legal erasure.
+- **D08 — Native download errors/progress belong partly to the browser/provider.** L31 tests
+  compatibility and retry; L36 labels telemetry. Shared Windows/system temporary files may
+  still use C: despite project/Codex/Docker data living on D:. These are documented platform
+  boundaries, not file-storage feature failures.
+
+## Maintenance rule
+
+Standing user instruction: assigned limitation work is mandatory phase scope. When the user
+says "continue", automatically read this register, work on all due L items and P decisions
+alongside the next scheduled feature, run their acceptance checks and update the evidence.
+No separate "fix this limitation" request is needed. Do not mark the phase complete or
+advance past unfinished assigned checks. Complete independent authorized work around external
+dependencies; keep affected items open and report the actual blocker/next action. Request
+only genuinely missing decisions, credentials or separately authorized external/destructive
+actions. Existing scope needs no repeat approval. This is active-development guidance, not
+background execution or authorization to push/deploy/spend/delete data. D constraints remain
+explicit design boundaries, not automatically fixable promises.
+
+Every new phase report must list the relevant L/P/D IDs, evidence for items it closes,
+new limitations with an assigned checkpoint, and any explicitly accepted design boundary.
+Include a "Limitations requiring explicit work" section for every numbered or lettered
+phase. Every new gap needs a stable ID, missing behavior/impact, concrete implementation or
+verification task, assigned phase/checkpoint, acceptance checks and status/evidence. Update
+this register, DEVELOPMENT_PLAN.md and CONTINUE.md together. If no new gaps are identified,
+state that and still review inherited open IDs. The report format is in docs/phases/README.md.
+Do not replace this register with "later phases will handle it." At Phase 33, no release-
+blocking L item may remain unexplained; P decisions must be recorded. Deferred optional
+features are not completed features. Any reproducible security/data-loss defect discovered
+while implementing these tasks is fixed before proceeding, regardless of its planned phase.

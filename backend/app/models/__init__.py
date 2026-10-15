@@ -1,5 +1,6 @@
 from app.models.account import AccountToken, EmailOutbox, LoginSession, RateLimit
 from app.models.file import File
+from app.models.file_version import FileVersion, FileVersionChange
 from app.models.folder import Folder
 from app.models.invitation import Invitation
 from app.models.membership import Membership
@@ -13,6 +14,8 @@ from app.models.upload_part import UploadPart
 from app.models.user import User, UserRole
 
 __all__ = [
+    "FileVersion",
+    "FileVersionChange",
     "TrashEntry",
     "ResourceGrant",
     "ShareLink",

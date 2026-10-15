@@ -47,6 +47,8 @@ class UploadService:
         if file is None:
             raise HTTPException(status_code=404, detail="File not found")
         await self.files.require_read(actor, await self.files.folders.authorize(actor), file)
+        if file.version_generation > 1:
+            raise HTTPException(409, "Use version history for this file")
         if file.upload_method != "basic":
             raise HTTPException(status_code=409, detail="Use multipart controls for this upload")
         if file.created_by != actor.id:
@@ -186,6 +188,9 @@ class UploadService:
         file.status, file.size_bytes = "uploaded", info.size_bytes
         file.checksum_sha256, file.content_type = info.checksum_sha256, info.content_type
         file.storage_etag, file.completed_at = info.etag, datetime.now(UTC)
+        from app.services.version_records import record_initial
+
+        await record_initial(self.db, file)
         await self.db.commit()
         await self.db.refresh(file)
         return self.files.read(actor, role, file)

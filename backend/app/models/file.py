@@ -141,6 +141,8 @@ class File(Base):
         ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    current_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    version_generation: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
     folder_id: Mapped[UUID | None] = mapped_column(nullable=True)
     trash_id: Mapped[UUID | None] = mapped_column(ForeignKey("trash_entries.id"), index=True)

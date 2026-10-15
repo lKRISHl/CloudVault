@@ -2,9 +2,21 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 13 trash/restore implementation and local verification are complete. Completed file/folder batches retain ACLs for 30 days, restore atomically to original locations, and support irreversible queued purge with provider-confirmed cleanup. Phase 12 is committed as cce1f62; Phase 13 is uncommitted. Schema is 013_trash; evidence is in CONTINUE.md. Remote CI/production provider/load checks remain pending.
+Current state: Phase 14 file versioning is implemented; local verification is complete. Immutable application snapshots preserve basic/multipart original content, replacement PUTs, historical downloads and optimistic restoration. All retained references participate in trash purge/accounting. Phase 13 is committed as c3df20f; Phase 14 remains uncommitted. Schema 014_versions. See CONTINUE.md. Remote CI/production provider/load gates remain pending.
 
-Next planned implementation: Phase 14, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 14A, then Phase 14B, before Phase 15. Phase 18A follows 18 and precedes 19; Phase 22A follows 22 and precedes 23. Phase 25A follows 25 and precedes 26. These follow-ups are planned, not implemented.
+
+## Limitations ownership and closure
+
+Every numbered/lettered phase report must include "Limitations requiring explicit work": inherited/new IDs, concrete missing behavior/impact, required implementation or verification, assigned checkpoint, acceptance checks and status/evidence. Update docs/LIMITATIONS_BACKLOG.md, this roadmap and CONTINUE.md together; if no new gaps are identified, state that and retain the inherited open-item review. The report requirements are in docs/phases/README.md.
+
+Standing user instruction: an ordinary "continue" authorizes the next scheduled development step, including its assigned limitation fixes and acceptance checks. Read docs/LIMITATIONS_BACKLOG.md before implementation, include every due L item and P decision in the working scope, and do not wait for the user to request each limitation separately. Complete the authorized implementation, tests and documentation autonomously. New limitations must receive an ID, checkpoint and acceptance criteria rather than being silently deferred.
+
+Do not mark a phase complete or advance past it with an unresolved assigned acceptance check. Complete independent work when an external dependency is unavailable, keep the affected item explicitly open, and report the exact dependency and next action. Ask only for genuinely missing product decisions, credentials, externally controlled prerequisites or actions requiring separate authorization; an existing agreed scope is not a reason to ask again. Deliberate D constraints are reviewed/documented, not falsely promised to disappear. This instruction governs active development when work resumes; it does not create background/scheduled execution or authorize remote push, external CI dispatch, publication, paid resources or destructive data removal.
+
+[Limitations backlog and schedule](docs/LIMITATIONS_BACKLOG.md) is the current register of historical gaps, resolved items, planned closures, product decisions and intentional constraints. It contains 36 open work/verification items, four explicit product-scope decisions, eight resolved groups and eight design/platform boundaries. Historical phase reports remain records of their original scope, not the live backlog.
+
+Every phase must reference the relevant register IDs and record actual acceptance evidence. Scheduling does not close an item. Security/data-loss defects block further work immediately. Remote CI requires separate push/dispatch authorization; production readiness is not inferred from completed phase numbers. Phase order is a dependency schedule, not a calendar-date or duration promise.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
@@ -219,20 +231,53 @@ Status: Implemented and locally verified on 2026-10-15. 250 backend tests on SQL
 - permanent delete
 - cleanup jobs
 
-Trash retains exact object references and ACLs. Restore preserves independently trashed children and rejects active name conflicts. Permanent folder deletion includes nested trash and commits irreversible intent before provider operations. Cleanup waits past upload authorizations, confirms absence, retries retained tombstones and fails closed on versioned/suspended buckets. Pending uploads must finish or clean before containing-folder trash. SQL backups cannot restore purged bytes. Phase 14 must extend retention/version-aware deletion before enabling versioned storage.
+Trash retains exact object references and ACLs. Restore preserves independently trashed children and rejects active name conflicts. Permanent folder deletion includes nested trash and commits irreversible intent before provider operations. Cleanup waits past upload authorizations, confirms absence, retries retained tombstones and fails closed on versioned/suspended buckets. Pending uploads must finish or clean before containing-folder trash. SQL backups cannot restore purged bytes. Phase 14 now includes every application snapshot/pending candidate in retention/purge. Provider bucket versioning remains disabled and needs explicit VersionId lifecycle verification before enablement.
 
 ## PHASE 14 — File Versioning
 
-Status: Not started.
+Status: Implemented; local SQLite/PostgreSQL, browser and rebuilt Docker verification passed (2026-10-15). See docs/phases/phase14.md.
 
 - versions
 - current version
 - restore version
 - metadata/history
 
-Coordinate retained application versions with trash purge and quota calculation. Before enabling provider bucket versioning, extend and verify upload/trash cleanup with explicit version handling. Delete markers alone do not establish byte reclamation; current Phase 9 maintenance fails closed on versioned buckets.
+Immutable application versions use distinct object keys on an unversioned bucket. Existing basic/multipart objects are version 1; replacement uploads use the basic cap (default 100 MiB), with multipart replacement/reload resume deferred. Current-version changes use a monotonically increasing generation; restore preserves logical name/location/ACL and revokes external links. History is reader-accessible. Retained/pending bytes are reported separately, without aggregate quota enforcement. Trash/expired-candidate cleanup preserves all exact references. See ADR-031. Coordinate any future retained application versions with trash purge and quota calculation. Before enabling provider bucket versioning, extend and verify upload/trash cleanup with explicit version handling. Delete markers alone do not establish byte reclamation; current Phase 9 maintenance fails closed on versioned buckets.
+
+## PHASE 14A — Version Transfers, Resume/Cancel and Pruning
+
+Status: Planned; not implemented. Complete after committing verified Phase 14 and before Phase 14B/15.
+
+Closure ownership: L02–L04 (L04 accounting/audit integration continues in 19/20).
+
+- Multipart replacement candidates with bounded hashing, provider receipts/composite verification and unchanged logical-file identity/current content until verified activation.
+- Secret-free reload-resume manifests, original-file validation, missing-part progress, original deadlines and explicit cancellation/reconciliation.
+- Configurable version pruning/individual history deletion with clear authority, protected current content, durable deletion intent and exact-reference retries.
+- Preserve ACL/ancestor boundaries, generation conflict handling, share revocation and all-version trash/accounting behavior.
+
+Completion criteria:
+- Actual basic/multipart replacement bytes, empty files, lost acknowledgements, reload, changed input, workspace/permission changes and concurrent restore/abort/complete/prune cases pass.
+- Current or in-flight content cannot be pruned accidentally; expiry/grace/settle and confirmed provider absence govern cleanup. Retained accounting changes only after verified reclamation.
+- SQLite/PostgreSQL migration/data preservation, provider integration, frontend/browser and rebuilt Docker checks are recorded. Provider bucket versioning remains disabled unless its separate verified lifecycle decision is implemented.
+
+## PHASE 14B — Core Library Movement and Recovery
+
+Status: Planned; not implemented. Complete after 14A and before 15.
+
+Closure ownership: L05–L08.
+
+- Completed-file moves with source/destination/ancestor authority, conflict handling, share revocation and immutable version keys.
+- Explicit destination/name selection for trash recovery while preserving ACLs, batch boundaries and original identities.
+- Safe cancel-transfers-then-trash flow for folders containing pending transfers; retain the current protective block until this workflow is implemented.
+- Authorized remediation/discard of legacy metadata with no upload reference, without inventing bytes or losing cleanup records.
+
+Completion criteria:
+- Cross-tenant/private-parent/name conflicts, missing parents, mixed creators, old independent trash, concurrent moves/restores/cancellations and rollback/data preservation are tested.
+- No action weakens authorization or bypasses original provider deadlines, durable cleanup references or current-version safety. Record actual backend/provider/browser/Docker evidence.
 
 ## PHASE 15 — File Preview
+
+Limitations closure work: L09: bounded safe preview/detected-type handling with tenant/version-aware derived artifacts; scan integration follows in 17.
 
 Status: Not started.
 
@@ -244,6 +289,8 @@ Status: Not started.
 
 ## PHASE 16 — Redis + Background Jobs
 
+Limitations closure work: L20/L22/L23/L25 and P04 provider decision: reliable jobs/inventory cursors and exact-reference lifecycle, choose maintained production storage before integration certification, decide/enforce unversioned versus fully version-aware provider policy, and define job/backlog health. Never enable bucket versioning without verified cleanup for every path.
+
 Status: Not started.
 
 - Redis
@@ -254,6 +301,8 @@ Status: Not started.
 
 ## PHASE 17 — Virus/Malware Scanning
 
+Limitations closure work: L09: quarantine, verified release and malicious/oversized content failure handling; uploaded is not synonymous with safe.
+
 Status: Not started.
 
 - asynchronous scanning
@@ -262,6 +311,8 @@ Status: Not started.
 
 ## PHASE 18 — Realtime
 
+Limitations closure work: L15: cross-tab workspace/refresh coordination, scoped-cache reset and roster/ACL/reconnect events; verify refresh security again in 27.
+
 Status: Not started.
 
 - WebSockets
@@ -269,7 +320,26 @@ Status: Not started.
 - notifications
 - reconnect handling
 
+## PHASE 18A — Collaboration Completion and Explicit MVP Scope
+
+Status: Planned; not implemented. Complete after 18 and before 19.
+
+Closure ownership: L10–L14. Scope decisions: P01–P03.
+
+- Folder read-sharing with explicit subtree/current-ancestor behavior and move/revocation tests.
+- A distinct named-recipient identity-proof flow; anonymous/password capability links keep their documented forwarding semantics.
+- Idempotent share creation without exposing stored raw secrets or misrepresenting URL grants as completed delivery.
+- Authorized resource ownership transfer with membership, version provenance, grant/link and ancestor consequences.
+- Tenant-scoped member/grant lookup and readable recipient selection beyond the currently loaded page.
+- Decide whether groups/custom roles, external editing/upload and profile avatars belong in the MVP. Record include/exclude decisions; included features require their own implementation and acceptance evidence before support is claimed.
+
+Completion criteria:
+- Sharing/ownership/group scope cannot bypass private ancestors, tenant membership or current permissions, including concurrent move/removal/restore operations.
+- Actual recipient proof, lost-response replay, revoked access and relevant desktop/mobile journeys pass. Complete P01–P03 decisions explicitly rather than leaving them as indefinite future work.
+
 ## PHASE 19 — Storage Quotas
+
+Limitations closure work: L19 and L04 accounting: concurrent reservations, retained/current/history/trash/pending accounting, orphan reconciliation and safe over-quota behavior. Introduce bounded AI budgets before AI enablement; integrate subscription entitlements in 25A.
 
 Status: Not started.
 
@@ -280,6 +350,8 @@ Status: Not started.
 
 ## PHASE 20 — Audit Logs
 
+Limitations closure work: L21/L32/L36 and L04 retention: audited content/permission/deletion transitions, technical metadata retention/compaction that preserves live cleanup refs, and honest issued-grant events rather than completed-download claims.
+
 Status: Not started.
 
 - user actions
@@ -287,6 +359,8 @@ Status: Not started.
 - organization-level audit history
 
 ## PHASE 21 — AI Document Processing
+
+Limitations closure work: L16 tags/L17 content processing and L19 bounded AI cost limits; enforce source/version ACL and invalidation boundaries on every derived artifact.
 
 Status: Not started.
 
@@ -297,6 +371,8 @@ Status: Not started.
 
 ## PHASE 22 — Semantic Search
 
+Limitations closure work: L17: current-authority retrieval, version/deletion invalidation and actual semantic-index behavior; lexical/navigation gaps close in 22A.
+
 Status: Not started.
 
 - chunking
@@ -304,7 +380,23 @@ Status: Not started.
 - pgvector
 - semantic retrieval
 
+## PHASE 22A — Search, Navigation and Large-List Pagination
+
+Status: Planned; not implemented. Complete after 22 and before 23.
+
+Closure ownership: L16/L18; measured scale verification continues in 32.
+
+- Define recursive filename scope, fuzzy/accent normalization and tag filtering separately from semantic search.
+- Use a common cursor/keyset strategy where needed for files/search/history/large membership lists; add scoped totals only where useful.
+- Preserve current tenant/resource/ancestor predicates before pagination/count/context and document concurrent-update consistency.
+
+Completion criteria:
+- Private deep hierarchies, broad/short terms, Unicode, concurrent changes and large-list navigation are tested with actual query-plan evidence.
+- Do not promise unlimited pages or immutable snapshots; production latency/throughput claims require Phase 32 measurements.
+
 ## PHASE 23 — Ask My Files / RAG
+
+Limitations closure work: L17: permission-aware source chunks/citations, current-version/deletion semantics and prompt-injection bounds.
 
 Status: Not started.
 
@@ -335,6 +427,8 @@ Status: Not started.
 
 ## PHASE 25A — Billing, Subscriptions + Entitlements
 
+Limitations closure work: L19: integrate verified plan entitlements, storage/AI metering and safe downgrade/over-quota reconciliation; payment infrastructure remains a separate production prerequisite.
+
 Status: Not started.
 
 Dependencies: Phase 19 quotas, Phase 20 audit logs, and Phase 25 webhook reliability. Implement before paid customer launch; billing is not required for an earlier unpaid resume demo.
@@ -356,6 +450,8 @@ Completion criteria:
 
 ## PHASE 26 — Testing Hardening
 
+Limitations closure work: L20/L22/L23/L31/L33/L35: actual chosen-provider/browser/outage/replay matrix, real-clock lifecycle evidence, initial query/lock profiling/timeouts, migration failures and paired DB/object recovery tests.
+
 Status: Not started.
 
 - unit tests
@@ -370,6 +466,8 @@ Completion criteria:
 - Record repeatable test commands and actual results; mocks alone do not establish external-service correctness.
 
 ## PHASE 27 — Security Hardening
+
+Limitations closure work: L15/L21/L24/L27–L30/L32 and P04 delivery decision: MFA/recovery codes and inaccessible-mailbox support policy, refresh-family replay handling, trusted proxies/rate/CPU/timing abuse review, provider/retention/logging policies and independent assessment requirements before public release.
 
 Status: Not started.
 
@@ -388,6 +486,8 @@ Completion criteria:
 
 ## PHASE 28 — Observability
 
+Limitations closure work: L25/L26/L32/L36: feature-aware dependency probes, cleanup/backlog age/errors, real SMTP alerts, secret-safe logs/traces/metrics and clearly labeled provider-observed download telemetry.
+
 Status: Not started.
 
 - structured logging
@@ -399,6 +499,8 @@ Status: Not started.
 
 ## PHASE 29 — Docker Productionization
 
+Limitations closure work: L24/L34: production resource/image/configuration hardening and reproducible deployment setup; local WSL limits are not production capacity evidence.
+
 Status: Not started.
 
 - optimized images
@@ -406,6 +508,8 @@ Status: Not started.
 - production compose/deployment configuration
 
 ## PHASE 30 — CI/CD
+
+Limitations closure work: L34: complete repeatable test/build/security/deploy automation. The already-pending successful remote run remains immediate L01 and is not postponed here.
 
 Status: Not started.
 
@@ -417,6 +521,8 @@ Status: Not started.
 - deployment pipeline
 
 ## PHASE 31 — Cloud Deployment
+
+Limitations closure work: L20/L22–L26/L31/L34/L35: verify the actual maintained storage/SMTP providers, IAM/encryption/CORS/TLS/clock/credential/lifecycle settings, hosted services and paired backup configuration before exposing production traffic.
 
 Status: Not started.
 
@@ -431,6 +537,8 @@ Status: Not started.
 
 ## PHASE 32 — Load Testing
 
+Limitations closure work: L18/L29/L33: measure representative tenant-lock, search/ACL/history, transfer, queue and abuse workloads; tune only from recorded results.
+
 Status: Not started.
 
 - concurrent users
@@ -440,6 +548,8 @@ Status: Not started.
 - bottleneck analysis
 
 ## PHASE 33 — Production Readiness
+
+Limitations closure work: L21/L29/L30/L31/L33/L35: close release blockers, review all remaining L/P decisions, run timed paired DB/object restore drills, record recovery/availability/cost/retention targets and incident/rollback runbooks. Deliberate design constraints remain documented, not falsely marked fixed.
 
 Status: Not started.
 

@@ -2,6 +2,7 @@ import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResp
 import type { FileSearchQuery, FileSearchPage } from '../types';
 import type { ShareLink } from '../types';
 import type { TrashEntry } from '../types';
+import type { VersionPage, VersionStart, VersionTicket } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -128,6 +129,11 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
 }
 
 export const api = {
+  versions: (id: string, offset = 0, signal?: AbortSignal) => fetchApi<VersionPage>(`${API_V1}/files/${id}/versions?offset=${offset}`, { signal }),
+  startVersion: (id: string, payload: VersionStart, signal?: AbortSignal) => fetchApi<VersionTicket>(`${API_V1}/files/${id}/versions`, { method: 'POST', body: JSON.stringify(payload), signal }),
+  completeVersion: (id: string, versionId: string, signal?: AbortSignal) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/versions/${versionId}/complete`, { method: 'POST', signal }),
+  restoreVersion: (id: string, versionId: string, generation: number, signal?: AbortSignal) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/versions/${versionId}/restore`, { method: 'POST', body: JSON.stringify({ base_generation: generation }), signal }),
+  versionDownload: (id: string, versionId: string, signal?: AbortSignal) => fetchApi<{ download_url: string; expires_at: string }>(`${API_V1}/files/${id}/versions/${versionId}/download-url`, { method: 'POST', signal }),
   trash: (offset = 0, signal?: AbortSignal) => fetchApi<{ items: TrashEntry[]; offset: number; has_more: boolean }>(`${API_V1}/trash?offset=${offset}`, { signal }),
   moveToTrash: (kind: 'files' | 'folders', id: string) => fetchApi<TrashEntry>(`${API_V1}/${kind}/${id}/trash`, { method: 'POST' }),
   restoreTrash: (id: string) => fetchApi<void>(`${API_V1}/trash/${id}/restore`, { method: 'POST' }),
@@ -304,6 +310,24 @@ export async function uploadBrowserFile(file: File, folderId: string | null, req
   }
   progress('Verifying upload…'); current();
   const completed = await api.completeUpload(ticket.file.id); current(); return completed;
+}
+
+export async function uploadVersionFile(id: string, file: File, requestId: string, generation: number, maxBytes: number, signal: AbortSignal) {
+  const epoch = sessionEpoch;
+  const current = () => { if (signal.aborted || sessionEpoch !== epoch) throw new Error('Session changed; retry from version history.'); };
+  current(); if (file.size > maxBytes) throw new Error('Replacement file exceeds the version upload limit.');
+  const checksum = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())))); current();
+  const ticket = await api.startVersion(id, { request_id: requestId, base_generation: generation,
+    declared_size_bytes: file.size, declared_content_type: /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+$/.test(file.type) ? file.type : null, checksum_sha256: checksum }, signal); current();
+  if (ticket.upload_url) {
+    try {
+      const response = await fetch(ticket.upload_url, { method: 'PUT', body: file, headers: ticket.headers, credentials: 'omit', referrerPolicy: 'no-referrer', signal }); current();
+      if (!response.ok && response.status !== 412) throw new Error('Version transfer failed.');
+    } catch (failure) {
+      current(); try { const result = await api.completeVersion(id, ticket.version.id, signal); current(); return result; } catch { throw failure; }
+    }
+  }
+  const result = await api.completeVersion(id, ticket.version.id, signal); current(); return result;
 }
 
 export async function downloadBrowserFile(id: string, signal?: AbortSignal) {

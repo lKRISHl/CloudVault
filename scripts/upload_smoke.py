@@ -331,6 +331,57 @@ def main():
                 == 204
             )
             assert member.get(f"/files/{fid}").status_code == 404
+        versions = require(api.get(f"/files/{fid}/versions"), 200)
+        original = versions["items"][0]
+        replacement = b"A separate immutable Docker version"
+        version = require(
+            api.post(
+                f"/files/{fid}/versions",
+                json={
+                    "request_id": str(uuid4()),
+                    "base_generation": versions["file"]["version_generation"],
+                    "declared_size_bytes": len(replacement),
+                    "declared_content_type": "text/plain",
+                    "checksum_sha256": base64.b64encode(
+                        hashlib.sha256(replacement).digest()
+                    ).decode(),
+                },
+            ),
+            201,
+        )
+        with httpx.Client(timeout=20) as transfer:
+            assert (
+                transfer.put(
+                    version["upload_url"],
+                    headers=version["headers"],
+                    content=replacement,
+                ).status_code
+                == 200
+            )
+            current = require(
+                api.post(f"/files/{fid}/versions/{version['version']['id']}/complete"),
+                200,
+            )
+            assert current["current_version"] == 2
+            for record, expected in [
+                (original, body),
+                (version["version"], replacement),
+            ]:
+                grant = require(
+                    api.post(f"/files/{fid}/versions/{record['id']}/download-url"), 200
+                )
+                assert transfer.get(grant["download_url"]).content == expected
+            restored_version = require(
+                api.post(
+                    f"/files/{fid}/versions/{original['id']}/restore",
+                    json={"base_generation": current["version_generation"]},
+                ),
+                200,
+            )
+            assert restored_version["current_version"] == 1
+        assert require(api.get(f"/files/{fid}/versions"), 200)["retained_bytes"] == len(
+            body
+        ) + len(replacement)
         trashed = require(api.post(f"/files/{fid}/trash"), 201)
         assert api.get(f"/files/{fid}").status_code == 404
         page = require(api.get("/trash"), 200)
@@ -353,7 +404,7 @@ def main():
         folder_trash = require(api.post(f"/folders/{empty['id']}/trash"), 201)
         assert api.post(f"/trash/{folder_trash['id']}/restore").status_code == 204
         print(
-            "Docker SMTP/transfers/search/sharing/ACL and file/folder trash/restore/purge queue passed"
+            "Docker SMTP/transfers/search/sharing/ACL, versions and trash/restore/purge queue passed"
         )
         print("Unique smoke accounts/workspace/two files retained as development data")
 

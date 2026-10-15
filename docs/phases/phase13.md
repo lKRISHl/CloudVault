@@ -1,7 +1,7 @@
 # Phase 13 — Trash and Restore
 
 Implemented and locally verified on 2026-10-15. Schema: 013_trash. Verification is recorded below.
-Phase 12 is committed as cce1f62; Phase 13 remains uncommitted.
+Phase 13 is committed as c3df20f. Phase 14 extends its cleanup to all application versions; the verification below records the Phase 13 implementation.
 
 ## A. What was built
 
