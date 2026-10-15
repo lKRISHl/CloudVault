@@ -47,6 +47,8 @@ class UploadService:
         if file is None:
             raise HTTPException(status_code=404, detail="File not found")
         await self.files.require_read(actor, await self.files.folders.authorize(actor), file)
+        if file.upload_cancelled_at:
+            raise HTTPException(410, "Upload cancelled; cleanup retains its original deadline")
         if file.version_generation > 1:
             raise HTTPException(409, "Use version history for this file")
         if file.upload_method != "basic":

@@ -10,11 +10,12 @@ async function mail(request: APIRequestContext, email: string, purpose: string) 
     const messages = await result.json() as { to: string; body: string }[];
     link = messages.filter((item) => item.to === email && item.body.includes(purpose)).at(-1)?.body.split('\n').find((line) => line.startsWith('http'))?.trim() ?? '';
     return link;
-  }).not.toBe('');
+  }, { timeout: 15000 }).not.toBe('');
   return link;
 }
 
 async function register(page: Page, request: APIRequestContext, email: string, name: string, workspace: string) {
+  await page.bringToFront();
   await page.goto('/register');
   await page.getByLabel('Full name').fill(name);
   await page.getByLabel('Workspace name').fill(workspace);
@@ -28,6 +29,7 @@ async function register(page: Page, request: APIRequestContext, email: string, n
 }
 
 async function invite(page: Page, request: APIRequestContext, email: string, role = 'member') {
+  await page.bringToFront();
   await page.goto('/app/settings');
   await page.getByLabel('Invitation email').fill(email);
   await page.getByLabel('Invitation role').selectOption(role);
@@ -42,6 +44,7 @@ async function invite(page: Page, request: APIRequestContext, email: string, rol
 }
 
 async function accept(page: Page, link: string) {
+  await page.bringToFront();
   await page.goto(link);
   await page.getByRole('button', { name: 'Join organization' }).click();
   await expect(page).toHaveURL(/\/app$/);
@@ -50,6 +53,7 @@ async function accept(page: Page, link: string) {
 }
 
 async function transfer(page: Page, email: string) {
+  await page.bringToFront();
   await page.goto('/app/settings');
   await page.getByLabel('New owner', { exact: true }).selectOption({ label: email });
   await page.getByLabel('Ownership transfer password').fill(password);

@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 14B — Core Library Movement and Recovery (2026-10-15)
+- Completed-file moves with expected-source concurrency, source/destination authority, conflict rollback and share revocation; immutable object/version identities remain unchanged.
+- Trash recovery to a selected writable destination/name, preserving ACL/batch boundaries and independent older trash; full depth/subtree ownership and purge/restore races remain protected.
+- Confirmed folder pending-upload cancellation commits with trash, denies later activation after restore and retains exact safe cleanup refs/deadlines. Legacy no-session metadata supports confirmed retained-tombstone discard.
+- Migration 016_library_recovery preserves data and guards cancellation/discard rollback. Phase evidence and inherited limitation checkpoints are recorded in docs/phases/phase14b.md and CONTINUE.md; aggregate quota/audit/security/provider/remote CI gates remain open.
+
 ## Phase 14A — Version Transfers, Resume/Cancel and Pruning (2026-10-15)
 - Multipart replacements with bounded hashing, durable pre-provider candidates/part receipts, missing-part resume and lost-acknowledgement reconciliation; current content remains available until verified activation.
 - Reload resume using secret-free scoped manifests or server history, original-file validation, pause and durable cancellation with safe cleanup.

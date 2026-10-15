@@ -58,7 +58,6 @@ class TrashCleanupService:
                         File.tenant_id == tenant_id,
                         file_scope(entry),
                         File.trash_id.is_not(None),
-                        File.status == "uploaded",
                         File.trash_id.in_(
                             select(TrashEntry.id).where(TrashEntry.not_before <= now)
                         ),
@@ -109,6 +108,8 @@ class TrashCleanupService:
                             else:
                                 version.purged_at = version.purged_at or now
                         else:
+                            if file.status == "pending":
+                                file.upload_cleanup_at = file.upload_cleanup_at or now
                             file.object_purged_at = file.object_purged_at or now
                     except StorageError:
                         continue
@@ -140,8 +141,10 @@ class TrashCleanupService:
                         File.tenant_id == tenant_id,
                         file_scope(entry),
                         File.trash_id.is_not(None),
-                        File.status == "uploaded",
-                        File.object_purged_at.is_(None),
+                        or_(
+                            and_(File.status == "uploaded", File.object_purged_at.is_(None)),
+                            and_(File.status == "pending", File.upload_cleanup_at.is_(None)),
+                        ),
                     )
                 )
             )

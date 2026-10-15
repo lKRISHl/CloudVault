@@ -5,10 +5,29 @@ from fastapi import APIRouter, Query, Request, Response
 
 from app.api.folders import WorkspaceUser
 from app.api.users import Database
-from app.schemas.trash import PurgeRequest, TrashPage, TrashRead
+from app.schemas.trash import CancelTrashRequest, PurgeRequest, RestoreRequest, TrashPage, TrashRead
 from app.services.trash import TrashService
 
 router = APIRouter()
+
+
+@router.post(
+    "/folders/{resource_id}/cancel-uploads-and-trash", response_model=TrashRead, status_code=201
+)
+async def cancel_and_trash(
+    resource_id: UUID,
+    payload: CancelTrashRequest,
+    actor: WorkspaceUser,
+    db: Database,
+    request: Request,
+):
+    return await TrashService(db).move_to_trash(
+        actor,
+        "folders",
+        resource_id,
+        request.client.host if request.client else "",
+        cancel_uploads=True,
+    )
 
 
 @router.post("/{kind}/{resource_id}/trash", response_model=TrashRead, status_code=201)
@@ -30,8 +49,16 @@ async def listing(actor: WorkspaceUser, db: Database, offset: int = Query(0, ge=
 
 
 @router.post("/trash/{entry_id}/restore", status_code=204)
-async def restore(entry_id: UUID, actor: WorkspaceUser, db: Database, request: Request):
-    await TrashService(db).restore(actor, entry_id, request.client.host if request.client else "")
+async def restore(
+    entry_id: UUID,
+    actor: WorkspaceUser,
+    db: Database,
+    request: Request,
+    payload: RestoreRequest | None = None,
+):
+    await TrashService(db).restore(
+        actor, entry_id, request.client.host if request.client else "", payload
+    )
     return Response(status_code=204)
 
 

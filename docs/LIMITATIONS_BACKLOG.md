@@ -1,6 +1,6 @@
 # CloudVault — Limitations and Closure Schedule
 
-Reviewed 2026-10-15 against the phase reports currently present (2, 2A, 2B, 3–14A),
+Reviewed 2026-10-15 against the phase reports currently present (2, 2A, 2B, 3–14B),
 CONTINUE.md, SECURITY.md and DEVELOPMENT_PLAN.md. Phases 0/1 are represented by the
 roadmap/security notes; separate phase0/phase1 reports are not present. Selected current
 code checks confirm file moves/avatars are absent, readiness checks only the DB, and
@@ -101,17 +101,21 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   current files API (rename exists, move does not). **When: 14B.** Add file moves with
   source/destination/ancestor authority, conflict handling, share revocation and unchanged
   content/version keys. Verify cross-tenant, private-parent and concurrent move cases.
+  **Closed locally in 14B:** immutable refs/share revocation, source/destination authority, expected-source concurrency and conflict rollback pass. Evidence: [14B §H](phases/phase14b.md#h-verification).
 - **L06 — Trash restore only supports the original active parent/conflict-free name.**
   Source: [13 §J](phases/phase13.md#j-operations-and-limitations). **When: 14B.** Add explicit
   writable destination/name selection and safe conflict recovery, preserving batch boundaries,
   ACLs and versions. Verify name collisions, private destination, missing parent and rollback.
+  **Closed locally in 14B:** chosen destination/name, active-parent/authority/depth/ownership checks, batch boundaries, collisions, rollback and restore/purge races pass. Evidence: [14B](phases/phase14b.md).
 - **L07 — Pending original transfers block containing-folder trash.** Sources: 13 §J,
   9 §J. **When: 14B.** Add an explicit cancel-transfers-then-trash workflow with durable
   cleanup references and race checks. Do not bypass deadlines, silently abandon objects or
   claim immediate name/byte reclamation. Preserve the existing safe block until implemented.
+  **Closed locally in 14B for tracked original File records:** confirmed atomic cancellation/trash, no activation after restore, creator/cap/race checks, actual late basic PUT and multipart cleanup pass. Original refs/deadlines remain; unmaterialized initialization-intent reconciliation is explicitly L37 in 16. Evidence: [14B](phases/phase14b.md).
 - **L08 — Legacy metadata lacking an upload reference cannot be completed/reticketed.**
   Source: 6 §J. **When: 14B.** Provide an authorized remediation/discard path that never
   invents stored bytes or drops cleanup refs. Verify old-schema seeded rows and name reuse.
+  **Closed locally in 14B for ordinary no-reference legacy rows:** authorized DISCARD, retained tombstone, old-schema preservation/guarded rollback and safe name reuse pass. Contradictory retained intent/version refs fail closed and are tracked separately as L37. Evidence: [14B](phases/phase14b.md).
 
 ### Previews, jobs, collaboration and security boundaries
 
@@ -233,6 +237,8 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   workloads/optimization; 33 accepted targets.** Measure actual lock wait, common/short-term
   search plans, index/migration cost, worker fairness/backlog and large-grant/version sets.
   Optimize from evidence; synthetic index checks are not throughput benchmarks.
+  Phase 14B adds the 100-pending cancellation bound and full subtree restore-height/ownership
+  traversal to these workloads; destination lists remain pages of 25.
 - **L34 — Production images/configuration, complete CI/CD and hosted services absent.**
   Sources: roadmap 29–31 and prior deployment gates. **When: 29 container/resource/config
   hardening; 30 repeatable build/test/security/deployment pipeline; 31 HTTPS/domain/secrets/
@@ -326,3 +332,19 @@ Do not replace this register with "later phases will handle it." At Phase 33, no
 blocking L item may remain unexplained; P decisions must be recorded. Deferred optional
 features are not completed features. Any reproducible security/data-loss defect discovered
 while implementing these tasks is fixed before proceeding, regardless of its planned phase.
+
+## Newly tracked in Phase 14B
+
+- **L37 — Contradictory legacy metadata with retained provider intent/version refs requires operator reconciliation.**
+  Source: [14B §D/J](phases/phase14b.md#d-cancellation-and-legacy-state). Ordinary pending rows
+  with no upload reference can be safely discarded. If a retained intent/snapshot contradicts
+  that legacy state, discard/cancel-trash fails closed rather than deleting evidence.
+  **When: 16 diagnostic/job reconciliation; 26 chosen-provider verification before public release.**
+  Add an authorized operator path that enumerates all retained refs/deadlines, safely adopts or
+  proves cleanup, and then retires metadata without inventing bytes or losing retries. Test
+  lost acknowledgements, changed bucket/provider errors, late writes and authorization. This
+  follow-up is automatically included when continuing those phases; current safe refusal remains.
+  Initialization intents without a materialized File row remain under existing exact-key
+  maintenance, outside the folder's tracked pending-record cancellation list. Include folder-
+  scoped intent discovery/cancellation and stale initialization-retry invalidation after
+  trash/recovery in the Phase 16 reconciliation work; preserve every original deadline/ref.

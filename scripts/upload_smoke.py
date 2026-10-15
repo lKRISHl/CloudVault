@@ -474,11 +474,35 @@ def main():
         assert require(api.get(version_root), 200)["retained_bytes"] == len(body) + len(
             replacement
         ) + sum(map(len, chunks))
+        destination = require(
+            api.post("/folders", json={"name": "Movement smoke destination"}), 201
+        )
+        moved = require(
+            api.post(
+                f"/files/{fid}/move",
+                json={
+                    "folder_id": destination["id"],
+                    "source_folder_id": None,
+                },
+            ),
+            200,
+        )
+        assert moved["id"] == fid and moved["current_version"] == 1
         trashed = require(api.post(f"/files/{fid}/trash"), 201)
         assert api.get(f"/files/{fid}").status_code == 404
         page = require(api.get("/trash"), 200)
         assert any(item["id"] == trashed["id"] for item in page["items"])
-        assert api.post(f"/trash/{trashed['id']}/restore").status_code == 204
+        assert (
+            api.post(
+                f"/trash/{trashed['id']}/restore",
+                json={
+                    "use_original": False,
+                    "destination_id": None,
+                    "name": "Recovered Docker upload.txt",
+                },
+            ).status_code
+            == 204
+        )
         restored = require(api.post(f"/files/{fid}/download-url"), 200)
         with httpx.Client(timeout=20) as transfer:
             assert transfer.get(restored["download_url"]).content == body
@@ -495,8 +519,32 @@ def main():
         )
         folder_trash = require(api.post(f"/folders/{empty['id']}/trash"), 201)
         assert api.post(f"/trash/{folder_trash['id']}/restore").status_code == 204
+        pending = require(
+            api.post(
+                "/files/uploads",
+                json={
+                    "name": "Pending cancellation.txt",
+                    "folder_id": empty["id"],
+                    "declared_size_bytes": len(body),
+                    "declared_content_type": "text/plain",
+                    "checksum_sha256": checksum,
+                    "request_id": str(uuid4()),
+                },
+            ),
+            201,
+        )
+        cancelled = require(
+            api.post(
+                f"/folders/{empty['id']}/cancel-uploads-and-trash",
+                json={"confirmation": "CANCEL UPLOADS"},
+            ),
+            201,
+        )
+        assert api.post(f"/trash/{cancelled['id']}/restore").status_code == 204
+        assert api.post(f"/files/{pending['file']['id']}/complete").status_code == 410
         print(
-            "Docker SMTP/transfers/search/sharing/ACL, version multipart/resume/cancel/prune/policy and trash/restore/purge queue passed"
+            "Docker SMTP/transfers/search/sharing/ACL, version transfers/retention, "
+            "file movement/recovery/cancel-folder and trash/purge queue passed"
         )
         print("Unique smoke accounts/workspace/two files retained as development data")
 

@@ -23,11 +23,63 @@ class FileService:
             **{
                 field: getattr(file, field)
                 for field in FileRead.model_fields
-                if field not in ("can_write", "can_manage")
+                if field not in ("can_write", "can_manage", "legacy_metadata")
             },
             can_write=PermissionService.writes(actor, role, file),
             can_manage=PermissionService.manages(actor, role, file),
+            legacy_metadata=file.status == "pending" and file.object_id is None,
         )
+
+    async def move(self, actor, file_id, payload, ip):
+        from app.services.accounts import AccountService
+
+        await AccountService(self.db).limit("file-move", ip, str(actor.id))
+        file = await PermissionService(self.db).managed(actor, "files", file_id, write=True)
+        role = await self.folders.authorize(actor)
+        if file.status != "uploaded":
+            raise HTTPException(409, "Only completed files can be moved")
+        if file.folder_id != payload.source_folder_id:
+            raise HTTPException(409, "File location changed; refresh before moving")
+        for parent in (file.folder_id, payload.folder_id):
+            path = await self.folders.ancestors(actor, parent)
+            if path:
+                await self.folders.require_write(actor, role, path[-1])
+        if file.folder_id != payload.folder_id:
+            await PermissionService(self.db).invalidate_shares(actor, "files", file.id)
+            file.folder_id = payload.folder_id
+        try:
+            await self.db.commit()
+            await self.db.refresh(file)
+        except IntegrityError:
+            await self.db.rollback()
+            raise HTTPException(409, "File metadata conflict") from None
+        return self.read(actor, role, file)
+
+    async def discard_legacy(self, actor, file_id, ip):
+        from datetime import UTC, datetime
+
+        from app.models import FileVersion, UploadIntent
+        from app.services.accounts import AccountService
+
+        await AccountService(self.db).limit("metadata-discard", ip, str(actor.id))
+        file = await PermissionService(self.db).managed(actor, "files", file_id, write=True)
+        role = await self.folders.authorize(actor)
+        path = await self.folders.ancestors(actor, file.folder_id)
+        if path:
+            await self.folders.require_write(actor, role, path[-1])
+        if (
+            file.status != "pending"
+            or file.object_id is not None
+            or await self.db.scalar(select(FileVersion.id).where(FileVersion.file_id == file.id))
+            or await self.db.get(UploadIntent, file.id)
+        ):
+            raise HTTPException(
+                409, "Only legacy metadata without any upload reference can be discarded"
+            )
+        now = datetime.now(UTC)
+        file.upload_cancelled_at = file.upload_cleanup_at = now
+        await PermissionService(self.db).invalidate_shares(actor, "files", file.id)
+        await self.db.commit()
 
     async def details(self, actor: User, file_id: UUID) -> FileRead:
         role = await self.folders.authorize(actor)

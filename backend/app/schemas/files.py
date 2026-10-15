@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.folders import FolderName
 
@@ -20,6 +20,8 @@ class FileMetadataCreate(FolderName):
 
 
 class FileRead(BaseModel):
+    upload_cancelled_at: datetime | None = None
+    legacy_metadata: bool = False
     current_version: int = 1
     version_generation: int = 1
     version_keep_last: int | None = None
@@ -52,3 +54,9 @@ class FilePage(BaseModel):
     offset: int
     limit: int
     has_more: bool
+
+
+class FileMove(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    folder_id: UUID | None
+    source_folder_id: UUID | None

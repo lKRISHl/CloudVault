@@ -9,9 +9,10 @@ from app.api.storage import UploadStorage
 from app.api.users import Database
 from app.api.versions import router as versions_router
 from app.schemas.downloads import DownloadTicket
-from app.schemas.files import FilePage, FileRead
+from app.schemas.files import FileMove, FilePage, FileRead
 from app.schemas.folders import FolderName
 from app.schemas.search import FileSearchPage, FileSearchQuery
+from app.schemas.trash import DiscardMetadataRequest
 from app.schemas.uploads import UploadConfiguration, UploadProof, UploadStart, UploadTicket
 from app.services.downloads import DownloadService
 from app.services.files import FileService
@@ -21,6 +22,29 @@ from app.services.uploads import UploadService
 router = APIRouter()
 router.include_router(multipart_router)
 router.include_router(versions_router)
+
+
+@router.post("/{file_id}/move", response_model=FileRead)
+async def move(
+    file_id: UUID, payload: FileMove, actor: WorkspaceUser, db: Database, request: Request
+):
+    return await FileService(db).move(
+        actor, file_id, payload, request.client.host if request.client else ""
+    )
+
+
+@router.post("/{file_id}/discard-metadata", status_code=204)
+async def discard(
+    file_id: UUID,
+    payload: DiscardMetadataRequest,
+    actor: WorkspaceUser,
+    db: Database,
+    request: Request,
+):
+    await FileService(db).discard_legacy(
+        actor, file_id, request.client.host if request.client else ""
+    )
+    return Response(status_code=204)
 
 
 @router.patch("/{file_id}", response_model=FileRead)

@@ -89,6 +89,7 @@ test('multipart uploads resume after reload with only missing chunks and can be 
   await page.getByLabel('File to upload').setInputFiles({ name: 'Cancelled.bin', mimeType: 'application/octet-stream', buffer: body });
   await page.getByRole('button', { name: 'Upload file', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Part transfer failed');
+  await page.unroute('http://localhost:9000/**');
   await page.getByRole('button', { name: 'Cancel multipart transfer', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Multipart upload cancelled');
   const cancelled = page.getByRole('region', { name: 'Files' }).getByRole('listitem').filter({ hasText: 'Cancelled.bin' });

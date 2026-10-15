@@ -8,6 +8,7 @@ import { UploadForm } from './UploadForm';
 import { DownloadButton } from './DownloadButton';
 import { RenameFile } from './RenameFile';
 import { TrashButton } from '../trash/TrashButton';
+import { FileRecoveryActions } from './FileRecoveryActions';
 
 export function FileList({ folderId, writable = false }: { folderId: string | null; writable?: boolean }) {
   const { user } = useAuth();
@@ -48,7 +49,9 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
       {file.can_manage && <Link className="secondary-button ml-3" to={`/app/permissions/files/${file.id}`} aria-label={`Permissions for ${file.name}`}>Permissions</Link>}
       {file.status === 'uploaded' && file.can_write && <RenameFile id={file.id} name={file.name} />}
       {file.status === 'uploaded' && file.can_manage && <TrashButton kind="files" id={file.id} name={file.name} />}
-      {writable && file.status === 'pending' && file.upload_method !== 'multipart' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Retry upload {file.name}</button>}
+      {file.can_manage && (file.status === 'uploaded' || file.legacy_metadata) && <FileRecoveryActions file={file} />}
+      {file.upload_cancelled_at && <p>Upload cancelled. Outstanding transfers are cleaned after their original authorization deadline.</p>}
+      {writable && file.status === 'pending' && !file.legacy_metadata && !file.upload_cancelled_at && file.upload_method !== 'multipart' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Retry upload {file.name}</button>}
       {writable && file.status === 'pending' && file.upload_method === 'multipart' && file.multipart_state === 'active' && file.created_by === user?.id && <button className="border rounded px-3 py-2" disabled={cancelId !== null} onClick={() => void cancel(file.id)}>Cancel multipart upload {file.name}</button>}
       {writable && file.status === 'pending' && file.upload_method === 'multipart' && file.multipart_state === 'active' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Resume upload {file.name}</button>}
     </li>)}</ul>

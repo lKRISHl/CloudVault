@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 test.skip(!process.env.TEST_S3_ENDPOINT, 'Version browser test requires disposable real storage');
@@ -44,7 +44,7 @@ test('real replacement and historical downloads retain both contents and restore
   expect(await readFile((await (await event).path())!)).toEqual(original);
 });
 
-test('multipart replacement resumes after reload, supports cancellation and protects current history from pruning', async ({ page, request }) => {
+test('multipart replacement resumes after reload, supports cancellation and protects current history from pruning', async ({ page, request }, testInfo) => {
   test.setTimeout(120000);
   const email = `version-resume-${Date.now()}@example.com`;
   await page.goto('/register'); await page.getByLabel('Full name').fill('Resume Owner');
@@ -64,6 +64,10 @@ test('multipart replacement resumes after reload, supports cancellation and prot
   await page.getByRole('link', { name: 'Versions of Resume history.bin', exact: true }).click();
   await expect(page.getByText('Current: version 1', { exact: true })).toBeVisible();
   const body = Buffer.alloc(8 * 1024 * 1024 + 5, 86);
+  await mkdir(testInfo.outputDir, { recursive: true });
+  const originalPath = testInfo.outputPath('Replacement.bin');
+  const changedPath = testInfo.outputPath('Changed.bin');
+  await writeFile(originalPath, body);
   let puts = 0;
   page.on('request', outgoing => { if (outgoing.method() === 'PUT' && outgoing.url().includes('partNumber=')) {
     puts++; expect(outgoing.headers()['authorization']).toBeUndefined(); expect(outgoing.headers()['cookie']).toBeUndefined();
@@ -73,16 +77,17 @@ test('multipart replacement resumes after reload, supports cancellation and prot
     else await route.continue();
   };
   await page.route('http://localhost:9000/**', outage);
-  await page.getByLabel('Replacement file', { exact: true }).setInputFiles({ name: 'Replacement.bin', mimeType: 'application/octet-stream', buffer: body });
+  await page.getByLabel('Replacement file', { exact: true }).setInputFiles(originalPath);
   await page.getByRole('button', { name: 'Upload new version', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Version part transfer failed');
   await page.unroute('http://localhost:9000/**', outage); await page.reload();
   await expect(page.getByText(/Resume record:/)).toBeVisible();
   const before = puts; const wrong = Buffer.from(body); wrong[0] = 87;
-  await page.getByLabel('Replacement file', { exact: true }).setInputFiles({ name: 'Replacement.bin', mimeType: 'application/octet-stream', buffer: wrong });
+  await writeFile(changedPath, wrong);
+  await page.getByLabel('Replacement file', { exact: true }).setInputFiles(changedPath);
   await page.getByRole('button', { name: 'Upload new version', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('original file content'); expect(puts).toBe(before);
-  await page.getByLabel('Replacement file', { exact: true }).setInputFiles({ name: 'Replacement.bin', mimeType: 'application/octet-stream', buffer: body });
+  await page.getByLabel('Replacement file', { exact: true }).setInputFiles(originalPath);
   await page.getByRole('button', { name: 'Upload new version', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Version uploaded and verified'); expect(puts).toBe(before + 1);
   await expect(page.getByText('Current: version 2', { exact: true })).toBeVisible();
@@ -95,7 +100,7 @@ test('multipart replacement resumes after reload, supports cancellation and prot
   await expect(page.getByRole('status')).toContainText('deletion queued');
   await expect(page.getByRole('button', { name: 'Download version 1', exact: true })).toHaveCount(0);
   await page.route('http://localhost:9000/**', outage);
-  await page.getByLabel('Replacement file', { exact: true }).setInputFiles({ name: 'Cancelled.bin', mimeType: 'application/octet-stream', buffer: body });
+  await page.getByLabel('Replacement file', { exact: true }).setInputFiles(originalPath);
   await page.getByRole('button', { name: 'Upload new version', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Version part transfer failed');
   await page.unroute('http://localhost:9000/**', outage);

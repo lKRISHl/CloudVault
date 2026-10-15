@@ -44,8 +44,12 @@ class File(Base):
         CheckConstraint("status IN ('pending', 'uploaded')", name="ck_files_status"),
         CheckConstraint("visibility IN ('workspace', 'private')", name="ck_files_visibility"),
         CheckConstraint(
-            "upload_cleanup_at IS NULL OR (status = 'pending' AND object_id IS NOT NULL)",
+            "upload_cleanup_at IS NULL OR (status = 'pending' AND "
+            "(object_id IS NOT NULL OR upload_cancelled_at IS NOT NULL))",
             name="ck_files_cleanup",
+        ),
+        CheckConstraint(
+            "upload_cancelled_at IS NULL OR status = 'pending'", name="ck_files_cancelled"
         ),
         CheckConstraint(
             "(object_id IS NULL AND storage_bucket IS NULL AND upload_expires_at IS NULL "
@@ -152,6 +156,7 @@ class File(Base):
         ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    upload_cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     current_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     version_generation: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     version_keep_last: Mapped[int | None] = mapped_column(Integer)

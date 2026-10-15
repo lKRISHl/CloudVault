@@ -125,6 +125,8 @@ export interface FolderPage {
 }
 
 export interface FileMetadata {
+  upload_cancelled_at?: string | null;
+  legacy_metadata?: boolean;
   current_version?: number;
   version_generation?: number;
   version_keep_last?: number | null;

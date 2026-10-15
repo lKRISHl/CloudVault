@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 14A is implemented and locally verified: multipart replacement, bounded hashing, reload resume/cancellation, manual history pruning and keep-last retention. Current content, live authority, fixed deadlines and confirmed cleanup accounting remain protected. Phase 14 is committed as 14a4485; Phase 14A implementation and verification are included in this handoff commit. Live schema 015_version_transfers. See CONTINUE.md and docs/phases/phase14a.md. Remote CI/production provider/load gates remain pending.
+Current state: Phase 14B is implemented and locally verified: completed-file moves, explicit trash destination/name recovery, confirmed tracked pending-upload cancellation with folder trash, and safe legacy metadata discard. Immutable content/version refs and live authority remain protected. Phase 14A is committed as 98a4a70; Phase 14B implementation and verification are included in this handoff commit. Verified development schema 016_library_recovery. See CONTINUE.md and docs/phases/phase14b.md. Remote CI/production provider/load gates and L37 reconciliation remain pending.
 
-Next planned implementation: Phase 14B, before Phase 15. Phase 18A follows 18 and precedes 19; Phase 22A follows 22 and precedes 23. Phase 25A follows 25 and precedes 26. These remaining follow-ups are planned, not implemented.
+Next planned implementation: Phase 15 safe previews/detected-type handling (L09). Phase 18A follows 18 and precedes 19; Phase 22A follows 22 and precedes 23. Phase 25A follows 25 and precedes 26. These remaining follow-ups are planned, not implemented.
 
 ## Limitations ownership and closure
 
@@ -246,7 +246,7 @@ Immutable application versions use distinct object keys on an unversioned bucket
 
 ## PHASE 14A — Version Transfers, Resume/Cancel and Pruning
 
-Status: Implemented and locally verified 2026-10-15; included in this handoff commit. L02/L03 and L04 core lifecycle acceptance pass. Evidence: docs/phases/phase14a.md. L04 aggregate quota/audit retention remain assigned to 19/20; external production/remote CI gates remain open.
+Status: Implemented and locally verified 2026-10-15; committed as 98a4a70. L02/L03 and L04 core lifecycle acceptance pass. Evidence: docs/phases/phase14a.md. L04 aggregate quota/audit retention remain assigned to 19/20; external production/remote CI gates remain open.
 
 Closure ownership: L02–L04 (L04 accounting/audit integration continues in 19/20).
 
@@ -262,7 +262,7 @@ Completion criteria:
 
 ## PHASE 14B — Core Library Movement and Recovery
 
-Status: Planned; not implemented. Complete after 14A and before 15.
+Status: Implemented and locally verified 2026-10-15; included in this handoff commit. L05–L08 close for the documented tracked-record scope. See docs/phases/phase14b.md for database/provider/browser/Docker evidence and L37 follow-up in 16/26.
 
 Closure ownership: L05–L08.
 
@@ -289,7 +289,7 @@ Status: Not started.
 
 ## PHASE 16 — Redis + Background Jobs
 
-Limitations closure work: L20/L22/L23/L25 and P04 provider decision: reliable jobs/inventory cursors and exact-reference lifecycle, choose maintained production storage before integration certification, decide/enforce unversioned versus fully version-aware provider policy, and define job/backlog health. Never enable bucket versioning without verified cleanup for every path.
+Limitations closure work: L20/L22/L23/L25/L37 and P04 provider decision: reliable jobs/inventory cursors and exact-reference lifecycle, safe operator reconciliation for contradictory legacy metadata/intents, choose maintained production storage before integration certification, decide/enforce unversioned versus fully version-aware provider policy, and define job/backlog health. Never enable bucket versioning without verified cleanup for every path.
 
 Status: Not started.
 
