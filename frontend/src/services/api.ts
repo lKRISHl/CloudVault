@@ -1,5 +1,6 @@
 import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace, Folder, FolderPage, FilePage, FileMetadata, UploadTicket, DownloadTicket, MultipartTicket, MultipartStart, MultipartProgress, PartTicket } from '../types';
 import type { FileSearchQuery, FileSearchPage } from '../types';
+import type { ShareLink } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -126,6 +127,9 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
 }
 
 export const api = {
+  shares: (id: string, offset: number, signal?: AbortSignal) => fetchApi<{ file_name: string; items: ShareLink[]; offset: number; has_more: boolean }>(`${API_V1}/files/${id}/shares?offset=${offset}`, { signal }),
+  createShare: (id: string, payload: { expires_in_hours: number; password: string | null; allow_download: boolean; max_downloads: number | null }) => fetchApi<ShareLink & { share_url: string }>(`${API_V1}/files/${id}/shares`, { method: 'POST', body: JSON.stringify(payload) }),
+  revokeShare: (fileId: string, id: string) => fetchApi<void>(`${API_V1}/files/${fileId}/shares/${id}`, { method: 'DELETE' }),
   searchFiles: (filters: FileSearchQuery, signal?: AbortSignal) => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
@@ -244,6 +248,15 @@ export const api = {
     method: 'DELETE', body: JSON.stringify({ password, confirmation }),
   }),
 };
+
+export async function publicShareRequest<T>(action: 'access' | 'download-url', payload: { token: string; password: string }, signal?: AbortSignal): Promise<T> {
+  // Public capabilities never inherit the signed-in user's cookies or authorization.
+  const response = await fetch(`${API_V1}/shares/${action}`, { method: 'POST', body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, credentials: 'omit',
+    referrerPolicy: 'no-referrer', cache: 'no-store', signal });
+  if (!response.ok) throw new ApiRequestError(await parseError(response), response.status);
+  return response.json();
+}
 
 export async function uploadBrowserFile(file: File, folderId: string | null, requestId: string,
   retryId: string | null, signal: AbortSignal, progress: (message: string) => void) {

@@ -1,4 +1,5 @@
 import { Icon } from '../../components/ui/Icon';
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../auth/AuthContext';
@@ -40,6 +41,7 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
       <p>Declared type: {file.declared_content_type ?? 'Type unspecified'}</p>
       <p>{file.can_write ? 'Creator or manager access' : 'Read only'}</p>
       {file.status === 'uploaded' && <DownloadButton id={file.id} name={file.name} />}
+      {file.status === 'uploaded' && file.can_write && <Link className="secondary-button ml-3" to={`/app/files/${file.id}/shares`} aria-label={`Share ${file.name}`}>Share</Link>}
       {writable && file.status === 'pending' && file.upload_method !== 'multipart' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Retry upload {file.name}</button>}
       {writable && file.status === 'pending' && file.upload_method === 'multipart' && file.multipart_state === 'active' && file.created_by === user?.id && <button className="border rounded px-3 py-2" disabled={cancelId !== null} onClick={() => void cancel(file.id)}>Cancel multipart upload {file.name}</button>}
       {writable && file.status === 'pending' && file.upload_method === 'multipart' && file.multipart_state === 'active' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Resume upload {file.name}</button>}

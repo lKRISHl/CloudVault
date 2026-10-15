@@ -12,6 +12,7 @@ import { RecoveryPage } from '../features/accounts/RecoveryPage';
 import { AccountActionPage } from '../features/accounts/AccountActionPage';
 import { FoldersPage } from '../features/folders/FoldersPage';
 import { FileSearchPage } from '../features/search/FileSearchPage';
+import { PublicSharePage, ShareManagementPage } from '../features/sharing/SharingPages';
 import { AppShell } from '../components/AppShell';
 import { ApiRequestError } from '../services/api';
 
@@ -60,6 +61,7 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/share" element={<PublicSharePage />} />
             <Route path="/account/recover" element={<RecoveryPage />} />
             <Route path="/account/action" element={<AccountActionPage />} />
             <Route path="/join" element={<JoinPage />} />
@@ -74,6 +76,7 @@ function App() {
               <Route path="/app/security" element={<SecurityPage />} />
               <Route path="/app/folders" element={<FoldersPage />} />
               <Route path="/app/search" element={<FileSearchPage />} />
+              <Route path="/app/files/:fileId/shares" element={<ShareManagementPage />} />
               </Route>
             </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />

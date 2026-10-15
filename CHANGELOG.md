@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 11 — Sharing (2026-10-15)
+- File creators/workspace managers create expiring external links with optional Argon2 passwords, metadata-only access and transactional download-grant limits.
+- Anonymous recipients receive minimal metadata and verified native attachment downloads without account cookies. Secrets are SHA-256 hashed, returned once in fragments, sent in POST bodies and cleared from the recipient address.
+- Tenant locks serialize grants/revocation; publisher removal, role updates, ownership transfer and account deletion revoke published links. Actual bytes/issued storage URLs cannot be recalled by app revocation.
+- 011_sharing adds capability metadata with guarded populated rollback. Phase 10 committed as d4aa3e1; Phase 11 remains uncommitted. Final test/runtime evidence is in CONTINUE.md.
+
 All notable changes to CloudVault will be documented in this file.
 
 ## [Unreleased] - 2026-10-15

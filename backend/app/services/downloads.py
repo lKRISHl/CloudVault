@@ -29,9 +29,22 @@ class DownloadService:
         if file.status != "uploaded" or not file.object_id:
             raise HTTPException(status_code=409, detail="File is not ready for download")
         await self.files.folders.ancestors(actor, file.folder_id)
+        issued = datetime.now(UTC)
+        url = await self.checked_url(file, settings.DOWNLOAD_URL_SECONDS, actor)
+        role = await self.files.folders.authorize(actor)
+        return DownloadTicket(
+            file=self.files.read(actor, role, file),
+            download_url=url,
+            expires_at=issued + timedelta(seconds=settings.DOWNLOAD_URL_SECONDS),
+        )
+
+    async def checked_url(
+        self, file: File, ttl: int, actor: User | None = None, deadline: datetime | None = None
+    ) -> str:
+        """Caller establishes authority; reuse verified object checks for share grants."""
         if file.storage_bucket != settings.S3_BUCKET_NAME:
             raise HTTPException(status_code=503, detail="Download storage configuration changed")
-        ref = ObjectRef(actor.tenant_id, file.id, file.object_id)
+        ref = ObjectRef(file.tenant_id, file.id, file.object_id)
         try:
             info = await self.storage.inspect_upload(ref)
             if (
@@ -49,16 +62,17 @@ class DownloadService:
                     status_code=409, detail="Stored file no longer matches verification"
                 )
             # Membership is authoritative, including changes during the provider inspection.
-            role = await self.files.folders.authorize(actor)
-            issued = datetime.now(UTC)
-            url = await self.storage.presign_download(ref, file.name, settings.DOWNLOAD_URL_SECONDS)
-            role = await self.files.folders.authorize(actor)
+            if actor is not None:
+                await self.files.folders.authorize(actor)
+            if deadline is not None:
+                ttl = min(ttl, int((deadline - datetime.now(UTC)).total_seconds()))
+                if ttl < 1:
+                    raise HTTPException(404, "Share unavailable or credentials incorrect")
+            url = await self.storage.presign_download(ref, file.name, ttl)
+            if actor is not None:
+                await self.files.folders.authorize(actor)
         except ObjectNotFoundError:
             raise HTTPException(status_code=409, detail="Stored file is unavailable") from None
         except StorageError:
             raise HTTPException(status_code=503, detail="Cannot authorize download") from None
-        return DownloadTicket(
-            file=self.files.read(actor, role, file),
-            download_url=url,
-            expires_at=issued + timedelta(seconds=settings.DOWNLOAD_URL_SECONDS),
-        )
+        return url

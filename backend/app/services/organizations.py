@@ -139,6 +139,17 @@ class OrganizationService:
         )
         if changed is None:
             raise HTTPException(status_code=409, detail="Membership or authority changed; reload")
+        from app.models import ShareLink
+
+        await self.db.execute(
+            update(ShareLink)
+            .where(
+                ShareLink.tenant_id == actor.tenant_id,
+                ShareLink.created_by == user_id,
+                ShareLink.revoked_at.is_(None),
+            )
+            .values(revoked_at=datetime.now(UTC))
+        )
         await self._revoke_invitations(user.id, actor.tenant_id)
         await self.db.commit()
         return MemberRead(
@@ -201,6 +212,17 @@ class OrganizationService:
                     select(LoginSession.id).where(LoginSession.tenant_id == actor.tenant_id)
                 ),
                 RefreshToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=datetime.now(UTC))
+        )
+        from app.models import ShareLink
+
+        await self.db.execute(
+            update(ShareLink)
+            .where(
+                ShareLink.tenant_id == actor.tenant_id,
+                ShareLink.created_by == user_id,
+                ShareLink.revoked_at.is_(None),
             )
             .values(revoked_at=datetime.now(UTC))
         )
@@ -466,5 +488,16 @@ class OrganizationService:
         if promoted is None:
             await self.db.rollback()
             raise HTTPException(status_code=409, detail="Target membership changed; try again")
+        from app.models import ShareLink
+
+        await self.db.execute(
+            update(ShareLink)
+            .where(
+                ShareLink.tenant_id == actor.tenant_id,
+                ShareLink.created_by.in_([actor.id, target_id]),
+                ShareLink.revoked_at.is_(None),
+            )
+            .values(revoked_at=datetime.now(UTC))
+        )
         await self._revoke_invitations(actor.id, actor.tenant_id)
         await self.db.commit()

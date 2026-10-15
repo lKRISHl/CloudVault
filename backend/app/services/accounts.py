@@ -386,6 +386,16 @@ class AccountService:
             .where(Invitation.created_by == user.id)
             .values(consumed_at=datetime.now(UTC))
         )
+        from app.models import ShareLink
+
+        await self.db.execute(
+            update(ShareLink)
+            .where(
+                ShareLink.created_by == user.id,
+                ShareLink.revoked_at.is_(None),
+            )
+            .values(revoked_at=datetime.now(UTC))
+        )
         await self.db.execute(delete(Membership).where(Membership.user_id == user.id))
         user.is_active = False
         user.deleted_at = datetime.now(UTC)

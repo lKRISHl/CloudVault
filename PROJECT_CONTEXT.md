@@ -68,7 +68,7 @@ Phases 4–8 and the frontend redesign are committed as 670d2a0.
 - **Team/Enterprise**: Advanced RBAC, semantic search, unlimited collaboration, custom domains.
 
 
-Phase 7 now supports actual member-authorized downloads of completed uploads through private, short-lived attachment URLs. Files remain unscanned; private ACLs, sharing, versioning, scanning and AI remain later phases. Development storage is on D:\CloudVault-Dev.
+Phase 7 now supports actual member-authorized downloads of completed uploads through private, short-lived attachment URLs. Files remain unscanned; private ACLs, versioning, scanning and AI remain later phases. Development storage is on D:\CloudVault-Dev.
 
 Phase 8 adds bounded multipart hashing/direct transfer, provider-verified parts,
 conditional composite completion and cancellation. Default maximum is 1 GiB with
@@ -81,11 +81,14 @@ missing-part transfer. Durable initialization intents and repeated maintenance o
 cleanup references reclaim expired/abandoned uploads and names. 206 backend tests,
 53 frontend tests, 14 Chromium journeys and Docker checks pass at 009_upload_cleanup.
 Current cleanup requires an unversioned bucket; provider lifecycle/production gates
-remain. Phase 9 is uncommitted; Phase 10 filename search is next.
+remain. Phase 9 is committed as 0551f25.
 
 Phase 9 and its regression notes are now committed as 0551f25. Phase 10 filename
 search is implemented with tenant isolation, metadata filters, stable sorting,
 bounded pagination, folder context and PostgreSQL trigram/tenant B-tree indexes.
 214 backend tests, 60 frontend tests, 15 browser journeys and Docker checks pass at
-010_file_search. Phase 10 is uncommitted; Phase 11 Sharing is next. Production
+010_file_search. Phase 10 is committed as d4aa3e1; Phase 11 Sharing is now implemented. Production
 load/provider/remote CI and existing deployment gates remain pending.
+
+## Current Sharing Capability (Phase 11)
+Completed files can be shared externally by their creators/workspace managers through expiring secret links with optional passwords, metadata-only access and download-grant limits. Recipients need no account. Revocation and publisher lifecycle checks prevent new grants; issued provider URLs remain usable until expiry. This is file-link sharing, with private ACLs/folder sharing/previews/recipient identity and AI still upcoming. See docs/phases/phase11.md.

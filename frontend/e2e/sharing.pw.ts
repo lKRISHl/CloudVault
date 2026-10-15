@@ -1,0 +1,74 @@
+import { readFile } from 'node:fs/promises';
+import { expect, test } from '@playwright/test';
+
+test.skip(!process.env.TEST_S3_ENDPOINT, 'Sharing browser test requires disposable real storage');
+
+test('share a real file with password, limited grants, anonymous recipient and revocation', async ({ page, request, browser }) => {
+  test.setTimeout(90000);
+  const email = `sharing-${Date.now()}@example.com`;
+  await page.goto('/register');
+  await page.getByLabel('Full name').fill('Sharing Owner');
+  await page.getByLabel('Workspace name').fill('Sharing Team');
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill('correct-horse-battery');
+  await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  let verification = '';
+  await expect.poll(async () => {
+    const messages = await (await request.get('http://127.0.0.1:48025/messages')).json() as { to: string; body: string }[];
+    verification = messages.filter(mail => mail.to === email && mail.body.includes('purpose=verify')).at(-1)?.body.split('\n').find(line => line.startsWith('http'))?.trim() ?? '';
+    return verification;
+  }).not.toBe('');
+  await page.goto(verification);
+  await page.getByRole('button', { name: 'Verify email', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Email verified');
+  await page.goto('/app/folders');
+  const content = Buffer.from('Real anonymously shared download bytes');
+  await page.getByLabel('File to upload').setInputFiles({ name: 'Shared résumé.txt', mimeType: 'text/plain', buffer: content });
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('File uploaded and verified');
+  await page.getByRole('link', { name: 'Share Shared résumé.txt', exact: true }).click();
+  await page.getByLabel('Optional link password').fill('separate-password');
+  await page.getByLabel('Maximum download grants (optional)').fill('1');
+  await page.getByRole('button', { name: 'Create share link', exact: true }).click();
+  await expect(page.getByLabel('New share URL')).toBeVisible();
+  const shareUrl = await page.getByLabel('New share URL').inputValue();
+  const context = await browser.newContext();
+  try {
+    const recipient = await context.newPage();
+    let credentialsLeaked = false;
+    recipient.on('request', req => { if (req.url().includes('/shares/')) credentialsLeaked ||= !!req.headers()['authorization'] || !!req.headers()['cookie']; });
+    await recipient.goto(shareUrl);
+    await expect(recipient).toHaveURL(/\/share$/);
+    await recipient.getByRole('button', { name: 'Open shared file', exact: true }).click();
+    await expect(recipient.getByRole('alert')).toContainText('Share unavailable');
+    await expect(recipient.getByText('Shared résumé.txt', { exact: true })).toHaveCount(0);
+    await recipient.getByLabel('Link password').fill('separate-password');
+    await recipient.getByRole('button', { name: 'Open shared file', exact: true }).click();
+    await expect(recipient.getByRole('region', { name: 'Shared file' })).toContainText('Shared résumé.txt');
+    const event = recipient.waitForEvent('download');
+    await recipient.getByRole('button', { name: 'Download shared file', exact: true }).click();
+    const downloaded = await event;
+    expect(downloaded.suggestedFilename()).toBe('Shared résumé.txt');
+    expect(await readFile((await downloaded.path())!)).toEqual(content);
+    await expect(recipient.getByRole('button', { name: 'Download shared file', exact: true })).toHaveCount(0);
+    expect(credentialsLeaked).toBe(false);
+    await recipient.goto(shareUrl);
+    await recipient.getByLabel('Link password').fill('separate-password');
+    await recipient.getByRole('button', { name: 'Open shared file', exact: true }).click();
+    await expect(recipient.getByRole('region', { name: 'Shared file' })).toContainText('grant limit reached');
+    await page.getByRole('button', { name: /^Revoke link / }).click();
+    await expect(page.getByRole('region', { name: 'Share links' })).toContainText('Revoked');
+    await recipient.getByRole('button', { name: 'Open shared file', exact: true }).click();
+    await expect(recipient.getByRole('alert')).toContainText('Share unavailable');
+    await page.getByLabel('Allow downloads').uncheck();
+    await page.getByLabel('Maximum download grants (optional)').fill('');
+    await page.getByRole('button', { name: 'Create share link', exact: true }).click();
+    await expect(page.getByLabel('New share URL')).toBeVisible();
+    await recipient.goto(await page.getByLabel('New share URL').inputValue());
+    await recipient.getByRole('button', { name: 'Open shared file', exact: true }).click();
+    await expect(recipient.getByRole('region', { name: 'Shared file' })).toContainText('Downloads disabled');
+    await recipient.setViewportSize({ width: 390, height: 844 });
+    expect(await recipient.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  } finally { await context.close(); }
+});

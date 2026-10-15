@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 10 implementation and local verification are complete. Filename search, filters, sorting, pagination and indexes pass database/browser/Docker checks. Schema is 010_file_search. Phase 9 is committed as 0551f25; Phase 10 is uncommitted. Evidence is in CONTINUE.md; remote CI and production provider/load checks remain pending.
+Current state: Phase 11 sharing implementation and local verification are complete. File capabilities support expiry, optional passwords, metadata-only access, bounded download grants and revocation. Schema is 011_sharing. Phase 10 is committed as d4aa3e1; Phase 11 is uncommitted. Evidence is in CONTINUE.md; remote CI and production provider/load checks remain pending.
 
-Next planned implementation: Phase 11, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 12, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
@@ -188,12 +188,14 @@ Status: Implemented and locally verified on 2026-10-15. See docs/phases/phase10.
 
 ## PHASE 11 — Sharing
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-15. 225 backend tests on SQLite/PostgreSQL, 66 frontend tests, 16 Chromium journeys and rebuilt Docker sharing/transfer/schema/maintenance checks pass. See docs/phases/phase11.md. File-only external links, 1–720 hour expiry, optional passwords, metadata-only access, grant limits and revocation are implemented. Public capabilities preserve tenant-scoped object checks. Remote CI/production verification remain pending.
 
 - share links
 - expiry
 - passwords where appropriate
 - download restrictions
+
+Scope: grant limits count issued URLs, not completed downloads. Existing signed URLs remain usable until their short expiry. Member removal/role updates/ownership transfer/account deletion revoke affected published links. Private recipient ACLs and folder sharing are not claimed.
 
 ## PHASE 12 — Permissions/RBAC
 

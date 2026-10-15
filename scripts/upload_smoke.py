@@ -189,8 +189,73 @@ def main():
         assert (
             not next_page["has_more"] and next_page["items"][0]["id"] == uploaded["id"]
         )
+        password = uuid4().hex
+        shared = require(
+            api.post(
+                f"/files/{file_id}/shares",
+                json={
+                    "password": password,
+                    "max_downloads": 1,
+                    "expires_in_hours": 1,
+                },
+            ),
+            201,
+        )
+        raw = parse_qs(urlsplit(shared["share_url"]).fragment)["token"][0]
+        with httpx.Client(
+            base_url="http://localhost:3000/api/v1", timeout=20
+        ) as recipient:
+            assert (
+                recipient.post("/shares/access", json={"token": raw}).status_code == 404
+            )
+            proof = {"token": raw, "password": password}
+            metadata = require(recipient.post("/shares/access", json=proof), 200)
+            assert metadata["name"] == completed["name"]
+            response = recipient.post("/shares/download-url", json=proof)
+            grant = require(response, 200)
+            assert response.headers["cache-control"] == "no-store"
+            with httpx.Client(timeout=30) as transfer:
+                received = transfer.get(grant["download_url"])
+                assert received.status_code == 200 and received.content == b"".join(
+                    chunks
+                )
+            assert recipient.post("/shares/download-url", json=proof).status_code == 403
+            revoked = api.delete(f"/files/{file_id}/shares/{shared['id']}")
+            assert revoked.status_code == 204
+            assert recipient.post("/shares/access", json=proof).status_code == 404
+            metadata_only = require(
+                api.post(
+                    f"/files/{uploaded['id']}/shares",
+                    json={
+                        "allow_download": False,
+                    },
+                ),
+                201,
+            )
+            metadata_token = parse_qs(urlsplit(metadata_only["share_url"]).fragment)[
+                "token"
+            ][0]
+            assert (
+                require(
+                    recipient.post("/shares/access", json={"token": metadata_token}),
+                    200,
+                )["allow_download"]
+                is False
+            )
+            assert (
+                recipient.post(
+                    "/shares/download-url", json={"token": metadata_token}
+                ).status_code
+                == 403
+            )
+            assert (
+                api.delete(
+                    f"/files/{uploaded['id']}/shares/{metadata_only['id']}"
+                ).status_code
+                == 204
+            )
         print(
-            "Docker SMTP/upload/resume/download and filename search/filter/sort/pagination passed"
+            "Docker SMTP/upload/resume/download/search and anonymous protected sharing passed"
         )
         print("Unique smoke account/workspace/two files retained as development data")
 

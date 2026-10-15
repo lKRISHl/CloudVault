@@ -306,3 +306,10 @@ is `.local/backups/cloudvault-before-phase10.sql`. Rebuild/start Compose after c
 API pages cap at 100 and offsets at 10000. Short/common terms can still scan; synthetic
 index verification is not a production benchmark. Review query logging, workloads,
 database timeouts, maintenance and deployment gates before production.
+
+## Share files (Phase 11)
+From Files or Search files choose Share on a completed writable file. Set expiry (1–720 hours; default 24), an optional password, Allow downloads and an optional grant cap. Save the generated URL immediately; its raw secret is not retrievable later. Send any password separately. Existing links are paginated and revocable. Recipients open the original full link at /share, check access and download directly from private storage.
+
+Grant caps count issued URLs, not completed downloads; lost API acknowledgement still consumes a grant. Metadata-only links reveal filename/size without previews. Revocation blocks new access/grants; previously issued URLs work until expiry. Removing/changing publisher membership or deleting their account revokes affected links. Public requests omit CloudVault account credentials. Reloading the recipient page requires reopening the original full link because the address fragment was cleared.
+
+Back up before alembic upgrade head (011_sharing); Docker backend startup migrates. A populated sharing table refuses downgrade: restore a pre-upgrade backup for an unrepresentable rollback. Run docker compose up --build -d, python scripts/docker_smoke.py and python scripts/upload_smoke.py for local verification. Tests use disposable databases/buckets. See docs/phases/phase11.md and CONTINUE.md for evidence and production gates.

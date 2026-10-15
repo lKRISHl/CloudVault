@@ -1,7 +1,7 @@
 # Phase 10 — File Search
 
 Implemented and locally verified on 2026-10-15. Schema: 010_file_search.
-Phase 9 is committed as 0551f25; Phase 10 changes remain uncommitted.
+Phase 9 is committed as 0551f25; Phase 10 is committed as d4aa3e1.
 
 ## A. What was built
 

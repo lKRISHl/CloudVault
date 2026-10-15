@@ -33,6 +33,15 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+    @app.middleware("http")
+    async def sharing_headers(request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path.startswith(f"{settings.API_V1_PREFIX}/shares/") or "/shares" in path:
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Referrer-Policy"] = "no-referrer"
+        return response
+
     @app.get("/", include_in_schema=False)
     async def root():
         return {"app": settings.APP_NAME, "version": settings.APP_VERSION}
