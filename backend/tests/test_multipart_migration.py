@@ -15,7 +15,7 @@ from app.models import File, Folder, Membership, Tenant, UploadIntent, UploadPar
 from app.schemas.files import FileMetadataCreate
 from app.services.auth import AuthService
 from app.services.files import FileService
-from app.services.folders import FolderService
+from tests.migration_seed import seed_folder
 
 
 @pytest.mark.asyncio
@@ -77,8 +77,8 @@ async def test_multipart_migration_preserves_basic_data_and_guards_part_records(
         async with factory() as db:
             actor = await AuthService(db).get_user_in_tenant(uid, tid)
             assert actor.password_hash == original_hash and actor.email_verified
-            parent = await FolderService(db).create(actor, "Preserved hierarchy", None)
-            child = await FolderService(db).create(actor, "Nested", parent.id)
+            parent = await seed_folder(db, actor, "Preserved hierarchy", None)
+            child = await seed_folder(db, actor, "Nested", parent.id)
         for args in (
             ("upgrade", "head"),
             ("check",),
@@ -154,6 +154,7 @@ async def test_multipart_migration_preserves_basic_data_and_guards_part_records(
         assert (
             guarded.returncode != 0 and "Cannot discard upload cleanup tombstones" in guarded.stderr
         )
+        assert migrate("upgrade", "head").returncode == 0
         async with factory() as db:
             assert (await db.get(File, file.id)).upload_cleanup_at is not None
             assert (await db.get(File, replacement.id)).upload_cleanup_at is None

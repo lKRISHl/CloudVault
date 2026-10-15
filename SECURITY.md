@@ -17,7 +17,7 @@
 
 ## Future Security Roadmap
 - **RBAC (Role-Based Access Control)**: Granular permissions for files and folders.
-- **Membership**: Global users have independent roles per organization. Richer resource permissions arrive in Phase 12.
+- **Membership**: Global users have independent roles per organization. Phase 12 implements resource-local viewer/editor grants and private ancestor boundaries.
 - Rate limiting, token-family replay response, cross-tab refresh coordination, and wider security review remain future hardening work.
 
 ## Phase 2 Organizations
@@ -53,7 +53,7 @@
 
 ## Phase 3 Folder Controls
 - Folder parent/tenant composite foreign keys, sibling/root name uniqueness and self-parent checks enforce structural constraints. Every folder lookup is tenant-scoped; unrelated folder/parent UUIDs return 404. Client-supplied tenant/creator fields are rejected.
-- Verified active members read shared workspace folders; creator or current owner/admin authority is required for writes, including destination/parent writes. Private/shared resource ACLs remain Phase 12 work.
+- Verified active members read shared workspace folders; creator or current owner/admin authority is required for writes, including destination/parent writes. Phase 12 extends writes to explicit editors and enforces private ancestor boundaries.
 - Structural writes lock before reading the graph, preventing concurrent moves from forming a cycle. Self/descendant moves, duplicate names and depth above 64 are rejected. Names reject path separators, dot-only paths and control/surrogate characters.
 - UUID/tenant/user-scoped query state and Phase 2B stale-response protections isolate workspace changes. Queries do not retry client errors; transient/network failures receive bounded retries and folder views expose manual retry.
 - Account deletion retains organization-owned folder metadata with a pseudonymous creator reference; deletion does not erase shared organizational content. Nonempty folder migration downgrade is refused; restore a pre-upgrade backup for rollback.
@@ -89,7 +89,7 @@ development storage smoke check does not certify production security.
 
 ## Phase 7 download boundary
 
-Uploaded objects are offered through short-lived, no-store attachment GET capabilities after current membership, tenant metadata and provider HEAD integrity checks. Pending/missing/changed objects fail closed. Current shared-workspace read access includes members without write rights; private ACLs remain Phase 12. Generic octet-stream and attachment headers are presentation controls, not malware safety. URLs remain reusable until expiry and are not version-pinned; out-of-band replacement after HEAD remains a provider/versioning limitation. Native browser delivery does not establish completion telemetry. Do not persist/log signed URL values.
+Uploaded objects are offered through short-lived, no-store attachment GET capabilities after current membership, tenant metadata and provider HEAD integrity checks. Pending/missing/changed objects fail closed. Phase 12 applies effective resource ACLs; authorized readers can download without write rights. Generic octet-stream and attachment headers are presentation controls, not malware safety. URLs remain reusable until expiry and are not version-pinned; out-of-band replacement after HEAD remains a provider/versioning limitation. Native browser delivery does not establish completion telemetry. Do not persist/log signed URL values.
 
 ## Phase 8 multipart boundary
 
@@ -111,7 +111,7 @@ Versioned/suspended buckets fail closed, since a delete marker does not prove re
 
 ## Phase 10 search boundary
 
-Current verified membership gates search. Tenant/non-cleaned constraints are unconditional; folder scope verifies the selected tenant's ancestor chain. Folder-name joins also match tenant identity. Creator filters never enumerate another tenant's accounts; foreign/nonexistent folders fail identically. Cleanup references/provider identities remain hidden. All current workspace members share read access; Phase 12 must apply private resource ACLs before search pagination/result context.
+Current verified membership gates search. Tenant/non-cleaned constraints are unconditional; folder scope verifies the selected tenant's ancestor chain. Folder-name joins also match tenant identity. Creator filters never enumerate another tenant's accounts; foreign/nonexistent folders fail identically. Cleanup references/provider identities remain hidden. Phase 12 applies private resource ACLs and ancestor boundaries before search pagination/result context.
 
 Filename terms normalize NFC/case folding and escape LIKE wildcard syntax, with bound parameters and whitelisted sorting. Queries reject control characters, unknown keys, incompatible scope/folder inputs, reversed sizes, offsets above 10000 and pages above 100. Separate persistent budgets are 1200 identity/4800 IP per configured window. These limits are not a production denial-of-service proof: broad/short terms, concurrent workloads, database statement timeouts and monitoring require deployment review. GET query values can enter access logs; configure appropriate logging/redaction/retention. Declared MIME/size remain untrusted for pending records and never imply scanning.
 
@@ -122,4 +122,11 @@ Only current verified file creators/workspace managers publish or manage complet
 
 Tokens are returned once in URL fragments, consumed into browser memory and removed from the address/history; public POST bodies carry proof. No-store/no-referrer covers sharing errors and successes, with frontend referrer policy. Production HTTPS, proxy/IP trust and body logging/redaction review remain required. Persistent public limits are 100/IP and 100/capability per configured window (default 15 minutes); creation/revocation use ordinary account category budgets. Malformed validation errors precede service limits. Distributed/CPU abuse and provider/tenant-lock throughput require review.
 
-Tenant serialization protects last-grant races and mutation ordering. Grant counters measure issued URLs, including ambiguous acknowledgement, not completed downloads. Published links revoke on member removal, role updates, ownership transfer and account deletion; current publisher authority is rechecked. Revocation cannot invalidate prior presigned URLs instantly or recall bytes. Files remain unscanned. Private ACLs, scans, quotas/audit and production hardening remain pending.
+Tenant serialization protects last-grant races and mutation ordering. Grant counters measure issued URLs, including ambiguous acknowledgement, not completed downloads. Published links revoke on member removal, role updates, ownership transfer and account deletion; current publisher authority is rechecked. Revocation cannot invalidate prior presigned URLs instantly or recall bytes. Files remain unscanned. Resource ACLs are implemented in Phase 12; scans, quotas/audit and production hardening remain pending.
+
+## Resource ACLs (Phase 12)
+Current verified membership remains necessary. Workspace visibility supplies local read; private resources need creator/manager authority or explicit viewer/editor access. Every containing folder is a mandatory read boundary. SQL predicates filter inaccessible rows before search/list pagination, has_more, breadcrumbs and folder context. Direct descendant grants cannot bypass private ancestors. Owners/admins are trusted workspace-wide managers; resource grants cannot assign those roles.
+
+Editor access delegates rename/content creation without ACL management, folder moves or external publication. Grants are resource-local and do not inherit editing. All resource/recipient queries use tenant scope; recipients must be active verified members. Membership removal deletes grants, and account deletion cascades them. Permission writes use tenant serialization and revoke file/subtree share links; public shares recheck publisher effective read authority. Authenticated downloads recheck ACLs before/after provider operations; already issued storage capabilities remain usable until expiry.
+
+Permission writes use persistent 100 identity/500 IP budgets per configured window; completed-file rename uses ordinary category limits. Resource successes/errors have no-store/no-referrer. Frontend management cache keys include workspace/user/resource and reject stale scoped responses. Previously received metadata/bytes cannot be recalled; no realtime cache erasure claim. Private-name collisions remain generic conflicts, so attempted creation can reveal namespace occupancy. Recursive-query/tenant-lock cost, statement timeouts, proxy/abuse review and representative load remain production gates. See docs/phases/phase12.md.

@@ -103,6 +103,8 @@ export interface Workspace {
 }
 
 export interface Folder {
+  can_manage?: boolean;
+  visibility?: 'workspace' | 'private';
   id: string;
   tenant_id: string;
   parent_id: string | null;
@@ -123,6 +125,8 @@ export interface FolderPage {
 }
 
 export interface FileMetadata {
+  can_manage?: boolean;
+  visibility?: 'workspace' | 'private';
   upload_method?: 'basic' | 'multipart';
   checksum_kind?: 'sha256' | 'sha256-composite';
   multipart_part_size?: number | null;

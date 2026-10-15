@@ -1,5 +1,6 @@
 import unicodedata
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -42,6 +43,8 @@ class FolderRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     can_write: bool
+    can_manage: bool = False
+    visibility: Literal["workspace", "private"] = "workspace"
 
 
 class FolderPage(BaseModel):

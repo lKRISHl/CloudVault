@@ -27,6 +27,7 @@ class Folder(Base):
             name="fk_folders_parent_tenant",
         ),
         CheckConstraint("parent_id IS NULL OR parent_id <> id", name="ck_folders_not_self_parent"),
+        CheckConstraint("visibility IN ('workspace', 'private')", name="ck_folders_visibility"),
         UniqueConstraint("tenant_id", "parent_id", "name_key", name="uq_folders_sibling_name"),
         Index(
             "uq_folders_root_name",
@@ -46,6 +47,9 @@ class Folder(Base):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     name_key: Mapped[str] = mapped_column(String(768), nullable=False)
+    visibility: Mapped[str] = mapped_column(
+        String(16), default="workspace", server_default="workspace"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

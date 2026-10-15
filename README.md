@@ -149,10 +149,10 @@ Open **Browse folders** from the workspace, or `/app/folders`. Create folders at
 root or within a writable folder, open them to browse children, use breadcrumbs,
 rename folders, and move them with the destination browser.
 
-All verified active workspace members can read these shared folders. Creators,
-owners and admins can rename/move a folder; creating a child or moving into another
-folder also requires permission on that parent. Granular private/shared ACLs arrive
-in Phase 12. Folder deletion/trash arrives in Phase 13.
+Phase 12 now enforces workspace/private visibility and mandatory ancestor read gates.
+Explicit viewers can browse; editors can rename/create content within the folder.
+Creators/managers control moves and ACLs, and the destination must be writable.
+Folder deletion/trash arrives in Phase 13.
 
 Names are trimmed, Unicode-normalized and case-insensitively unique among siblings;
 path separators, control characters and dot-only names are rejected. The tree has
@@ -296,7 +296,7 @@ authorized downloads. New searches/cleared filters reset pagination.
 Search is case-insensitive with Unicode NFC/case folding; accents stay significant.
 Percent/underscore match literal characters. Folder scope searches direct children.
 Pending size/MIME are declarations, and files remain unscanned. Search currently follows
-shared workspace read policy; private resource ACLs remain Phase 12.
+effective resource ACLs and mandatory ancestor boundaries from Phase 12.
 
 Back up before upgrading to 010_file_search. PostgreSQL needs pg_trgm provisioning
 permission (or prior operator installation); SQLite uses the B-tree fallback. Search
@@ -313,3 +313,10 @@ From Files or Search files choose Share on a completed writable file. Set expiry
 Grant caps count issued URLs, not completed downloads; lost API acknowledgement still consumes a grant. Metadata-only links reveal filename/size without previews. Revocation blocks new access/grants; previously issued URLs work until expiry. Removing/changing publisher membership or deleting their account revokes affected links. Public requests omit CloudVault account credentials. Reloading the recipient page requires reopening the original full link because the address fragment was cleared.
 
 Back up before alembic upgrade head (011_sharing); Docker backend startup migrates. A populated sharing table refuses downgrade: restore a pre-upgrade backup for an unrepresentable rollback. Run docker compose up --build -d, python scripts/docker_smoke.py and python scripts/upload_smoke.py for local verification. Tests use disposable databases/buckets. See docs/phases/phase11.md and CONTINUE.md for evidence and production gates.
+
+## Control resource access (Phase 12)
+Choose Permissions on a managed file/folder in Files or Search files. Existing content is workspace-visible. Make it private and select verified workspace members from paginated candidates for Viewer or Editor access. Viewers read/download. Editors rename completed files/folders and add content within editable folders. Creators and managers control permissions, folder moves and external share links.
+
+Every containing folder must be readable. A direct file grant cannot bypass a private ancestor; grant each required private ancestor separately. Editor grants affect their resource and do not inherit editing over other creators' children. Removing a grant does not remove workspace visibility or creator/manager rights. Permission changes revoke external links for the affected file/folder subtree; issued storage URLs remain valid until expiry. Moving a folder changes its ancestor restrictions. Member removal deletes explicit grants.
+
+Back up before alembic upgrade head (012_permissions); Docker startup migrates. Downgrade refuses any private visibility or explicit grant; restore a pre-upgrade backup for an unrepresentable rollback. Run docker compose up --build -d, python scripts/docker_smoke.py and python scripts/upload_smoke.py. The latter verifies private hiding, real viewer download, editor rename and revoked access using a second verified member. See docs/phases/phase12.md and CONTINUE.md for evidence and remaining deployment gates.

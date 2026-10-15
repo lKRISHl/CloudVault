@@ -33,6 +33,7 @@ function MoveDestination({ folder, pending, choose, cancel }: {
     <button className={button} disabled={!offset || query.isFetching || pending} onClick={() => setOffset(Math.max(0, offset - 25))}>Previous destinations</button>
     <button className={button} disabled={!query.data?.has_more || query.isFetching || pending} onClick={() => setOffset(offset + 25)}>Next destinations</button>
     <p>Choose a writable destination. A folder cannot be moved inside itself or its descendants.</p>
+    <p>Moving changes which containing folders protect this subtree and revokes its external links.</p>
     <button className={button} disabled={pending || query.isFetching || !query.data || !!forbidden || (!!parent && !query.data.parent?.can_write)} onClick={() => choose(parent)}>Move here</button>
     <button className={button} disabled={pending} onClick={cancel}>Cancel move</button>
   </section>;
@@ -66,7 +67,7 @@ export function FoldersPage() {
     <div className="page-heading"><div><span className="eyebrow">YOUR CONTENT, ORGANIZED</span><h1>Folders</h1><p>A little structure. A lot more room to create.</p></div><span className="page-emblem"><Icon name="folder" /></span></div>
     <Link className="secondary-button" to={`/app/search${parent ? `?folder=${encodeURIComponent(parent)}` : ''}`}>{parent ? 'Search this folder' : 'Search workspace files'}</Link>
 
-    <p className="muted-copy">Workspace members can browse. Folder creators, owners and admins can organize folders.</p>
+    <p className="muted-copy">Visibility and containing folders govern access. Editors can rename and add content; creators and managers control moves and permissions.</p>
     {!enabled && <p role="alert">Select a workspace and verify your email in account security to use folders.</p>}
     <nav aria-label="Folder breadcrumbs" className="flex flex-wrap gap-2">
       <button className={button} onClick={() => browse(null)}>All folders</button>
@@ -84,8 +85,9 @@ export function FoldersPage() {
       <button className="folder-open flex-1 text-left" aria-label={`Open folder ${item.name}`} onClick={() => browse(item.id)}><span className="folder-icon"><Icon name="folder" /></span><span>{item.name}</span></button>
       {item.can_write ? <>
         <button className={button} aria-label={`Rename ${item.name}`} onClick={() => open(item, 'rename')}>Rename</button>
-        <button className={button} aria-label={`Move ${item.name}`} onClick={() => open(item, 'move')}>Move</button>
+        {(item.can_manage ?? item.can_write) && <button className={button} aria-label={`Move ${item.name}`} onClick={() => open(item, 'move')}>Move</button>}
       </> : <span>Read only</span>}
+      {item.can_manage && <Link className="secondary-button" to={`/app/permissions/folders/${item.id}`} aria-label={`Permissions for ${item.name}`}>Permissions</Link>}
     </li>)}</ul>
     {query.data?.items.length === 0 && <div className="empty-state"><Icon name="folder" /><strong>No folders here.</strong><p>Create a folder to give your next project a home.</p></div>}
     {enabled && query.isSuccess && <FileList key={`${user?.tenant?.id}/${parent}`} folderId={parent} writable={!!writable} />}

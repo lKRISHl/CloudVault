@@ -51,6 +51,7 @@ class MultipartService:
         )
         if file is None:
             raise HTTPException(404, "File not found")
+        await self.files.require_read(actor, role, file)
         if file.created_by != actor.id:
             raise HTTPException(403, "Only the upload creator can manage multipart uploads")
         if file.upload_method != "multipart":
@@ -59,7 +60,7 @@ class MultipartService:
             raise HTTPException(503, "Upload storage configuration changed")
         path = await self.files.folders.ancestors(actor, file.folder_id)
         if path:
-            self.files.folders.require_write(actor, role, path[-1])
+            await self.files.folders.require_write(actor, role, path[-1])
         return file, role
 
     @staticmethod
@@ -176,7 +177,7 @@ class MultipartService:
                     raise HTTPException(409, "Upload request ID belongs to different metadata")
                 path = await self.files.folders.ancestors(actor, existing.folder_id)
                 if path:
-                    self.files.folders.require_write(actor, role, path[-1])
+                    await self.files.folders.require_write(actor, role, path[-1])
                 if existing.storage_bucket != settings.S3_BUCKET_NAME:
                     raise HTTPException(503, "Upload storage configuration changed")
                 file = existing

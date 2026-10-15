@@ -68,7 +68,7 @@ Phases 4–8 and the frontend redesign are committed as 670d2a0.
 - **Team/Enterprise**: Advanced RBAC, semantic search, unlimited collaboration, custom domains.
 
 
-Phase 7 now supports actual member-authorized downloads of completed uploads through private, short-lived attachment URLs. Files remain unscanned; private ACLs, versioning, scanning and AI remain later phases. Development storage is on D:\CloudVault-Dev.
+Phase 7 now supports actual member-authorized downloads of completed uploads through private, short-lived attachment URLs. Files remain unscanned; Phase 12 now adds resource ACLs; versioning, scanning and AI remain later phases. Development storage is on D:\CloudVault-Dev.
 
 Phase 8 adds bounded multipart hashing/direct transfer, provider-verified parts,
 conditional composite completion and cancellation. Default maximum is 1 GiB with
@@ -91,4 +91,7 @@ bounded pagination, folder context and PostgreSQL trigram/tenant B-tree indexes.
 load/provider/remote CI and existing deployment gates remain pending.
 
 ## Current Sharing Capability (Phase 11)
-Completed files can be shared externally by their creators/workspace managers through expiring secret links with optional passwords, metadata-only access and download-grant limits. Recipients need no account. Revocation and publisher lifecycle checks prevent new grants; issued provider URLs remain usable until expiry. This is file-link sharing, with private ACLs/folder sharing/previews/recipient identity and AI still upcoming. See docs/phases/phase11.md.
+Completed files can be shared externally by their creators/workspace managers through expiring secret links with optional passwords, metadata-only access and download-grant limits. Recipients need no account. Revocation and publisher lifecycle checks prevent new grants; issued provider URLs remain usable until expiry. This is file-link sharing, with resource ACLs now implemented in Phase 12; folder share links, previews, recipient identity and AI remain upcoming. See docs/phases/phase11.md.
+
+## Current Resource Access (Phase 12)
+File/folder workspace/private visibility and explicit viewer/editor grants now govern signed-in workspace access. Every containing folder must be readable; search/list queries filter before pagination/context. Creators and trusted workspace managers control permissions, moves and external publication. Editors can rename completed files/folders and create content in editable folders; editing does not inherit to others' child resources. Permission changes revoke affected external links and member removal deletes grants. Public recipient identity verification, groups/custom roles, realtime cache synchronization and later trash/version/scanning/AI/deployment work remain pending. See docs/phases/phase12.md.

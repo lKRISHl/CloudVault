@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.models import File, Membership, Tenant, User, UserRole
 from app.schemas.search import FileSearchQuery
 from app.services.search import FileSearchService
+from tests.migration_seed import seed_file
 
 
 @pytest.mark.asyncio
@@ -64,16 +65,7 @@ async def test_search_indexes_preserve_data_and_support_postgres_plans(tmp_path)
             )
             await db.flush()
             db.add(Membership(tenant_id=tid, user_id=uid, role=UserRole.OWNER))
-            db.add(
-                File(
-                    id=fid,
-                    tenant_id=tid,
-                    created_by=uid,
-                    name="Needle.pdf",
-                    name_key="needle.pdf",
-                    declared_size_bytes=123,
-                )
-            )
+            await seed_file(db, tid, uid, fid, "Needle.pdf", 123)
             await db.commit()
         for args in [
             ("upgrade", "head"),

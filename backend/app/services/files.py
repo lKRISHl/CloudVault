@@ -9,6 +9,7 @@ from app.models import User, UserRole
 from app.models.file import File
 from app.schemas.files import FileMetadataCreate, FilePage, FileRead
 from app.services.folders import FolderService
+from app.services.permissions import PermissionService
 
 
 class FileService:
@@ -22,9 +23,10 @@ class FileService:
             **{
                 field: getattr(file, field)
                 for field in FileRead.model_fields
-                if field != "can_write"
+                if field not in ("can_write", "can_manage")
             },
-            can_write=role in (UserRole.OWNER, UserRole.ADMIN) or file.created_by == actor.id,
+            can_write=PermissionService.writes(actor, role, file),
+            can_manage=PermissionService.manages(actor, role, file),
         )
 
     async def details(self, actor: User, file_id: UUID) -> FileRead:
@@ -38,6 +40,39 @@ class FileService:
         )
         if file is None:
             raise HTTPException(status_code=404, detail="File not found")
+        await self.require_read(actor, role, file)
+        return self.read(actor, role, file)
+
+    async def require_read(self, actor, role, file):
+        await PermissionService(self.db).require_file(actor, role, file)
+
+    async def rename(self, actor, file_id, name, ip):
+        from app.services.accounts import AccountService
+
+        await AccountService(self.db).limit("file-rename", ip, str(actor.id))
+        role = await self.folders.authorize(actor, write=True)
+        file = await self.db.scalar(
+            select(File).where(
+                File.id == file_id,
+                File.tenant_id == actor.tenant_id,
+                File.upload_cleanup_at.is_(None),
+            )
+        )
+        if file is None:
+            raise HTTPException(404, "File not found")
+        await self.require_read(actor, role, file)
+        if not PermissionService.writes(actor, role, file):
+            raise HTTPException(403, "Editor access required")
+        if file.status != "uploaded":
+            raise HTTPException(409, "Only completed files can be renamed")
+        file.name, file.name_key = name, name.casefold()
+        try:
+            await self.db.commit()
+            await self.db.refresh(file)
+        except IntegrityError:
+            await self.db.rollback()
+            raise HTTPException(409, "File metadata conflict") from None
+        await PermissionService(self.db).mark(actor, [file])
         return self.read(actor, role, file)
 
     async def children(
@@ -49,7 +84,7 @@ class FileService:
             await self.db.scalars(
                 select(File)
                 .where(
-                    File.tenant_id == actor.tenant_id,
+                    PermissionService.file_read(actor, role),
                     File.folder_id == folder_id,
                     File.upload_cleanup_at.is_(None),
                 )
@@ -58,6 +93,7 @@ class FileService:
                 .limit(limit + 1)
             )
         )
+        await PermissionService(self.db).mark(actor, rows[:limit])
         return FilePage(
             items=[self.read(actor, role, file) for file in rows[:limit]],
             offset=offset,
@@ -81,7 +117,7 @@ class FileService:
         """Caller must hold the tenant write lock and have rechecked membership."""
         path = await self.folders.ancestors(actor, payload.folder_id)
         if path:
-            self.folders.require_write(actor, role, path[-1])
+            await self.folders.require_write(actor, role, path[-1])
         if (
             await self.db.scalar(
                 select(File.id).where(

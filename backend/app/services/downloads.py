@@ -26,12 +26,14 @@ class DownloadService:
         )
         if file is None:
             raise HTTPException(status_code=404, detail="File not found")
+        await self.files.require_read(actor, role, file)
         if file.status != "uploaded" or not file.object_id:
             raise HTTPException(status_code=409, detail="File is not ready for download")
         await self.files.folders.ancestors(actor, file.folder_id)
         issued = datetime.now(UTC)
         url = await self.checked_url(file, settings.DOWNLOAD_URL_SECONDS, actor)
         role = await self.files.folders.authorize(actor)
+        await self.files.require_read(actor, role, file)
         return DownloadTicket(
             file=self.files.read(actor, role, file),
             download_url=url,
@@ -63,14 +65,16 @@ class DownloadService:
                 )
             # Membership is authoritative, including changes during the provider inspection.
             if actor is not None:
-                await self.files.folders.authorize(actor)
+                role = await self.files.folders.authorize(actor)
+                await self.files.require_read(actor, role, file)
             if deadline is not None:
                 ttl = min(ttl, int((deadline - datetime.now(UTC)).total_seconds()))
                 if ttl < 1:
                     raise HTTPException(404, "Share unavailable or credentials incorrect")
             url = await self.storage.presign_download(ref, file.name, ttl)
             if actor is not None:
-                await self.files.folders.authorize(actor)
+                role = await self.files.folders.authorize(actor)
+                await self.files.require_read(actor, role, file)
         except ObjectNotFoundError:
             raise HTTPException(status_code=409, detail="Stored file is unavailable") from None
         except StorageError:

@@ -46,6 +46,7 @@ class UploadService:
         )
         if file is None:
             raise HTTPException(status_code=404, detail="File not found")
+        await self.files.require_read(actor, await self.files.folders.authorize(actor), file)
         if file.upload_method != "basic":
             raise HTTPException(status_code=409, detail="Use multipart controls for this upload")
         if file.created_by != actor.id:
@@ -61,7 +62,7 @@ class UploadService:
     async def parent_authority(self, actor, role, file):
         path = await self.files.folders.ancestors(actor, file.folder_id)
         if path:
-            self.files.folders.require_write(actor, role, path[-1])
+            await self.files.folders.require_write(actor, role, path[-1])
 
     async def ticket(self, actor, role, file) -> UploadTicket:
         if file.status != "pending":

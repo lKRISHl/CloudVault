@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
 import { UploadForm } from './UploadForm';
 import { DownloadButton } from './DownloadButton';
+import { RenameFile } from './RenameFile';
 
 export function FileList({ folderId, writable = false }: { folderId: string | null; writable?: boolean }) {
   const { user } = useAuth();
@@ -24,7 +25,7 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
     queryFn: () => api.files(folderId, offset) });
   return <section aria-label="Files" className="file-section space-y-3">
     <h2 className="section-title">Files <span>Workspace library</span></h2>
-    <p>Uploaded files can be downloaded by workspace members. Files remain unscanned; open only content you trust.</p>
+    <p>Resource and containing folder permissions govern access. Files remain unscanned; open only content you trust.</p>
     {writable && <UploadForm key={retryId ?? 'new-upload'} folderId={folderId} retryId={retryId}
       multipartRetry={query.data?.items.some(file => file.id === retryId && file.upload_method === 'multipart') ?? false}
       finished={() => setRetryId(null)} />}
@@ -41,7 +42,9 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
       <p>Declared type: {file.declared_content_type ?? 'Type unspecified'}</p>
       <p>{file.can_write ? 'Creator or manager access' : 'Read only'}</p>
       {file.status === 'uploaded' && <DownloadButton id={file.id} name={file.name} />}
-      {file.status === 'uploaded' && file.can_write && <Link className="secondary-button ml-3" to={`/app/files/${file.id}/shares`} aria-label={`Share ${file.name}`}>Share</Link>}
+      {file.status === 'uploaded' && file.can_manage && <Link className="secondary-button ml-3" to={`/app/files/${file.id}/shares`} aria-label={`Share ${file.name}`}>Share</Link>}
+      {file.can_manage && <Link className="secondary-button ml-3" to={`/app/permissions/files/${file.id}`} aria-label={`Permissions for ${file.name}`}>Permissions</Link>}
+      {file.status === 'uploaded' && file.can_write && <RenameFile id={file.id} name={file.name} />}
       {writable && file.status === 'pending' && file.upload_method !== 'multipart' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Retry upload {file.name}</button>}
       {writable && file.status === 'pending' && file.upload_method === 'multipart' && file.multipart_state === 'active' && file.created_by === user?.id && <button className="border rounded px-3 py-2" disabled={cancelId !== null} onClick={() => void cancel(file.id)}>Cancel multipart upload {file.name}</button>}
       {writable && file.status === 'pending' && file.upload_method === 'multipart' && file.multipart_state === 'active' && file.created_by === user?.id && <button className="border rounded px-3 py-2" onClick={() => setRetryId(file.id)}>Resume upload {file.name}</button>}

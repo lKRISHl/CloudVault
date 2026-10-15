@@ -24,6 +24,7 @@ from app.schemas.shares import (
 from app.services.accounts import AccountService
 from app.services.downloads import DownloadService
 from app.services.files import FileService
+from app.services.permissions import PermissionService
 from app.storage.base import ObjectStorage
 
 
@@ -64,6 +65,7 @@ class ShareService:
         )
         if file is None:
             raise HTTPException(404, "File not found")
+        await self.files.require_read(actor, role, file)
         if role not in (UserRole.OWNER, UserRole.ADMIN) and file.created_by != actor.id:
             raise HTTPException(
                 403, "Only the file creator or workspace managers can share this file"
@@ -188,6 +190,13 @@ class ShareService:
             verify_password, payload.password, link.password_hash
         ):
             raise denied
+        from types import SimpleNamespace
+
+        publisher = SimpleNamespace(id=link.created_by, tenant_id=link.tenant_id)
+        try:
+            await PermissionService(self.db).require_file(publisher, publisher_role, file)
+        except HTTPException:
+            raise denied from None
         remaining = (
             None
             if link.max_downloads is None

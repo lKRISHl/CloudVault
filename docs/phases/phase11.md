@@ -1,7 +1,7 @@
 # Phase 11 — Sharing
 
 Implemented and locally verified on 2026-10-15. Schema: 011_sharing. Final verification is recorded below.
-Phase 10 is committed as d4aa3e1; Phase 11 remains uncommitted.
+Phase 10 is committed as d4aa3e1; Phase 11 is committed as fa6a27e.
 
 ## A. What was built
 

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.core.security import hash_password
 from app.models import Folder, Membership, Tenant, User, UserRole
 from app.services.auth import AuthService
-from app.services.folders import FolderService
+from tests.migration_seed import seed_folder
 
 
 @pytest.mark.asyncio
@@ -75,13 +75,14 @@ async def test_folder_migration_preserves_accounts_and_refuses_nonempty_downgrad
         async with factory() as db:
             actor = await AuthService(db).get_user_in_tenant(uid, tid)
             assert actor.password_hash == original_hash and actor.email_verified
-            parent = await FolderService(db).create(actor, "Preserved hierarchy", None)
-            child = await FolderService(db).create(actor, "Nested", parent.id)
+            parent = await seed_folder(db, actor, "Preserved hierarchy", None)
+            child = await seed_folder(db, actor, "Nested", parent.id)
         rejected = migrate("downgrade", "004_workspaces")
         assert (
             rejected.returncode != 0
             and "Cannot downgrade nonempty folders safely" in rejected.stderr
         )
+        assert migrate("upgrade", "head").returncode == 0
         async with factory() as db:
             folders = list(await db.scalars(select(Folder)))
             assert len(folders) == 2

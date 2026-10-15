@@ -40,6 +40,8 @@ class FileRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     can_write: bool
+    can_manage: bool = False
+    visibility: Literal["workspace", "private"] = "workspace"
 
 
 class FilePage(BaseModel):

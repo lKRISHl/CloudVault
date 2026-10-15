@@ -105,7 +105,8 @@ async def test_sharing_upgrade_alignment_preservation_and_guarded_rollback(tmp_p
             assert (await db.get(User, uid)).password_hash == "original"
         async with engine.connect() as conn:
             assert (
-                await conn.scalar(text("SELECT version_num FROM alembic_version")) == "011_sharing"
+                await conn.scalar(text("SELECT version_num FROM alembic_version"))
+                == "012_permissions"
             )
     finally:
         await engine.dispose()

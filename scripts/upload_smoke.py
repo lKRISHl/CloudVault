@@ -17,6 +17,26 @@ def require(response, status):
     return response.json()
 
 
+def verify_email(api, email):
+    token = None
+    with httpx.Client(base_url="http://localhost:8025", timeout=10) as inbox:
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and token is None:
+            messages = require(
+                inbox.get("/api/v1/search", params={"query": f"to:{email}"}), 200
+            )["messages"]
+            for message in messages:
+                mail = require(inbox.get("/api/v1/message/" + message["ID"]), 200)
+                for line in mail.get("Text", "").splitlines():
+                    if line.startswith("http") and "purpose=verify" in line:
+                        token = parse_qs(urlsplit(line.strip()).fragment)["token"][0]
+            if token is None:
+                time.sleep(0.2)
+    if token is None:
+        raise RuntimeError("Docker verification email did not arrive")
+    require(api.post("/account/verify", json={"token": token}), 200)
+
+
 def main():
     email = f"phase9-smoke-{uuid4().hex}@example.com"
     body = b"CloudVault verified Docker upload"
@@ -35,25 +55,7 @@ def main():
             201,
         )
         api.headers["Authorization"] = "Bearer " + session["access_token"]
-        token = None
-        with httpx.Client(base_url="http://localhost:8025", timeout=10) as inbox:
-            deadline = time.monotonic() + 30
-            while time.monotonic() < deadline and token is None:
-                messages = require(
-                    inbox.get("/api/v1/search", params={"query": f"to:{email}"}), 200
-                )["messages"]
-                for message in messages:
-                    mail = require(inbox.get("/api/v1/message/" + message["ID"]), 200)
-                    for line in mail.get("Text", "").splitlines():
-                        if line.startswith("http") and "purpose=verify" in line:
-                            token = parse_qs(urlsplit(line.strip()).fragment)["token"][
-                                0
-                            ]
-                if token is None:
-                    time.sleep(0.2)
-        if token is None:
-            raise RuntimeError("Docker verification email did not arrive")
-        require(api.post("/account/verify", json={"token": token}), 200)
+        verify_email(api, email)
         ticket = require(
             api.post(
                 "/files/uploads",
@@ -254,10 +256,85 @@ def main():
                 ).status_code
                 == 204
             )
-        print(
-            "Docker SMTP/upload/resume/download/search and anonymous protected sharing passed"
+        member_email = f"permission-smoke-{uuid4().hex}@example.com"
+        invitation = require(
+            api.post(
+                "/organizations/current/invitations",
+                json={
+                    "email": member_email,
+                    "role": "member",
+                },
+            ),
+            201,
         )
-        print("Unique smoke account/workspace/two files retained as development data")
+        with httpx.Client(
+            base_url="http://localhost:3000/api/v1", timeout=20
+        ) as member:
+            joined = require(
+                member.post(
+                    "/organizations/invitations/accept",
+                    json={
+                        "token": invitation["token"],
+                        "full_name": "Permission Smoke",
+                        "password": uuid4().hex,
+                    },
+                ),
+                201,
+            )
+            member.headers["Authorization"] = "Bearer " + joined["access_token"]
+            verify_email(member, member_email)
+            fid = uploaded["id"]
+            assert (
+                api.patch(
+                    f"/files/{fid}/permissions", json={"visibility": "private"}
+                ).status_code
+                == 204
+            )
+            assert member.get(f"/files/{fid}").status_code == 404
+            hidden = require(
+                member.get("/files/search", params={"q": "Verified Docker upload.txt"}),
+                200,
+            )
+            assert not hidden["items"] and not hidden["has_more"]
+            uid = joined["user"]["id"]
+            assert (
+                api.put(
+                    f"/files/{fid}/permissions/{uid}", json={"role": "viewer"}
+                ).status_code
+                == 204
+            )
+            visible = require(member.get(f"/files/{fid}"), 200)
+            assert not visible["can_write"] and not visible["can_manage"]
+            grant = require(member.post(f"/files/{fid}/download-url"), 200)
+            with httpx.Client(timeout=20) as transfer:
+                received = transfer.get(grant["download_url"])
+                assert received.status_code == 200 and received.content == body
+            assert (
+                api.put(
+                    f"/files/{fid}/permissions/{uid}", json={"role": "editor"}
+                ).status_code
+                == 204
+            )
+            renamed = require(
+                member.patch(
+                    f"/files/{fid}", json={"name": "Edited Docker upload.txt"}
+                ),
+                200,
+            )
+            assert renamed["can_write"] and not renamed["can_manage"]
+            assert member.get(f"/files/{fid}/permissions").status_code == 403
+            assert member.post(f"/files/{fid}/shares", json={}).status_code == 403
+            assert (
+                api.put(
+                    f"/files/{fid}/permissions/{uid}", json={"role": None}
+                ).status_code
+                == 204
+            )
+            assert member.get(f"/files/{fid}").status_code == 404
+        print(
+            "Docker SMTP/transfers/search/sharing and real viewer/editor/private ACL checks passed"
+        )
+        print("Unique smoke accounts/workspace/two files retained as development data")
 
 
 if __name__ == "__main__":

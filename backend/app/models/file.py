@@ -31,6 +31,7 @@ class File(Base):
         ),
         CheckConstraint("declared_size_bytes >= 0", name="ck_files_declared_size"),
         CheckConstraint("status IN ('pending', 'uploaded')", name="ck_files_status"),
+        CheckConstraint("visibility IN ('workspace', 'private')", name="ck_files_visibility"),
         CheckConstraint(
             "upload_cleanup_at IS NULL OR (status = 'pending' AND object_id IS NOT NULL)",
             name="ck_files_cleanup",
@@ -137,6 +138,9 @@ class File(Base):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     name: Mapped[str] = mapped_column(String(255))
     name_key: Mapped[str] = mapped_column(String(768))
+    visibility: Mapped[str] = mapped_column(
+        String(16), default="workspace", server_default="workspace"
+    )
     declared_size_bytes: Mapped[int] = mapped_column(BigInteger)
     declared_content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending", server_default="pending")

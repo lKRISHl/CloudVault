@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 11 sharing implementation and local verification are complete. File capabilities support expiry, optional passwords, metadata-only access, bounded download grants and revocation. Schema is 011_sharing. Phase 10 is committed as d4aa3e1; Phase 11 is uncommitted. Evidence is in CONTINUE.md; remote CI and production provider/load checks remain pending.
+Current state: Phase 12 resource permissions and local verification are complete. Workspace/private visibility, viewer/editor grants, mandatory ancestor read gates and scoped management now protect browsing, search, transfers and sharing. Phase 11 is committed as fa6a27e; Phase 12 is uncommitted. Evidence is in CONTINUE.md. Remote CI and production load/provider checks remain pending.
 
-Next planned implementation: Phase 12, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 13, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
@@ -112,7 +112,7 @@ Status: Implemented and locally verified on 2026-10-14. Folder hierarchy, mutati
 - hierarchy
 - folder permissions foundation
 
-Implemented policy: verified active members read workspace folders and create at root; folder creators/owners/admins modify folders and create within writable parents. Granular private/shared viewer/editor ACLs remain Phase 12. Names are normalized and case-insensitively unique per parent. Maximum depth is 64. Folder deletion/trash is Phase 13.
+Implemented policy: verified active members read workspace folders and create at root; folder creators/owners/admins modify folders and create within writable parents. Phase 12 now adds private/shared viewer/editor ACLs and mandatory ancestor read gates. Names are normalized and case-insensitively unique per parent. Maximum depth is 64. Folder deletion/trash is Phase 13.
 
 ## PHASE 4 — File Metadata
 
@@ -199,7 +199,7 @@ Scope: grant limits count issued URLs, not completed downloads. Existing signed 
 
 ## PHASE 12 — Permissions/RBAC
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-15. 235 backend tests on SQLite/PostgreSQL, 72 frontend tests, 17 Chromium journeys and rebuilt Docker transfer/sharing/ACL/schema/maintenance checks pass. See docs/phases/phase12.md. Workspace/private visibility, explicit viewer/editor grants, ancestor read gates, filtered search/list pages, guarded transfer/publishing and permission controls are implemented.
 
 - viewer
 - editor
@@ -207,7 +207,7 @@ Status: Not started.
 - resource-level authorization
 - secure access checks
 
-Apply resource read ACLs to search/list predicates before pagination and folder-name context. Search must not reveal inaccessible filenames, locations or result counts.
+Resource read ACLs now apply before search/list pagination and folder-name context. Viewers read/download; editors rename resources and create content in editable folders; creators/managers control ACLs, moves and publication. Grants are resource-local, every private ancestor must be accessible, and permission changes revoke affected external links. Existing content defaults to workspace visibility.
 
 ## PHASE 13 — Trash + Restore
 

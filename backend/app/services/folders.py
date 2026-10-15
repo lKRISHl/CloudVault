@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Membership, Tenant, User, UserRole
 from app.models.folder import Folder
 from app.schemas.folders import FolderPage, FolderRead
+from app.services.permissions import PermissionService
 
 MAX_DEPTH = 64
 
@@ -45,9 +46,10 @@ class FolderService:
 
     @staticmethod
     def can_write(actor: User, role: UserRole, folder: Folder) -> bool:
-        return role in (UserRole.OWNER, UserRole.ADMIN) or folder.created_by == actor.id
+        return PermissionService.writes(actor, role, folder)
 
-    def require_write(self, actor: User, role: UserRole, folder: Folder) -> None:
+    async def require_write(self, actor: User, role: UserRole, folder: Folder) -> None:
+        await PermissionService(self.db).require_folder(actor, role, folder)
         if not self.can_write(actor, role, folder):
             raise HTTPException(
                 status_code=403,
@@ -65,6 +67,8 @@ class FolderService:
             created_at=folder.created_at,
             updated_at=folder.updated_at,
             can_write=FolderService.can_write(actor, role, folder),
+            can_manage=PermissionService.manages(actor, role, folder),
+            visibility=folder.visibility,
         )
 
     async def folder(self, actor: User, folder_id: UUID) -> Folder:
@@ -75,6 +79,8 @@ class FolderService:
         )
         if folder is None:
             raise HTTPException(status_code=404, detail="Folder not found")
+        role = await self.authorize(actor)
+        await PermissionService(self.db).require_folder(actor, role, folder)
         return folder
 
     async def ancestors(self, actor: User, folder_id: UUID | None) -> list[Folder]:
@@ -98,12 +104,17 @@ class FolderService:
         rows = list(
             await self.db.scalars(
                 select(Folder)
-                .where(Folder.tenant_id == actor.tenant_id, Folder.parent_id == parent_id)
+                .where(
+                    Folder.tenant_id == actor.tenant_id,
+                    Folder.parent_id == parent_id,
+                    Folder.id.in_(PermissionService.visible_folders(actor, role)),
+                )
                 .order_by(Folder.name, Folder.id)
                 .offset(offset)
                 .limit(limit + 1)
             )
         )
+        await PermissionService(self.db).mark(actor, rows[:limit])
         return FolderPage(
             parent=self.read(actor, role, path[-1]) if path else None,
             breadcrumbs=[self.read(actor, role, folder) for folder in path],
@@ -147,7 +158,7 @@ class FolderService:
         role = await self.authorize(actor, write=True)
         path = await self.ancestors(actor, parent_id)
         if path:
-            self.require_write(actor, role, path[-1])
+            await self.require_write(actor, role, path[-1])
         if len(path) + 1 > MAX_DEPTH:
             raise HTTPException(status_code=409, detail="Maximum folder depth exceeded")
         await self.ensure_name(actor, parent_id, name)
@@ -164,7 +175,7 @@ class FolderService:
     async def rename(self, actor: User, folder_id: UUID, name: str) -> FolderRead:
         role = await self.authorize(actor, write=True)
         folder = await self.folder(actor, folder_id)
-        self.require_write(actor, role, folder)
+        await self.require_write(actor, role, folder)
         await self.ensure_name(actor, folder.parent_id, name, exclude=folder.id)
         folder.name, folder.name_key = name, name.casefold()
         return await self.save(actor, role, folder)
@@ -172,14 +183,16 @@ class FolderService:
     async def move(self, actor: User, folder_id: UUID, parent_id: UUID | None) -> FolderRead:
         role = await self.authorize(actor, write=True)
         folder = await self.folder(actor, folder_id)
-        self.require_write(actor, role, folder)
+        await self.require_write(actor, role, folder)
+        if not PermissionService.manages(actor, role, folder):
+            raise HTTPException(403, "Only creators or managers can move folders")
         path = await self.ancestors(actor, parent_id)
         if any(item.id == folder.id for item in path):
             raise HTTPException(
                 status_code=409, detail="Cannot move a folder into itself or its descendants"
             )
         if path:
-            self.require_write(actor, role, path[-1])
+            await self.require_write(actor, role, path[-1])
         subtree = (
             select(Folder.id, literal(1).label("depth"))
             .where(Folder.id == folder.id, Folder.tenant_id == actor.tenant_id)
@@ -194,5 +207,6 @@ class FolderService:
         if len(path) + height > MAX_DEPTH:
             raise HTTPException(status_code=409, detail="Maximum folder depth exceeded")
         await self.ensure_name(actor, parent_id, folder.name, exclude=folder.id)
+        await PermissionService(self.db).invalidate_shares(actor, "folders", folder.id)
         folder.parent_id = parent_id
         return await self.save(actor, role, folder)

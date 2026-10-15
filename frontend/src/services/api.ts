@@ -127,6 +127,10 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
 }
 
 export const api = {
+  permissions: (kind: 'files' | 'folders', id: string, offset: number, signal?: AbortSignal) => fetchApi<{ name: string; visibility: 'workspace' | 'private'; items: { user_id: string; role: 'viewer' | 'editor' }[]; offset: number; has_more: boolean }>(`${API_V1}/${kind}/${id}/permissions?offset=${offset}`, { signal }),
+  setVisibility: (kind: 'files' | 'folders', id: string, visibility: 'workspace' | 'private') => fetchApi<void>(`${API_V1}/${kind}/${id}/permissions`, { method: 'PATCH', body: JSON.stringify({ visibility }) }),
+  setGrant: (kind: 'files' | 'folders', id: string, userId: string, role: 'viewer' | 'editor' | null) => fetchApi<void>(`${API_V1}/${kind}/${id}/permissions/${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  renameFile: (id: string, name: string) => fetchApi<FileMetadata>(`${API_V1}/files/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
   shares: (id: string, offset: number, signal?: AbortSignal) => fetchApi<{ file_name: string; items: ShareLink[]; offset: number; has_more: boolean }>(`${API_V1}/files/${id}/shares?offset=${offset}`, { signal }),
   createShare: (id: string, payload: { expires_in_hours: number; password: string | null; allow_download: boolean; max_downloads: number | null }) => fetchApi<ShareLink & { share_url: string }>(`${API_V1}/files/${id}/shares`, { method: 'POST', body: JSON.stringify(payload) }),
   revokeShare: (fileId: string, id: string) => fetchApi<void>(`${API_V1}/files/${fileId}/shares/${id}`, { method: 'DELETE' }),

@@ -4,6 +4,7 @@ from app.models import File, Folder
 from app.schemas.search import FileSearchItem, FileSearchPage, FileSearchQuery
 from app.services.accounts import AccountService
 from app.services.files import FileService
+from app.services.permissions import PermissionService
 
 
 class FileSearchService:
@@ -11,12 +12,14 @@ class FileSearchService:
         self.db, self.files = db, FileService(db)
 
     @staticmethod
-    def statement(tenant_id, query: FileSearchQuery):
+    def statement(tenant_id, query: FileSearchQuery, actor=None, role=None):
         statement = (
             select(File, Folder.name)
             .outerjoin(Folder, (Folder.id == File.folder_id) & (Folder.tenant_id == File.tenant_id))
             .where(File.tenant_id == tenant_id, File.upload_cleanup_at.is_(None))
         )
+        if actor is not None:
+            statement = statement.where(PermissionService.file_read(actor, role))
         if query.scope == "root":
             statement = statement.where(File.folder_id.is_(None))
         elif query.scope == "folder":
@@ -54,7 +57,8 @@ class FileSearchService:
         role = await self.files.folders.authorize(actor)
         if query.scope == "folder":
             await self.files.folders.ancestors(actor, query.folder_id)
-        rows = list(await self.db.execute(self.statement(actor.tenant_id, query)))
+        rows = list(await self.db.execute(self.statement(actor.tenant_id, query, actor, role)))
+        await PermissionService(self.db).mark(actor, [file for file, _ in rows[: query.limit]])
         return FileSearchPage(
             items=[
                 FileSearchItem(

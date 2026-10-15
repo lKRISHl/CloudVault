@@ -199,6 +199,16 @@ class OrganizationService:
         )
         if removed is None:
             raise HTTPException(status_code=409, detail="Membership or authority changed; reload")
+        from sqlalchemy import delete
+
+        from app.models import ResourceGrant
+
+        await self.db.execute(
+            delete(ResourceGrant).where(
+                ResourceGrant.tenant_id == actor.tenant_id,
+                ResourceGrant.user_id == user_id,
+            )
+        )
         await self.db.execute(
             update(LoginSession)
             .where(LoginSession.user_id == user_id, LoginSession.tenant_id == actor.tenant_id)

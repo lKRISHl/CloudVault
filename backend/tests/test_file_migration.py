@@ -14,7 +14,7 @@ from app.models import File, Folder, Membership, Tenant, User, UserRole
 from app.schemas.files import FileMetadataCreate
 from app.services.auth import AuthService
 from app.services.files import FileService
-from app.services.folders import FolderService
+from tests.migration_seed import seed_folder
 
 
 @pytest.mark.asyncio
@@ -76,8 +76,8 @@ async def test_file_migration_preserves_folders_and_refuses_nonempty_downgrade(t
         async with factory() as db:
             actor = await AuthService(db).get_user_in_tenant(uid, tid)
             assert actor.password_hash == original_hash and actor.email_verified
-            parent = await FolderService(db).create(actor, "Preserved hierarchy", None)
-            child = await FolderService(db).create(actor, "Nested", parent.id)
+            parent = await seed_folder(db, actor, "Preserved hierarchy", None)
+            child = await seed_folder(db, actor, "Nested", parent.id)
         for args in (
             ("upgrade", "head"),
             ("check",),

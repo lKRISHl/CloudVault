@@ -25,3 +25,5 @@ and interview questions. Record verification gaps explicitly.
 - [Phase 10 — File Search](phase10.md)
 
 - [Phase 11 — Sharing](phase11.md)
+
+- [Phase 12 — Permissions / RBAC](phase12.md)

@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 12 — Resource Permissions (2026-10-15)
+- Workspace/private file and folder visibility, explicit active-member viewer/editor grants and creator/manager permission controls. Existing data defaults to workspace visibility.
+- Central authorization filters folder/file/search queries before pagination and folder context; mandatory private ancestor boundaries protect direct IDs, uploads, downloads and ongoing share authority.
+- Editors can rename completed files and folders/create content within editable folders; creators/managers control moves, ACLs and external publication. Permission changes revoke affected external links; member removal deletes grants.
+- 012_permissions preserves accounts/content and refuses downgrade that discards grants or private policy. Historical migration fixtures now seed historical rows without invoking current-schema services. Verification is recorded in CONTINUE.md.
+
 ## Phase 11 — Sharing (2026-10-15)
 - File creators/workspace managers create expiring external links with optional Argon2 passwords, metadata-only access and transactional download-grant limits.
 - Anonymous recipients receive minimal metadata and verified native attachment downloads without account cookies. Secrets are SHA-256 hashed, returned once in fragments, sent in POST bodies and cleared from the recipient address.

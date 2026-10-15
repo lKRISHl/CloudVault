@@ -6,10 +6,12 @@ from app.api.files import router as files_router
 from app.api.folders import router as folders_router
 from app.api.health import router as health_router
 from app.api.organizations import router as organizations_router
+from app.api.permissions import router as permissions_router
 from app.api.shares import router as shares_router
 from app.api.users import router as users_router
 
 api_router = APIRouter()
+api_router.include_router(permissions_router, tags=["permissions"])
 api_router.include_router(shares_router, tags=["sharing"])
 api_router.include_router(files_router, prefix="/files", tags=["files"])
 api_router.include_router(health_router, prefix="/health", tags=["health"])
