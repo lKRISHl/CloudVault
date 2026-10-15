@@ -124,6 +124,7 @@ class FileService:
                     File.tenant_id == actor.tenant_id,
                     File.folder_id == payload.folder_id,
                     File.name_key == payload.name.casefold(),
+                    File.trash_id.is_(None),
                     File.upload_cleanup_at.is_(None),
                 )
             )

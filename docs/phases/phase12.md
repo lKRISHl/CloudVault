@@ -1,7 +1,7 @@
 # Phase 12 — Permissions / RBAC
 
 Implemented and locally verified on 2026-10-15. Schema: 012_permissions. Final verification is recorded below.
-Phase 11 is committed as fa6a27e; Phase 12 remains uncommitted.
+Phase 11 is committed as fa6a27e; Phase 12 is committed as cce1f62.
 
 ## A. What was built
 

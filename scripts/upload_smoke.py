@@ -331,8 +331,29 @@ def main():
                 == 204
             )
             assert member.get(f"/files/{fid}").status_code == 404
+        trashed = require(api.post(f"/files/{fid}/trash"), 201)
+        assert api.get(f"/files/{fid}").status_code == 404
+        page = require(api.get("/trash"), 200)
+        assert any(item["id"] == trashed["id"] for item in page["items"])
+        assert api.post(f"/trash/{trashed['id']}/restore").status_code == 204
+        restored = require(api.post(f"/files/{fid}/download-url"), 200)
+        with httpx.Client(timeout=20) as transfer:
+            assert transfer.get(restored["download_url"]).content == body
+        trashed = require(api.post(f"/files/{fid}/trash"), 201)
+        assert (
+            api.post(
+                f"/trash/{trashed['id']}/purge", json={"confirmation": "DELETE"}
+            ).status_code
+            == 202
+        )
+        assert api.post(f"/trash/{trashed['id']}/restore").status_code == 409
+        empty = require(
+            api.post("/folders", json={"name": "Recoverable smoke folder"}), 201
+        )
+        folder_trash = require(api.post(f"/folders/{empty['id']}/trash"), 201)
+        assert api.post(f"/trash/{folder_trash['id']}/restore").status_code == 204
         print(
-            "Docker SMTP/transfers/search/sharing and real viewer/editor/private ACL checks passed"
+            "Docker SMTP/transfers/search/sharing/ACL and file/folder trash/restore/purge queue passed"
         )
         print("Unique smoke accounts/workspace/two files retained as development data")
 

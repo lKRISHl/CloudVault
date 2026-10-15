@@ -8,9 +8,11 @@ from app.api.health import router as health_router
 from app.api.organizations import router as organizations_router
 from app.api.permissions import router as permissions_router
 from app.api.shares import router as shares_router
+from app.api.trash import router as trash_router
 from app.api.users import router as users_router
 
 api_router = APIRouter()
+api_router.include_router(trash_router, tags=["trash"])
 api_router.include_router(permissions_router, tags=["permissions"])
 api_router.include_router(shares_router, tags=["sharing"])
 api_router.include_router(files_router, prefix="/files", tags=["files"])

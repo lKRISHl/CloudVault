@@ -1,6 +1,7 @@
 import type { AccountSession, AcceptInvitationPayload, EmailDelivery, HealthResponse, Invitation, InvitationCreated, LoginPayload, Member, ReadinessResponse, RegisterPayload, Tenant, TokenResponse, User, Workspace, Folder, FolderPage, FilePage, FileMetadata, UploadTicket, DownloadTicket, MultipartTicket, MultipartStart, MultipartProgress, PartTicket } from '../types';
 import type { FileSearchQuery, FileSearchPage } from '../types';
 import type { ShareLink } from '../types';
+import type { TrashEntry } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -127,6 +128,10 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
 }
 
 export const api = {
+  trash: (offset = 0, signal?: AbortSignal) => fetchApi<{ items: TrashEntry[]; offset: number; has_more: boolean }>(`${API_V1}/trash?offset=${offset}`, { signal }),
+  moveToTrash: (kind: 'files' | 'folders', id: string) => fetchApi<TrashEntry>(`${API_V1}/${kind}/${id}/trash`, { method: 'POST' }),
+  restoreTrash: (id: string) => fetchApi<void>(`${API_V1}/trash/${id}/restore`, { method: 'POST' }),
+  purgeTrash: (id: string, confirmation: string) => fetchApi<{ detail: string }>(`${API_V1}/trash/${id}/purge`, { method: 'POST', body: JSON.stringify({ confirmation }) }),
   permissions: (kind: 'files' | 'folders', id: string, offset: number, signal?: AbortSignal) => fetchApi<{ name: string; visibility: 'workspace' | 'private'; items: { user_id: string; role: 'viewer' | 'editor' }[]; offset: number; has_more: boolean }>(`${API_V1}/${kind}/${id}/permissions?offset=${offset}`, { signal }),
   setVisibility: (kind: 'files' | 'folders', id: string, visibility: 'workspace' | 'private') => fetchApi<void>(`${API_V1}/${kind}/${id}/permissions`, { method: 'PATCH', body: JSON.stringify({ visibility }) }),
   setGrant: (kind: 'files' | 'folders', id: string, userId: string, role: 'viewer' | 'editor' | null) => fetchApi<void>(`${API_V1}/${kind}/${id}/permissions/${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),

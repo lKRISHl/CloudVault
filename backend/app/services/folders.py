@@ -53,7 +53,7 @@ class FolderService:
         if not self.can_write(actor, role, folder):
             raise HTTPException(
                 status_code=403,
-                detail="Only the folder creator or organization managers can modify this folder",
+                detail="Editor access to this folder is required",
             )
 
     @staticmethod
@@ -135,6 +135,7 @@ class FolderService:
             Folder.tenant_id == actor.tenant_id,
             Folder.parent_id == parent_id,
             Folder.name_key == name.casefold(),
+            Folder.trash_id.is_(None),
         )
         if exclude:
             statement = statement.where(Folder.id != exclude)

@@ -152,7 +152,7 @@ rename folders, and move them with the destination browser.
 Phase 12 now enforces workspace/private visibility and mandatory ancestor read gates.
 Explicit viewers can browse; editors can rename/create content within the folder.
 Creators/managers control moves and ACLs, and the destination must be writable.
-Folder deletion/trash arrives in Phase 13.
+Phase 13 now supplies completed-content trash, original-location restore and queued permanent deletion.
 
 Names are trimmed, Unicode-normalized and case-insensitively unique among siblings;
 path separators, control characters and dot-only names are rejected. The tree has
@@ -320,3 +320,10 @@ Choose Permissions on a managed file/folder in Files or Search files. Existing c
 Every containing folder must be readable. A direct file grant cannot bypass a private ancestor; grant each required private ancestor separately. Editor grants affect their resource and do not inherit editing over other creators' children. Removing a grant does not remove workspace visibility or creator/manager rights. Permission changes revoke external links for the affected file/folder subtree; issued storage URLs remain valid until expiry. Moving a folder changes its ancestor restrictions. Member removal deletes explicit grants.
 
 Back up before alembic upgrade head (012_permissions); Docker startup migrates. Downgrade refuses any private visibility or explicit grant; restore a pre-upgrade backup for an unrepresentable rollback. Run docker compose up --build -d, python scripts/docker_smoke.py and python scripts/upload_smoke.py. The latter verifies private hiding, real viewer download, editor rename and revoked access using a second verified member. See docs/phases/phase12.md and CONTINUE.md for evidence and remaining deployment gates.
+
+## Trash and restore (Phase 13)
+Choose Move to trash on a completed managed file/folder, then open Trash from navigation. Retention is 30 days. Restore returns the batch to its original location and permissions; restore the parent first and resolve any active name conflicts. Independently trashed children stay in trash. Trash/restore require a writable original parent; mixed-creator folder subtrees require a workspace manager. Pending uploads must finish or clean first.
+
+Delete permanently requires typing DELETE, disables restore immediately and queues storage cleanup; folder deletion includes nested trash. Cleanup waits past active upload deadlines and verifies provider removal. It may take longer under failure/load. Internal tombstones/history remain for retries, and already issued download URLs/received bytes cannot be recalled. Versioned buckets are refused until version-aware handling exists.
+
+Back up before alembic upgrade head (013_trash); Docker startup migrates. Any retained trash history prevents downgrade, even after restore; rollback may require the pre-upgrade backup. SQL backups cannot restore purged object bytes. The existing Compose upload-cleanup worker includes trash; direct operation can also run python -m app.jobs.cleanup_trash --once. Run docker compose up --build -d, python scripts/docker_smoke.py and python scripts/upload_smoke.py. See docs/phases/phase13.md and CONTINUE.md for proof and remaining gates.

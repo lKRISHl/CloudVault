@@ -184,3 +184,4 @@ export interface ShareLink {
   allow_download: boolean; password_required: boolean; max_downloads: number | null; download_grants: number; created_at: string;
 }
 export interface SharedFile { name: string; size_bytes: number; expires_at: string; allow_download: boolean; grants_remaining: number | null }
+export interface TrashEntry { id: string; resource_id: string; kind: 'files' | 'folders'; name: string; trashed_at: string; retain_until: string; not_before: string; purge_requested_at: string | null }

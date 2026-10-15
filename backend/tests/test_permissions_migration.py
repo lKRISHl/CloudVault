@@ -100,6 +100,7 @@ async def test_permission_migration_preserves_content_and_refuses_access_loss(tm
             await db.commit()
         refused = migrate("downgrade", "011_sharing")
         assert refused.returncode != 0 and "Private visibility or grants exist" in refused.stderr
+        assert migrate("upgrade", "head").returncode == 0
         async with factory() as db:
             file = await db.get(File, fid)
             assert file.visibility == "private"
@@ -108,6 +109,7 @@ async def test_permission_migration_preserves_content_and_refuses_access_loss(tm
             await db.commit()
         refused = migrate("downgrade", "011_sharing")
         assert refused.returncode != 0 and "Private visibility or grants exist" in refused.stderr
+        assert migrate("upgrade", "head").returncode == 0
         assert migrate("check").returncode == 0
     finally:
         await engine.dispose()

@@ -1,0 +1,50 @@
+import { readFile } from 'node:fs/promises';
+import { expect, test } from '@playwright/test';
+
+test.skip(!process.env.TEST_S3_ENDPOINT, 'Trash browser test requires disposable real storage');
+
+test('real file trash/restore preserves bytes and permanent deletion requires explicit confirmation', async ({ page, request }) => {
+  test.setTimeout(90000);
+  const email = `trash-${Date.now()}@example.com`;
+  await page.goto('/register'); await page.getByLabel('Full name').fill('Trash Owner');
+  await page.getByLabel('Workspace name').fill('Trash Team'); await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill('correct-horse-battery');
+  await page.getByRole('button', { name: 'Create workspace', exact: true }).click(); await expect(page).toHaveURL(/\/app$/);
+  let link = '';
+  await expect.poll(async () => {
+    const messages = await (await request.get('http://127.0.0.1:48025/messages')).json() as { to: string; body: string }[];
+    link = messages.filter(item => item.to === email && item.body.includes('purpose=verify')).at(-1)?.body.split('\n').find(line => line.startsWith('http'))?.trim() ?? '';
+    return link;
+  }).not.toBe('');
+  await page.goto(link); await page.getByRole('button', { name: 'Verify email', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Email verified'); await page.goto('/app/folders');
+  const body = Buffer.from('Recoverable real file bytes');
+  await page.getByLabel('File to upload').setInputFiles({ name: 'Recoverable.txt', mimeType: 'text/plain', buffer: body });
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click(); await expect(page.getByRole('status')).toContainText('File uploaded and verified');
+  await page.getByRole('button', { name: 'Move Recoverable.txt to trash', exact: true }).click();
+  await expect(page.getByText('Recoverable.txt', { exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Trash', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore Recoverable.txt', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('original permissions');
+  await page.getByRole('link', { name: 'Back to files', exact: true }).click();
+  const event = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download Recoverable.txt', exact: true }).click();
+  const downloaded = await event; expect(await readFile((await downloaded.path())!)).toEqual(body);
+  await page.getByRole('button', { name: 'Move Recoverable.txt to trash', exact: true }).click();
+  await expect(page.getByText('Recoverable.txt', { exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Trash', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete permanently Recoverable.txt', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Confirm permanent deletion' })).toBeDisabled();
+  await page.getByLabel('Type DELETE to permanently delete').fill('DELETE');
+  await page.getByRole('button', { name: 'Confirm permanent deletion', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Permanent deletion queued');
+  await expect(page.getByRole('button', { name: 'Restore Recoverable.txt', exact: true })).toBeDisabled();
+  await page.setViewportSize({ width: 390, height: 844 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await page.getByRole('link', { name: 'Back to files', exact: true }).click();
+  await page.getByLabel('Folder name', { exact: true }).fill('Recover folder'); await page.getByRole('button', { name: 'Create folder', exact: true }).click();
+  await page.getByRole('button', { name: 'Move Recover folder to trash', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open folder Recover folder' })).toHaveCount(0);
+  await page.getByLabel('Folder name', { exact: true }).fill('Recover folder'); await page.getByRole('button', { name: 'Create folder', exact: true }).click();
+  await page.getByRole('link', { name: 'Trash', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore Recover folder', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Original names are occupied');
+});

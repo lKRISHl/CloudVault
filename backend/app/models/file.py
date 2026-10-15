@@ -79,16 +79,24 @@ class File(Base):
             "folder_id",
             "name_key",
             unique=True,
-            postgresql_where=text("folder_id IS NOT NULL AND upload_cleanup_at IS NULL"),
-            sqlite_where=text("folder_id IS NOT NULL AND upload_cleanup_at IS NULL"),
+            postgresql_where=text(
+                "folder_id IS NOT NULL AND upload_cleanup_at IS NULL AND trash_id IS NULL"
+            ),
+            sqlite_where=text(
+                "folder_id IS NOT NULL AND upload_cleanup_at IS NULL AND trash_id IS NULL"
+            ),
         ),
         Index(
             "uq_files_root_name",
             "tenant_id",
             "name_key",
             unique=True,
-            postgresql_where=text("folder_id IS NULL AND upload_cleanup_at IS NULL"),
-            sqlite_where=text("folder_id IS NULL AND upload_cleanup_at IS NULL"),
+            postgresql_where=text(
+                "folder_id IS NULL AND upload_cleanup_at IS NULL AND trash_id IS NULL"
+            ),
+            sqlite_where=text(
+                "folder_id IS NULL AND upload_cleanup_at IS NULL AND trash_id IS NULL"
+            ),
         ),
         Index("ix_files_children", "tenant_id", "folder_id", "name", "id"),
         Index("ix_files_creator", "tenant_id", "created_by"),
@@ -135,6 +143,9 @@ class File(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
     folder_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    trash_id: Mapped[UUID | None] = mapped_column(ForeignKey("trash_entries.id"), index=True)
+    object_purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    purge_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     name: Mapped[str] = mapped_column(String(255))
     name_key: Mapped[str] = mapped_column(String(768))

@@ -14,6 +14,7 @@ export function AppShell() {
         <NavLink end to="/app"><Icon name="grid" />Overview</NavLink>
         <NavLink to="/app/folders"><Icon name="folder" />Files & folders</NavLink>
         <NavLink to="/app/search"><Icon name="search" />Search files</NavLink>
+        <NavLink to="/app/trash"><Icon name="trash" />Trash</NavLink>
         <NavLink to="/app/settings"><Icon name="settings" />Workspace settings</NavLink>
         <NavLink to="/app/security"><Icon name="shield" />Account security</NavLink>
       </nav>

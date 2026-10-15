@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 13 — Trash and Restore (2026-10-15)
+- Completed files/folder subtrees can move to 30-day trash, disappear from all live ACL/read/transfer paths and restore with original identities/ACLs. Independent older trash remains separate; names can be reused and restore conflicts roll back atomically.
+- Creators/managers manage scoped trash pages; pending transfers and other creators' subtrees require completion/cleanup or manager authority. Existing links revoke and never silently reactivate.
+- Explicit DELETE-confirmed purge commits irreversible state before storage deletion. Existing cleanup worker handles bounded trash batches, waits past upload authorizations, refuses versioned buckets and retains exact references for provider failures/late writes.
+- 013_trash preserves existing data and refuses downgrade with retained history. Phase 12 committed as cce1f62; Phase 13 is uncommitted. Verification/operational limits are recorded in CONTINUE.md.
+
 ## Phase 12 — Resource Permissions (2026-10-15)
 - Workspace/private file and folder visibility, explicit active-member viewer/editor grants and creator/manager permission controls. Existing data defaults to workspace visibility.
 - Central authorization filters folder/file/search queries before pagination and folder context; mandatory private ancestor boundaries protect direct IDs, uploads, downloads and ongoing share authority.

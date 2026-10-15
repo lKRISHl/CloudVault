@@ -39,8 +39,10 @@ class PermissionService:
         return or_(model.visibility == "workspace", model.created_by == actor.id, grant)
 
     @staticmethod
-    def visible_folders(actor, role):
+    def visible_folders(actor, role, include_trash=False):
         local = PermissionService.local_read(Folder, actor, role)
+        if not include_trash:
+            local = and_(local, Folder.trash_id.is_(None))
         visible = (
             select(Folder.id, literal(1).label("depth"))
             .where(
@@ -48,7 +50,7 @@ class PermissionService:
                 Folder.parent_id.is_(None),
                 local,
             )
-            .cte("visible_folders", recursive=True)
+            .cte(recursive=True)
         )
         visible = visible.union_all(
             select(Folder.id, (visible.c.depth + 1))
@@ -61,14 +63,15 @@ class PermissionService:
         return select(visible.c.id)
 
     @staticmethod
-    def file_read(actor, role):
+    def file_read(actor, role, include_trash=False):
         return and_(
             File.tenant_id == actor.tenant_id,
             File.upload_cleanup_at.is_(None),
+            literal(True) if include_trash else File.trash_id.is_(None),
             PermissionService.local_read(File, actor, role),
             or_(
                 File.folder_id.is_(None),
-                File.folder_id.in_(PermissionService.visible_folders(actor, role)),
+                File.folder_id.in_(PermissionService.visible_folders(actor, role, include_trash)),
             ),
         )
 

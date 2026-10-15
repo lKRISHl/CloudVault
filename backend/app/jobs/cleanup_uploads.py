@@ -148,6 +148,9 @@ async def tick(factory=async_session_maker, marker=None):
             finally:
                 await scoped.close()
         marker = await sweep_orphans(inventory, factory, marker, now)
+        from app.jobs.cleanup_trash import tick as trash_tick
+
+        await trash_tick(factory)
         logger.info("Upload maintenance checked %s records; reclaimed %s", len(candidates), cleaned)
         return marker
     finally:

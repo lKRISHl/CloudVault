@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
 import type { Folder } from '../../types';
 import { FileList } from './FileList';
+import { TrashButton } from '../trash/TrashButton';
 
 const button = 'border rounded px-3 py-2 disabled:opacity-50';
 const input = 'block border rounded p-2 w-full';
@@ -88,6 +89,7 @@ export function FoldersPage() {
         {(item.can_manage ?? item.can_write) && <button className={button} aria-label={`Move ${item.name}`} onClick={() => open(item, 'move')}>Move</button>}
       </> : <span>Read only</span>}
       {item.can_manage && <Link className="secondary-button" to={`/app/permissions/folders/${item.id}`} aria-label={`Permissions for ${item.name}`}>Permissions</Link>}
+      {item.can_manage && <TrashButton kind="folders" id={item.id} name={item.name} />}
     </li>)}</ul>
     {query.data?.items.length === 0 && <div className="empty-state"><Icon name="folder" /><strong>No folders here.</strong><p>Create a folder to give your next project a home.</p></div>}
     {enabled && query.isSuccess && <FileList key={`${user?.tenant?.id}/${parent}`} folderId={parent} writable={!!writable} />}

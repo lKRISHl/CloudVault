@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { Icon } from '../../components/ui/Icon';
 import { DownloadButton } from '../folders/DownloadButton';
 import { RenameFile } from '../folders/RenameFile';
+import { TrashButton } from '../trash/TrashButton';
 import { api } from '../../services/api';
 import type { FileSearchQuery } from '../../types';
 
@@ -74,7 +75,7 @@ function SearchWorkspace({ folderId }: { folderId: string | null }) {
         <p className="file-name"><span className="file-icon"><Icon name="file" /></span><strong>{file.name}</strong><span className={`status-badge ${file.status}`}>{file.multipart_state === 'aborted' ? 'Cancelled' : file.status === 'uploaded' ? 'Uploaded' : 'Pending'}</span></p>
         <p>{file.status === 'uploaded' ? 'Verified' : 'Declared'} size: {(file.size_bytes ?? file.declared_size_bytes).toLocaleString()} bytes · {file.declared_content_type ?? 'Type unspecified'}</p>
         <p>Location: {file.folder_id ? file.folder_name ?? 'Folder' : 'Root'}</p>
-        <div className="flex flex-wrap gap-3"><Link className="secondary-button" aria-label={`Open folder for ${file.name}`} to={`/app/folders${file.folder_id ? `?folder=${encodeURIComponent(file.folder_id)}` : ''}`}>Open folder</Link>{file.status === 'uploaded' && <DownloadButton id={file.id} name={file.name} />}{file.status === 'uploaded' && file.can_manage && <Link className="secondary-button" to={`/app/files/${file.id}/shares`} aria-label={`Share ${file.name}`}>Share</Link>}{file.can_manage && <Link className="secondary-button" to={`/app/permissions/files/${file.id}`} aria-label={`Permissions for ${file.name}`}>Permissions</Link>}{file.status === 'uploaded' && file.can_write && <RenameFile id={file.id} name={file.name} />}</div>
+        <div className="flex flex-wrap gap-3"><Link className="secondary-button" aria-label={`Open folder for ${file.name}`} to={`/app/folders${file.folder_id ? `?folder=${encodeURIComponent(file.folder_id)}` : ''}`}>Open folder</Link>{file.status === 'uploaded' && <DownloadButton id={file.id} name={file.name} />}{file.status === 'uploaded' && file.can_manage && <Link className="secondary-button" to={`/app/files/${file.id}/shares`} aria-label={`Share ${file.name}`}>Share</Link>}{file.can_manage && <Link className="secondary-button" to={`/app/permissions/files/${file.id}`} aria-label={`Permissions for ${file.name}`}>Permissions</Link>}{file.status === 'uploaded' && file.can_write && <RenameFile id={file.id} name={file.name} />}{file.status === 'uploaded' && file.can_manage && <TrashButton kind="files" id={file.id} name={file.name} />}</div>
       </li>)}</ul>
       {query.data?.items.length === 0 && <div className="empty-state"><Icon name="search" /><strong>No matching files.</strong><p>Try another filename or clear the filters.</p></div>}
       <div className="flex gap-3"><button className="secondary-button" disabled={!offset || query.isFetching} onClick={() => setOffset(Math.max(0, offset - pageSize))}>Previous results</button><button className="secondary-button" disabled={!query.data?.has_more || query.isFetching || offset + pageSize > 10000} onClick={() => setOffset(offset + pageSize)}>Next results</button></div>

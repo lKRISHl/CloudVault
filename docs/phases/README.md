@@ -27,3 +27,5 @@ and interview questions. Record verification gaps explicitly.
 - [Phase 11 — Sharing](phase11.md)
 
 - [Phase 12 — Permissions / RBAC](phase12.md)
+
+- [Phase 13 — Trash and Restore](phase13.md)

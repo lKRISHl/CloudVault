@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 12 resource permissions and local verification are complete. Workspace/private visibility, viewer/editor grants, mandatory ancestor read gates and scoped management now protect browsing, search, transfers and sharing. Phase 11 is committed as fa6a27e; Phase 12 is uncommitted. Evidence is in CONTINUE.md. Remote CI and production load/provider checks remain pending.
+Current state: Phase 13 trash/restore implementation and local verification are complete. Completed file/folder batches retain ACLs for 30 days, restore atomically to original locations, and support irreversible queued purge with provider-confirmed cleanup. Phase 12 is committed as cce1f62; Phase 13 is uncommitted. Schema is 013_trash; evidence is in CONTINUE.md. Remote CI/production provider/load checks remain pending.
 
-Next planned implementation: Phase 13, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
+Next planned implementation: Phase 14, only on explicit user instruction. Phase 25A follows Phase 25 and precedes Phase 26.
 
 ## Immediate Verification Gate — Existing Infrastructure
 
@@ -112,7 +112,7 @@ Status: Implemented and locally verified on 2026-10-14. Folder hierarchy, mutati
 - hierarchy
 - folder permissions foundation
 
-Implemented policy: verified active members read workspace folders and create at root; folder creators/owners/admins modify folders and create within writable parents. Phase 12 now adds private/shared viewer/editor ACLs and mandatory ancestor read gates. Names are normalized and case-insensitively unique per parent. Maximum depth is 64. Folder deletion/trash is Phase 13.
+Implemented policy: verified active members read workspace folders and create at root; folder creators/owners/admins modify folders and create within writable parents. Phase 12 now adds private/shared viewer/editor ACLs and mandatory ancestor read gates. Names are normalized and case-insensitively unique per parent. Maximum depth is 64. Phase 13 now adds completed-content trash/restore with retained ACLs.
 
 ## PHASE 4 — File Metadata
 
@@ -211,7 +211,7 @@ Resource read ACLs now apply before search/list pagination and folder-name conte
 
 ## PHASE 13 — Trash + Restore
 
-Status: Not started.
+Status: Implemented and locally verified on 2026-10-15. 250 backend tests on SQLite/PostgreSQL, 77 frontend tests, 18 Chromium journeys, actual byte-reclamation/migration checks and rebuilt Docker trash/restore/queue/schema/maintenance checks pass. See docs/phases/phase13.md. Completed-file/folder batch trash, 30-day retention, ACL-scoped pages, original-location restore/conflicts, explicit purge confirmation and durable provider cleanup are implemented.
 
 - soft delete
 - trash
@@ -219,7 +219,7 @@ Status: Not started.
 - permanent delete
 - cleanup jobs
 
-Coordinate deletion/trash retention with upload initialization intents and cleanup tombstones; maintenance must not remove object versions still referenced by retained content.
+Trash retains exact object references and ACLs. Restore preserves independently trashed children and rejects active name conflicts. Permanent folder deletion includes nested trash and commits irreversible intent before provider operations. Cleanup waits past upload authorizations, confirms absence, retries retained tombstones and fails closed on versioned/suspended buckets. Pending uploads must finish or clean before containing-folder trash. SQL backups cannot restore purged bytes. Phase 14 must extend retention/version-aware deletion before enabling versioned storage.
 
 ## PHASE 14 — File Versioning
 
@@ -230,7 +230,7 @@ Status: Not started.
 - restore version
 - metadata/history
 
-Before enabling provider bucket versioning, extend and verify upload cleanup with explicit version handling. Delete markers alone do not establish byte reclamation; current Phase 9 maintenance fails closed on versioned buckets.
+Coordinate retained application versions with trash purge and quota calculation. Before enabling provider bucket versioning, extend and verify upload/trash cleanup with explicit version handling. Delete markers alone do not establish byte reclamation; current Phase 9 maintenance fails closed on versioned buckets.
 
 ## PHASE 15 — File Preview
 

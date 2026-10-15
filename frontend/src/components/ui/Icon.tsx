@@ -1,5 +1,6 @@
-export function Icon({ name, className = '' }: { name: 'vault' | 'folder' | 'file' | 'grid' | 'settings' | 'shield' | 'upload' | 'search'; className?: string }) {
+export function Icon({ name, className = '' }: { name: 'vault' | 'folder' | 'file' | 'grid' | 'settings' | 'shield' | 'upload' | 'search' | 'trash'; className?: string }) {
   const paths = {
+    trash: 'M4 7h16 M9 7V3h6v4 M6 7l1 14h10l1-14 M10 11v6 M14 11v6',
     vault: 'M5 4h14v16H5z M9 9h6v6H9z M12 9v6 M9 12h6',
     folder: 'M3 7V5h6l2 2h10v12H3z',
     file: 'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6',

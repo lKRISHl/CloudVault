@@ -38,6 +38,8 @@ test('private ancestors, viewer download, editor rename, and revoked grants prot
     await page.goto('/app/folders'); await page.getByLabel('Folder name', { exact: true }).fill('Confidential');
     await page.getByRole('button', { name: 'Create folder', exact: true }).click();
     await page.getByRole('button', { name: 'Open folder Confidential' }).click();
+    await expect(page.getByRole('navigation', { name: 'Folder breadcrumbs' })).toContainText('Confidential');
+    await expect(page.getByLabel('File to upload')).toBeEnabled();
     const content = Buffer.from('Real private file with viewer/editor ACL');
     await page.getByLabel('File to upload').setInputFiles({ name: 'Private.txt', mimeType: 'text/plain', buffer: content });
     await page.getByRole('button', { name: 'Upload file', exact: true }).click();
