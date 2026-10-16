@@ -1,5 +1,24 @@
 # Changelog
 
+## Phase 16 — Redis and Background Jobs (2026-10-16, locally verified)
+- Durable private preview jobs (migration 019), dedicated queue/worker, lease-fenced retries/publication, fixed expiry/cancellation and authority/generation/prune/trash rechecks on private result reads. PNG/UTF-8 bytes stay in S3 with retained cleanup identities.
+- Isolated MP4/WebM static video posters with codec/duration/pixel/protocol/resource bounds and decoder process-group cleanup. Actual FFmpeg/container/API/S3 verification passes; no moving playback or scanning claim.
+- Browser polls/cancels queued previews; its 103-test frontend milestone, lint/build and Phase16-only real-queue Chromium journey pass. Phase 15's later completion passes the full browser suite and 105 frontend tests.
+- Retained initialization folder/scope/cancellation (migration 018), atomic subtree intent cancellation and stale-retry refusal after trash/recovery. Historical unknown scope stays explicit.
+- Read-only paged operator reference inventory, explicit confirmed multi-pass absence-checked retirement and manager-authorized verified version adoption with existing change history/share invalidation. All cleanup refs/deadlines remain retained; no live operator action was performed.
+- Celery Beat/private email-storage queues, durable maintenance leases/checkpoints, stale-owner fencing, bounded sanitized retries and execution-health CLI. Compose declares persistent capped Redis and queued worker commands.
+- Persisted rotation across six bounded cleanup stages, interrupted-attempt recovery, per-stage failure/deferred freshness and operator aggregate backlog/dependency probes. Default batch 5, configurable 1–10.
+- Migrations 017–019 pass real PostgreSQL preservation/alignment/rollback checks. Full regression initially 357 passed/four failed/one host-video skip; obsolete fixture expectations were fixed and memory failures rerun successfully (seven passed). Final provider policy/cleanup rerun: two passed. Exact evidence is in docs/phases/phase16.md.
+- Actual Redis AOF restart, prefork-child kill during provider I/O, real 240-second lease recovery, six-stage progress and two-tenant bounded cleanup pass. Real-provider lost-ACK/late-write retries retain references; Enabled/Suspended purge is refused. Dedicated browser cancellation/retry/poster journey passes. Disposable stack removed; normal app restored with a fresh DB backup.
+- AWS S3 selected by the user as production target; cloud compatibility/security certification remains pending. Phase 15 browser verification was deferred during this milestone and subsequently completed at the user's request.
+
+## Phase 15 — Bounded Preview (implemented 2026-10-15, locally completed 2026-10-16)
+- Current/history text and static image/PDF previews with verified bounded bytes, live tenant/ACL/version rechecks and unscanned labels.
+- Credential-free network-disabled native renderer configuration, process/resource bounds, escaped text, scoped browser state and blob cleanup; no migration or durable derivative cache.
+- Local SQLite/targeted backend, actual container/native/live API/provider smokes and the 306-test PostgreSQL/provider baseline pass. Deferred full browser acceptance resumed and passed 22/22 journeys, including previews and the large-version byte check; latest frontend tests pass 105, plus lint/build and disposable cleanup.
+- Fixed navigation during pending trash/restore/purge: successful mutations invalidate shared caches after the original component unmounts, while guarding local state updates. Two late-response/unmount regression tests protect this behavior. Docker frontend rebuilt and normal app restored with UI/API/private-storage smoke checks passing.
+- L38 local queues/static posters subsequently completed in 16; AWS/failure expansion stays 26 and isolation/security review 27. Scanning/quarantine stays 17. See docs/phases/phase15.md and CONTINUE.md.
+
 ## Phase 14B — Core Library Movement and Recovery (2026-10-15)
 - Completed-file moves with expected-source concurrency, source/destination authority, conflict rollback and share revocation; immutable object/version identities remain unchanged.
 - Trash recovery to a selected writable destination/name, preserving ACL/batch boundaries and independent older trash; full depth/subtree ownership and purge/restore races remain protected.

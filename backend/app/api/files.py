@@ -11,17 +11,85 @@ from app.api.versions import router as versions_router
 from app.schemas.downloads import DownloadTicket
 from app.schemas.files import FileMove, FilePage, FileRead
 from app.schemas.folders import FolderName
+from app.schemas.previews import PreviewJobRead, PreviewJobRequest, PreviewRead, PreviewRequest
 from app.schemas.search import FileSearchPage, FileSearchQuery
 from app.schemas.trash import DiscardMetadataRequest
 from app.schemas.uploads import UploadConfiguration, UploadProof, UploadStart, UploadTicket
 from app.services.downloads import DownloadService
 from app.services.files import FileService
+from app.services.preview_jobs import PreviewJobService
+from app.services.previews import PreviewService
 from app.services.search import FileSearchService
 from app.services.uploads import UploadService
 
 router = APIRouter()
 router.include_router(multipart_router)
 router.include_router(versions_router)
+
+
+@router.post("/{file_id}/preview-jobs", response_model=PreviewJobRead, status_code=202)
+async def enqueue_preview(
+    file_id: UUID,
+    payload: PreviewJobRequest,
+    actor: WorkspaceUser,
+    db: Database,
+    request: Request,
+    response: Response,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await PreviewJobService(db).enqueue(
+        actor, file_id, payload, request.client.host if request.client else ""
+    )
+
+
+@router.get("/{file_id}/preview-jobs/{job_id}", response_model=PreviewJobRead)
+async def get_preview_job(
+    file_id: UUID,
+    job_id: UUID,
+    actor: WorkspaceUser,
+    db: Database,
+    storage: UploadStorage,
+    response: Response,
+    request: Request,
+):
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    return await PreviewJobService(db, storage).get(
+        actor, file_id, job_id, request.client.host if request.client else ""
+    )
+
+
+@router.delete("/{file_id}/preview-jobs/{job_id}", response_model=PreviewJobRead)
+async def cancel_preview_job(
+    file_id: UUID,
+    job_id: UUID,
+    actor: WorkspaceUser,
+    db: Database,
+    response: Response,
+    request: Request,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return await PreviewJobService(db).cancel(
+        actor, file_id, job_id, request.client.host if request.client else ""
+    )
+
+
+@router.post("/{file_id}/preview", response_model=PreviewRead)
+async def preview(
+    file_id: UUID,
+    payload: PreviewRequest,
+    actor: WorkspaceUser,
+    db: Database,
+    storage: UploadStorage,
+    request: Request,
+    response: Response,
+):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    return await PreviewService(db, storage).create(
+        actor, file_id, payload, request.client.host if request.client else ""
+    )
 
 
 @router.post("/{file_id}/move", response_model=FileRead)

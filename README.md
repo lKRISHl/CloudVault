@@ -343,3 +343,44 @@ Trash supports **Restore elsewhere** with a chosen destination/name when the ori
 For a folder blocked by pending uploads, use **Cancel uploads and trash**, then type `CANCEL UPLOADS`. This cancels up to 100 live pending uploads atomically with trash; restore cannot resume them. Outstanding storage URLs/bytes wait for original authorization expiry and verified cleanup. Cancel smaller subfolders first if the limit is exceeded. Legacy metadata explicitly marked without an upload session offers **Discard metadata** with `DISCARD`; upload again afterward. Referenced transfers cannot use legacy discard, and internal tombstones remain retained.
 
 Back up before `alembic upgrade head` (`016_library_recovery`); Docker startup migrates. Cancellation/discard history prevents downgrade; use a pre-upgrade backup for an unrepresentable rollback. Run `docker compose up --build -d`, `python scripts/docker_smoke.py` and `python scripts/upload_smoke.py`. Keep maintenance running while developing; stop the stack when finished to save resources. See [Phase 14B](docs/phases/phase14b.md) and CONTINUE.md for executed checks and limits.
+
+## File previews — Phase 15 locally verified
+Current/history previews support escaped UTF-8 text and static PNGs generated from PNG/JPEG/GIF/WebP/PDF input. Use Preview on files/search or Preview version N in history. Content remains unscanned; unsupported/oversized input uses Versions and downloads. Sources are limited to 10 MiB, images to 16M pixels, output to 1600 edge/1 MiB PNG, PDF browsing to the first 100 pages of at most 1000, and text to 65,536 characters.
+
+Native parsing requires the isolated Linux renderer, configured in Compose with no network/application credentials/data mounts, read-only root and resource/time limits. Direct Windows APIs can preview text; use the Compose API for native formats. No migration beyond 016_library_recovery or persistent derivatives is introduced. After Docker starts, run docker compose up --build -d, python scripts/docker_smoke.py, python scripts/preview_smoke.py and python scripts/upload_smoke.py. The preview smoke checks actual container restrictions and PNG/PDF round trips. It needs installed backend requirements (Pillow).
+
+Local backend/frontend and actual container/native/live API/provider smokes pass. The completed full Chromium rerun passes 22/22 journeys, including previews and large-version byte verification through length/SHA-256. A Trash cache race during navigation was fixed and regression-tested; all 105 frontend tests, lint/build and disposable cleanup pass. The PostgreSQL/provider baseline passes 306 tests. TEST_PREVIEW_FIXTURE_RENDERER=1 belongs only to disposable browser tests with owned generated files and TEST_S3_* settings; it does not verify production isolation. Phase 16's actual sandbox/queue checks pass separately. Malware/quarantine work remains 17. See [Phase 15](docs/phases/phase15.md), CONTINUE.md and the limitation register. Preserve volumes/data when stopping Docker to save RAM.
+
+## Phase 16 queues and previews — locally verified
+Celery Beat now schedules separate email/storage maintenance queues, with durable DB leases/checkpoints and execution-health reporting. AWS S3 is the selected production target; actual AWS integration/certification remains pending. Phase 15's earlier browser deferral is now closed with a successful full rerun.
+
+Source/application schema is 019_preview_jobs; actual PostgreSQL migration and Compose checks pass. Back up before upgrading, and rebuild API/renderer/workers/scheduler together after source changes. For direct Linux operation, run one `celery -A app.jobs.celery_app:celery_app beat --schedule=/tmp/celerybeat-schedule` and separate prefork workers consuming email/storage/previews queues as shown in Compose. Native Windows prefork deployment is not the intended runtime. Legacy `python -m app.jobs.deliver_email` and `cleanup_uploads` loops remain manual fallback; avoid deploying both sets simultaneously.
+
+Use `python -m app.jobs.check_jobs --job email`, `--job storage` or `--job previews` for Redis, stage freshness/failure, aggregate backlog counts/ages and non-destructive bucket/versioning checks. Storage rotates six stages with 5 records per turn by default (`STORAGE_STAGE_BATCH_SIZE`, 1–10); a full rotation takes approximately six minutes while jobs finish on schedule. Health is not proof of SMTP delivery, reclaimed bytes or an empty provider. Actual Redis restart, prefork kill/real-clock recovery, PostgreSQL/local-provider cleanup, native video and Phase16-only browser checks pass; latest frontend regression passes 105 tests/lint/build. See [Phase 16](docs/phases/phase16.md) for exact regression results, initial failures corrected/retested and the host FFmpeg skip. Phase 15's full browser suite now also passes.
+
+Phase 16 also records initialization folder scope/cancellation and includes unmaterialized
+intents in confirmed folder cancellation. Old unknown-scope initialization retries require
+a fresh request; original cleanup refs/deadlines remain. For a trusted DB operator,
+`python -m app.jobs.reconcile_upload --tenant <UUID> --file <UUID>` is a read-only inventory
+with version pages (`--version-offset`). Explicit retirement/adoption commands, authority
+checks, bounded multi-pass progress and safety windows are documented in the Phase 16 report.
+Do not publish inventories or run mutation commands merely to inspect a problem. Migration
+018 refuses downgrade once scope/cancellation would be lost; restore a pre-upgrade backup.
+
+The preview page now queues private version-bound requests, polls and can cancel preparation.
+Compose includes a dedicated `preview-worker` queue; its five-second hints alternate rendering
+and cleanup, persisting rotation before work. `python -m app.jobs.check_jobs --job previews`
+reports execution/backlog/storage observations. Raw PNG/UTF-8 results stay in private S3,
+never PostgreSQL or Redis; reads recheck access, retained version and current generation.
+Jobs expire after 15 minutes, permit three attempts and cap queued/running work at 20 per
+workspace. Cleanup waits expiry plus lease/settle (25 minutes from creation by default) and
+keeps exact references for late writes. These bounds are not aggregate quotas or byte-purge promises.
+
+The renderer Docker target alone installs FFmpeg. Selected MP4/WebM H.264/VP8/VP9 videos up
+to 10 MiB/two minutes and 4K pixel bounds can produce a static PNG poster; moving playback
+uses the original download. Actual generated-video decoding/container/API checks pass;
+ordinary host video tools remain unavailable. Migration 019 guards preview refs
+and worker leases on downgrade; back up before upgrading the API/renderer/workers/scheduler.
+Use `python scripts/preview_smoke.py --queued --video` with owned generated fixtures.
+For the disposable acceptance stack, add `--phase16-stack`; see the phase report's isolated
+test commands. Phase 15's final browser verification is complete.

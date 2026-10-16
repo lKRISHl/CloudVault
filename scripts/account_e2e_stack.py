@@ -67,6 +67,31 @@ async def serve():
     from app.services.email import deliver_next
     from sqlalchemy import event
 
+    if os.getenv("TEST_PREVIEW_FIXTURE_RENDERER") == "1":
+        # Owned generated fixtures only. Production/API code never falls back to host parsing.
+        # The live Docker smoke separately verifies the network-disabled container boundary.
+        from app.schemas.previews import PreviewContent
+        from app.services import previews
+
+        async def fixture_renderer(data, page):
+            command = BACKEND / "app" / "previews" / "worker.py"
+            process = await asyncio.create_subprocess_exec(
+                sys.executable, "-I", str(command), str(page),
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+                env={key: os.environ[key] for key in ("SystemRoot", "TEMP", "TMP") if key in os.environ},
+            )
+            try:
+                output, _ = await asyncio.wait_for(process.communicate(data), 12)
+                if process.returncode or len(output) > previews.MAX_OUTPUT:
+                    raise RuntimeError("Fixture preview renderer failed")
+                return PreviewContent.model_validate_json(output)
+            finally:
+                if process.returncode is None:
+                    process.kill()
+                    await process.wait()
+        previews.isolated_render = fixture_renderer
+
     @event.listens_for(engine.sync_engine, "connect")
     def enforce_test_foreign_keys(connection, _):
         cursor = connection.cursor()
@@ -81,6 +106,20 @@ async def serve():
                 await asyncio.sleep(0.1)
 
     dispatcher = asyncio.create_task(delivery_loop())
+    async def preview_fixture_loop():
+        # Disposable DB/owned provider fixtures only; this does not certify Celery or Redis.
+        from app.jobs.preview_queue import tick
+
+        turn = "render"
+        while True:
+            await tick(async_session_maker, turn=turn)
+            turn = "cleanup" if turn == "render" else "render"
+            await asyncio.sleep(0.1)
+
+    preview_dispatcher = (
+        asyncio.create_task(preview_fixture_loop())
+        if os.getenv("TEST_PREVIEW_FIXTURE_RENDERER") == "1" else None
+    )
     try:
         await uvicorn.Server(
             uvicorn.Config(
@@ -95,6 +134,10 @@ async def serve():
         dispatcher.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await dispatcher
+        if preview_dispatcher:
+            preview_dispatcher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await preview_dispatcher
         await engine.dispose()
 
 

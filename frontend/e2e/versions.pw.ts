@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 
 test.skip(!process.env.TEST_S3_ENDPOINT, 'Version browser test requires disposable real storage');
@@ -92,7 +93,10 @@ test('multipart replacement resumes after reload, supports cancellation and prot
   await expect(page.getByRole('status')).toContainText('Version uploaded and verified'); expect(puts).toBe(before + 1);
   await expect(page.getByText('Current: version 2', { exact: true })).toBeVisible();
   const downloadEvent = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download version 2', exact: true }).click();
-  expect(await readFile((await (await downloadEvent).path())!)).toEqual(body);
+  const received = await readFile((await (await downloadEvent).path())!);
+  expect(received.length).toBe(body.length);
+  // Compare every byte through a digest without constructing a multi-million-entry diff.
+  expect(createHash('sha256').update(received).digest('hex')).toBe(createHash('sha256').update(body).digest('hex'));
   await expect(page.getByRole('button', { name: 'Delete version 2', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Delete version 1', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Confirm history deletion' })).toBeDisabled();

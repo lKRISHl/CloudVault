@@ -16,6 +16,7 @@ import { PublicSharePage, ShareManagementPage } from '../features/sharing/Sharin
 import { PermissionsPage } from '../features/permissions/PermissionsPage';
 import { TrashPage } from '../features/trash/TrashPage';
 import { VersionsPage } from '../features/versions/VersionsPage';
+import { PreviewPage } from '../features/previews/PreviewPage';
 import { AppShell } from '../components/AppShell';
 import { ApiRequestError } from '../services/api';
 
@@ -83,6 +84,7 @@ function App() {
               <Route path="/app/permissions/:kind/:id" element={<PermissionsPage />} />
               <Route path="/app/trash" element={<TrashPage />} />
               <Route path="/app/files/:fileId/versions" element={<VersionsPage />} />
+              <Route path="/app/files/:fileId/preview" element={<PreviewPage />} />
               </Route>
             </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />

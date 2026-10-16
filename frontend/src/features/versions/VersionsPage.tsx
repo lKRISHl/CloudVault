@@ -110,6 +110,7 @@ function Versions({ fileId }: { fileId: string }) {
         <p className="break-words">Created {new Date(version.created_at).toLocaleString()} · Uploader {version.created_by}</p>
         <div className="flex flex-wrap gap-3">
           {version.status === 'uploaded' && !version.prune_requested_at && <button className="secondary-button" disabled={working} onClick={() => void download(version.id)}>Download version {version.number}</button>}
+          {version.status === 'uploaded' && !version.prune_requested_at && <Link className="secondary-button" to={`/app/files/${fileId}/preview?version=${version.id}`}>Preview version {version.number}</Link>}
           {data.file.can_write && version.status === 'uploaded' && !version.is_current && !version.prune_requested_at && <button className="secondary-button" disabled={working} onClick={() => setRestore({ id: version.id, number: version.number })}>Restore version {version.number}</button>}
           {data.file.can_manage && version.status === 'uploaded' && !version.is_current && !version.prune_requested_at && <button className="secondary-button" disabled={working} onClick={() => { setPrune({ id: version.id, number: version.number }); setConfirmation(''); }}>Delete version {version.number}</button>}
           {data.file.can_write && version.status === 'pending' && version.created_by === user?.id && !version.cancelled_at && <>

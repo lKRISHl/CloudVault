@@ -5,7 +5,7 @@ from sqlalchemy import and_, exists, func, literal, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
-from app.models import File, FileVersion, Folder, TrashEntry, UserRole
+from app.models import File, FileVersion, Folder, TrashEntry, UploadIntent, UserRole
 from app.schemas.trash import RestoreRequest, TrashPage, TrashRead
 from app.services.accounts import AccountService
 from app.services.folders import FolderService
@@ -120,24 +120,45 @@ class TrashService:
             )
         )
         pending = [file for file in files if file.status != "uploaded"]
-        if pending and not cancel_uploads:
+        now = datetime.now(UTC)
+        intents = []
+        if kind == "folders":
+            intents = list(
+                await self.db.scalars(
+                    select(UploadIntent)
+                    .where(
+                        UploadIntent.tenant_id == actor.tenant_id,
+                        UploadIntent.folder_id.in_(subtree(actor.tenant_id, resource_id)),
+                        UploadIntent.cancelled_at.is_(None),
+                        UploadIntent.expires_at > now,
+                        ~exists().where(File.id == UploadIntent.file_id),
+                    )
+                    .limit(101)
+                )
+            )
+            if role not in (UserRole.OWNER, UserRole.ADMIN) and any(
+                intent.created_by != actor.id for intent in intents
+            ):
+                raise HTTPException(
+                    403, "Workspace managers must handle other creators' initializations"
+                )
+        if (pending or intents) and not cancel_uploads:
             raise HTTPException(
                 409, "Finish uploads or wait for cancelled-upload cleanup before trashing"
             )
-        if len(pending) > 100:
+        if len(pending) + len(intents) > 100:
             raise HTTPException(
                 409,
                 "At most 100 pending transfers can be cancelled per folder operation; "
                 "handle smaller subfolders first",
             )
-        now = datetime.now(UTC)
+        for intent in intents:
+            intent.cancelled_at = now
         for file in pending:
             file.upload_cancelled_at = file.upload_cancelled_at or now
             if file.upload_method == "multipart":
                 file.multipart_state = "aborted"
             if file.object_id is None:
-                from app.models import UploadIntent
-
                 if await self.db.get(UploadIntent, file.id) or await self.db.scalar(
                     select(FileVersion.id).where(FileVersion.file_id == file.id)
                 ):
@@ -154,6 +175,8 @@ class TrashService:
             )
         )
         deadline = max(now, utc(latest)) if latest else now
+        if intents:
+            deadline = max(deadline, *(utc(intent.expires_at) for intent in intents))
         version_deadline = await self.db.scalar(
             select(func.max(FileVersion.upload_expires_at)).where(
                 FileVersion.tenant_id == actor.tenant_id,

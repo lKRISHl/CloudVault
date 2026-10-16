@@ -245,6 +245,157 @@ async def test_lost_create_acknowledgement_retains_exact_key_before_provider_wri
 
 
 @pytest.mark.asyncio
+async def test_folder_cancellation_finds_unmaterialized_intent_and_blocks_retry_after_restore(
+    client,
+    db_factory,
+    storage,
+    monkeypatch,
+):
+    from sqlalchemy import select
+
+    from tests.api.test_folders import create as folder
+
+    owner = await register_user(client)
+    parent = await folder(client, owner, "Initialization")
+    child = await folder(client, owner, "Nested", parent=parent["id"])
+    request = payload(folder_id=child["id"])
+    original = storage.create_multipart
+
+    async def lost(ref):
+        await original(ref)
+        raise StorageUnavailableError("private-lost-ack")
+
+    monkeypatch.setattr(storage, "create_multipart", lost)
+    assert (
+        await client.post(ROOT + "/multipart/uploads", headers=bearer(owner), json=request)
+    ).status_code == 503
+    async with db_factory() as db:
+        intent = await db.scalar(select(UploadIntent))
+        assert intent.folder_id == UUID(child["id"])
+        deadline, identity = intent.expires_at, (intent.file_id, intent.object_id)
+    ordinary = await client.post(f"/api/v1/folders/{parent['id']}/trash", headers=bearer(owner))
+    assert ordinary.status_code == 409
+    cancelled = await client.post(
+        f"/api/v1/folders/{parent['id']}/cancel-uploads-and-trash",
+        headers=bearer(owner),
+        json={"confirmation": "CANCEL UPLOADS"},
+    )
+    assert cancelled.status_code == 201, cancelled.text
+    assert (
+        await client.post(
+            f"/api/v1/trash/{cancelled.json()['id']}/restore",
+            headers=bearer(owner),
+            json={},
+        )
+    ).status_code == 204
+    monkeypatch.setattr(storage, "create_multipart", original)
+    before = len(storage.created)
+    retry = await client.post(ROOT + "/multipart/uploads", headers=bearer(owner), json=request)
+    assert retry.status_code == 410, retry.text
+    assert len(storage.created) == before
+    async with db_factory() as db:
+        intent = await db.get(UploadIntent, identity[0])
+        assert (
+            intent.cancelled_at
+            and intent.expires_at == deadline
+            and intent.object_id == identity[1]
+        )
+        assert await db.get(File, identity[0]) is None
+
+
+@pytest.mark.asyncio
+async def test_folder_creator_cannot_cancel_another_creators_initialization(
+    client,
+    storage,
+    monkeypatch,
+):
+    from tests.api.test_folders import create as folder
+
+    owner = await register_user(client)
+    member, _ = await add_member(client, owner)
+    parent = await folder(client, member, "Member-owned")
+
+    async def lost(ref):
+        raise StorageUnavailableError("unavailable")
+
+    monkeypatch.setattr(storage, "create_multipart", lost)
+    assert (
+        await client.post(
+            ROOT + "/multipart/uploads",
+            headers=bearer(owner),
+            json=payload(folder_id=parent["id"]),
+        )
+    ).status_code == 503
+    url = f"/api/v1/folders/{parent['id']}/cancel-uploads-and-trash"
+    assert (
+        await client.post(url, headers=bearer(member), json={"confirmation": "CANCEL UPLOADS"})
+    ).status_code == 403
+    assert (
+        await client.post(url, headers=bearer(owner), json={"confirmation": "CANCEL UPLOADS"})
+    ).status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_cancellation_between_intent_commit_and_provider_start_is_rechecked(
+    client,
+    db_factory,
+    storage,
+    monkeypatch,
+):
+    from app.services.multipart import MultipartService
+
+    owner = await register_user(client)
+    prepare = MultipartService.prepare_intent
+
+    async def cancel_after_commit(service, actor, request):
+        intent = await prepare(service, actor, request)
+        async with db_factory() as db:
+            current = await db.get(UploadIntent, intent.file_id)
+            current.cancelled_at = datetime.now(UTC)
+            await db.commit()
+        return intent
+
+    monkeypatch.setattr(MultipartService, "prepare_intent", cancel_after_commit)
+    response = await client.post(ROOT + "/multipart/uploads", headers=bearer(owner), json=payload())
+    assert response.status_code == 410, response.text
+    assert not storage.created
+
+
+@pytest.mark.asyncio
+async def test_old_unmaterialized_unknown_scope_cannot_reactivate_on_retry(
+    client,
+    db_factory,
+    storage,
+    monkeypatch,
+):
+    from sqlalchemy import select
+
+    owner = await register_user(client)
+    request = payload()
+    original = storage.create_multipart
+
+    async def lost(ref):
+        raise StorageUnavailableError("lost acknowledgement")
+
+    monkeypatch.setattr(storage, "create_multipart", lost)
+    assert (
+        await client.post(ROOT + "/multipart/uploads", headers=bearer(owner), json=request)
+    ).status_code == 503
+    async with db_factory() as db:
+        intent = await db.scalar(select(UploadIntent))
+        intent.scope_recorded = False
+        identity, deadline = intent.file_id, intent.expires_at
+        await db.commit()
+    monkeypatch.setattr(storage, "create_multipart", original)
+    response = await client.post(ROOT + "/multipart/uploads", headers=bearer(owner), json=request)
+    assert response.status_code == 409 and "unknown location" in response.text
+    assert not storage.created
+    async with db_factory() as db:
+        assert (await db.get(UploadIntent, identity)).expires_at == deadline
+        assert await db.get(File, identity) is None
+
+
+@pytest.mark.asyncio
 async def test_parts_receipts_completion_and_reconciliation(client, db_factory, storage):
     owner = await register_user(client)
     data = payload()

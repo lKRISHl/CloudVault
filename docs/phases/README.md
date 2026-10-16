@@ -1,5 +1,17 @@
 # Phase Reports
 
+## Latest completed phase
+
+- [Phase 16 — Redis and Background Jobs](phase16.md): maintenance queues, bounded stage
+  rotation, operator backlog health and reference reconciliation/cancellation implemented;
+  queued previews/static video posters, actual decoder/container/broker restart/prefork kill/
+  real-clock recovery, PostgreSQL/local provider cleanup and Phase16-only browser checks pass.
+
+- [Phase 15 — Bounded File Preview](phase15.md): unit/SQLite/frontend and container/native/live
+  API/provider smokes pass; PostgreSQL/provider baseline passes 306 tests. Deferred browser
+  acceptance is now complete: 22/22 Chromium journeys and 105 frontend tests pass after a
+  shared-cache navigation fix. Lint/build and test-data cleanup pass.
+
 Keep completed phase explanations in this folder, named `phase<N>.md`, such as
 `phase2.md` and `phase3.md`. Added stages use lowercase suffixes, such as `phase2a.md`,
 `phase2b.md`, and `phase25a.md`. Create a report after implementing and testing its phase;

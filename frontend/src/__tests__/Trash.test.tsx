@@ -62,3 +62,30 @@ it('moves a managed resource to recoverable trash and reports errors', async () 
   await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Move Project to trash' })); });
   expect(api.moveToTrash).toHaveBeenCalledWith('folders', 'folder');
 });
+
+it('invalidates trash loaded during navigation when a late move finishes after unmount', async () => {
+  let finish!: (value: TrashEntry) => void;
+  vi.spyOn(api, 'moveToTrash').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const { cache, unmount } = show(<TrashButton kind="files" id="file" name="Report.pdf" />);
+  await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Move Report.pdf to trash' })); });
+  unmount();
+  const key = ['trash', 'workspace', 'me', 0];
+  cache.setQueryData(key, { items: [], offset: 0, has_more: false });
+  expect(cache.getQueryState(key)?.isInvalidated).toBe(false);
+  await act(async () => { finish(entry); });
+  expect(cache.getQueryState(key)?.isInvalidated).toBe(true);
+});
+
+it('invalidates files loaded during navigation when a late restore finishes after unmount', async () => {
+  let finish!: () => void;
+  vi.mocked(api.restoreTrash).mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+  const { cache, unmount } = show();
+  await screen.findByText('Report.pdf');
+  await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Restore Report.pdf' })); });
+  unmount();
+  const key = ['files', 'workspace', 'me', null, 0];
+  cache.setQueryData(key, { items: [], offset: 0, has_more: false });
+  expect(cache.getQueryState(key)?.isInvalidated).toBe(false);
+  await act(async () => { finish(); });
+  expect(cache.getQueryState(key)?.isInvalidated).toBe(true);
+});

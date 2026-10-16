@@ -1,60 +1,122 @@
 # CloudVault — Current State
 
-Current Phase:
-Phase 14B — Core Library Movement and Recovery (locally complete)
+Current Phase: Phase 16 — Redis/Background Jobs, implemented and locally verified 2026-10-16.
+Phase 15's previously deferred work is also completed and locally verified 2026-10-16:
+22/22 Chromium journeys, 105 frontend tests, lint/build and disposable cleanup pass.
+A navigation race in shared Trash/file cache invalidation was fixed and regression-tested.
+No Phase 17 work yet. Both phase reports are current; no browser deferral remains.
+Project: D:\CloudVault-Dev\Project\CloudVault. Source/application schema: 019_preview_jobs.
+Last commit: a933798 (Phase 14B); Phase 15/16 changes remain uncommitted. No push/remote CI.
 
-Status:
-Implemented and locally verified 2026-10-15. Phase 14A committed as 98a4a70; Phase 14B implementation and verification are included in this handoff commit. Development DB/image verified at 016_library_recovery. Docker/WSL intentionally stopped after verification to save RAM; localhost:3000 is offline until restarted. No push/remote CI. Project remains D:\CloudVault-Dev\Project\CloudVault.
+## Completed Phase 16 scope
 
-Completed Work:
-- Earlier account/email/session, workspaces/membership, hierarchy/files, storage, transfers/resume/cleanup, search, sharing, ACLs, trash, immutable versions and version multipart/resume/cancel/pruning remain implemented. Historical reports: docs/phases/phase2.md through phase14a.md.
-- L05: completed-file moves require creator/manager authority, writable source/destination parents and matching expected source_folder_id under tenant serialization. Location changes revoke links; immutable object/version identity, current generation, bytes and resource-local grants stay unchanged. Foreign/private/read-only/stale/name-conflict paths fail safely.
-- L06: restore to the original parent or an explicitly selected active writable destination/name. Original readable trash authority remains mandatory. Root move/name and clearing only that batch commit atomically; older independent trash remains trash. Full subtree height, cycles, mixed creators, conflicts and irreversible purge protect recovery.
-- L07: normal trash still blocks pending original uploads. A separate CANCEL UPLOADS confirmation cancels up to 100 tracked live pending File records with folder trash atomically; mixed creators require managers. upload_cancelled_at/aborted state denies later grants/completion even after restore. Existing capabilities retain their deadline; refs remain for safe original/trash cleanup. Pending refs block completed purge until absence is confirmed; retries catch late bytes.
-- L08: no-session legacy metadata offers DISCARD with creator/manager/writable-parent authority. Only pending rows without object/version/intent refs can be tombstoned; the row stays retained and its live name becomes reusable. Contradictory references fail closed, tracked as L37.
-- Migration 016 adds nullable pending-only File.upload_cancelled_at and permits no-reference legacy cleanup tombstones. Existing rows/snapshots preserved. Any cancellation/discard marker guards downgrade, even after cleanup; use a pre-upgrade backup for unrepresentable rollback.
-- Browser destination picker uses 25-record pages; moves carry expected source, restore supports new destination/name, cancellation/discard require explicit confirmations and cancelled records hide retry/resume. Scoped caches refresh affected views. Browser helper stability fixes preserve all assertions: navigation/page activation, bounded email wait, large fixtures from D and outage teardown before successful cancellation.
+- Celery Beat and separate JSON-only email/storage/preview queues; persistent capped Redis.
+- PostgreSQL UUID leases/fencing, durable six-stage storage rotation committed before I/O,
+  provider-bound orphan cursors and safe operator execution/stage/backlog health.
+- L37 retained intent folder/scope/cancellation, subtree cancellation/stale-retry invalidation,
+  paged DB-operator diagnostics, explicit bounded retirement and verified snapshot adoption.
+  Original deadlines/exact references survive errors and remain available for late writes.
+- L38 requester/tenant/version/generation-bound queued previews, private S3 derivatives,
+  cancellation/publication fencing, bounded retries and retained-reference cleanup.
+- Actual credential-free, network-disabled, read-only constrained FFmpeg renderer for bounded
+  static MP4/WebM posters. No moving playback, native host fallback or scan certification.
+- AWS S3 selected (ADR-037); unversioned immutable-key release policy retained. Actual AWS
+  resources/credentials/spending were not provisioned. Production verification stays 26/31.
 
-Important Files:
-- docs/phases/phase14b.md, docs/LIMITATIONS_BACKLOG.md, DEVELOPMENT_PLAN.md and ADR-034 in DECISIONS.md.
-- backend/app/services/files.py, trash.py, trash_cleanup.py, uploads.py, multipart.py; models/file.py, schemas/files.py, schemas/trash.py, api/files.py and api/trash.py.
-- backend/migrations/versions/016_library_recovery.py; tests/api/test_library_recovery.py, test_library_recovery_integration.py and test_library_recovery_migration.py.
-- frontend/src/features/folders/DestinationPicker.tsx, FileRecoveryActions.tsx, FileList.tsx; features/trash/TrashPage.tsx, TrashButton.tsx; services/api.ts and types/index.ts.
-- frontend/src/__tests__/LibraryRecovery.test.tsx, e2e/library-recovery.pw.ts, multipart.pw.ts, versions.pw.ts and workspaces.pw.ts; scripts/upload_smoke.py.
+## Verification and evidence
 
-Verification Passed:
-- Full backend: 286 SQLite tests (429.13s) and 286 PostgreSQL tests (437.45s), including disposable real MinIO and migration cases. A final legacy-snapshot fail-closed guard was then added; all 15 recovery API/provider cases pass again on SQLite (13.55s) and PostgreSQL (16.50s). The full collection was not rerun after that guard.
-- Actual provider tests preserve moved/recovered native bytes, filename/version/object identity; cover basic and multipart pending cancellation, an issued basic PUT arriving after cancellation, safe deadline waiting and confirmed exact-key abort/delete absence without affecting completed content.
-- API checks cover creator/manager/editor/foreign/private/read-only boundaries, concurrent moves, stale source, conflicts/rollback, original-parent absence, older independent trash, depth 64, mixed creators, cancel/complete and restore/purge races, 100-pending bound, legacy intent/snapshot refusal, tombstones and name reuse.
-- Migration tests seed old-schema legacy rows, preserve data through upgrade/empty downgrade/re-upgrade, verify schema alignment and refuse cancellation/discard history loss. Earlier version/history migration checks remain green.
-- 93 frontend tests pass. Final ESLint, TypeScript/Vite, Ruff and whitespace pass. Controls cover expected-source conflict, DISCARD/CANCEL confirmations, destination paging/read-only selection and renamed explicit restore.
-- All 21 Chromium/SMTP/storage journeys pass in the final full run (1.2m). New journey verifies moved/recovered bytes, cancellation and restored cancelled-state controls/mobile. Earlier attempts had intermittent navigation/input/transport failures; helpers now activate identity pages, wait for navigation/email, use large version files on D and end simulated storage outages before cancellation. Assertions remain intact.
-- Docker rebuild/start, private bucket/mc/adapter/HTTP and SMTP/transfers/search/sharing/ACL/version/movement/renamed-recovery/cancel-folder/trash smoke pass. Verified 016_library_recovery has no schema drift; maintenance checked four trash batches. Eight services were running/healthy before intentional shutdown to save RAM.
-- Ignored pre-upgrade backup .local/backups/cloudvault-before-phase14b.sql (140348 bytes); earlier backups preserved. Owned cloudvault_phase14b_* PostgreSQL test database dropped, browser bucket removed and no .local/e2e-storage.json remains. No destructive fixture used application data. Unique smoke data remains in development storage.
-- Evidence: .local/phase14b-sqlite.log, phase14b-postgres.log, phase14b-final-recovery-sqlite.log, phase14b-final-recovery-postgres.log, phase14b-migration.log, phase14b-frontend.log, phase14b-browser-final.log, phase14b-eslint-final.log, phase14b-build-final.log, phase14b-ruff-final.log, phase14b-docker-build.log, phase14b-docker-smoke.log, phase14b-upload-smoke.log, phase14b-live-schema.log, phase14b-maintenance.log, phase14b-services.log and phase14b-shutdown.log. Expiry tests inject time; no real-duration retention, remote CI or production/load/security certification.
+- Affected backend milestone: 127 passed, one host-FFmpeg skip. 103 frontend tests, lint/build
+  passed at that milestone. Latest Phase15 completion adds two frontend regression cases:
+  all 105 tests pass. Successful Trash mutations now invalidate shared caches after unmount.
+- Full new PostgreSQL/local-provider suite: 357 passed, four failed, one host-FFmpeg skip,
+  698.55s. Two obsolete migration expectations were fixed (legacy unknown-scope fixture and
+  current-head assertion). Two were Windows MemoryError/Argon2 allocation failures. A leaked
+  test transaction caused by failed session.close was terminated only in its disposable DB
+  to release teardown. Never describe this original full run as all green.
+- Focused rerun of all four failures, neighboring upload case and two new actual-provider
+  cleanup cases: seven passed in 66.67s after stopping unused test services. Final provider
+  rerun: two passed in 4.60s, including real Enabled/Suspended bucket refusal.
+- Real PostgreSQL 016–019 upgrade, legacy intent preservation, model alignment, downgrade and
+  re-upgrade pass in a separate owned DB. Initial suite DBs were confirmed removed.
+- Actual renderer isolation/generated PNG/PDF/MP4, queued API/S3 current PDF/historical PNG/
+  static poster and real queued SMTP/Mailpit round trips pass. Host FFmpeg skip remains;
+  actual video decoding was proved inside the constrained container.
+- Final live Redis AOF restart, actual prefork-child SIGKILL during provider I/O, committed
+  cursor/lease retention and actual 240-second lease expiry/recovery pass. All six stages
+  progress; bounded passes remove objects for 12 seeded expired refs across two tenants,
+  retaining exact refs. Final all-job/all-stage health is healthy. This is no load benchmark.
+- Phase16-only Chromium journey: one passed in 18.7s, using actual queues/provider/renderer:
+  verify, upload, stop preview worker, cancel known queued job (DELETE 200), restart worker,
+  refresh to static poster, inert/mobile display. No fixture dispatcher/mocked responses.
+- Ruff, Compose static validation and final frontend ESLint pass.
+- Evidence: .local/phase16-live-preview.log, phase16-postgres-migrations.log,
+  phase16-postgres-full.log, phase16-postgres-rerun.log, phase16-provider-final.log,
+  phase16-live-queue.log, phase16-live-health.log, phase16-browser.log,
+  phase16-acceptance-eslint.log, phase16-test-cleanup.log, phase16-app-restore.log.
+- Earlier observer/container interruptions are not successful recovery evidence. The final
+  scenario independently passed. All acceptance DBs/buckets/volumes were separate from app
+  data. The owned acceptance project/volumes were removed with its validated manifest.
 
-Limitations requiring explicit work:
-- L05–L08 close locally for the documented tracked/no-reference scope. L37 is new: contradictory legacy intent/version refs require safe operator diagnostics/adoption/cleanup before retirement. Unmaterialized initialization intents stay in existing exact-key maintenance, outside tracked folder File cancellation. Phase 16 adds folder-scoped discovery/cancellation and stale-init retry invalidation after trash/recovery; Phase 26 verifies chosen-provider failures/lost ACK/late writes and no dropped refs. Active trashed parents already reject allocation. This follow-up is automatically included at those checkpoints.
-- Next due L09: Phase 15 safe bounded preview/detected-type handling, then Phase 17 quarantine/scanning. Existing bytes/declared MIME/attachment responses do not establish safe content.
-- L04/L19 aggregate quota/current/history/trash/pending reconciliation remains 19; L21/L36 and complete movement/recovery/cancellation audit/metadata retention remain 20. Per-file accounting/minimal events/tombstones do not close those checks.
-- L15 realtime/cross-tab/cache coordination remains 18; L17/L18 navigation/rich search/pagination remain 22A. Destination pages shift under concurrent changes. Source location checks are optimistic; users refresh conflicts. Resource grants remain attached when containing-folder visibility changes.
-- L20/L22–L25/L33 provider lifecycle/fairness/real-clock verification, maintained production storage/IAM/encryption/CORS/lifecycle, job/backlog health, paired backups and representative worker/tenant-lock/deep-tree/100-pending workloads remain 16/26/27/28/31/32. No throughput benchmark. Application versions require unversioned buckets; Enabled/Suspended maintenance fails closed.
-- L01 remote CI stays immediate/open pending separately authorized push/dispatch with evidence tied to the tested commit. Production SMTP, MFA, abuse/security/cross-browser/provider/load, deployment/monitoring and paired DB/object restore gates remain assigned/open.
-- D constraints remain: issued URLs/received bytes cannot be recalled; cancellation/queued purge cannot be undone; byte reclamation waits safe provider proof; cleanup refs/organization data remain retained. Ordinary original/version multipart limits/deadlines/grace/part boundaries and uploader controls remain. Full metadata erasure/legal compliance is not claimed.
-- L37 is the new assigned follow-up; no additional unassigned gap identified. Earlier sharing/ownership/search/product-decision gaps retain their checkpoints in the register. Every phase must review and carry them explicitly.
+## Operation
 
-Operation:
-- Docker/WSL are stopped to save RAM. Start Docker Desktop, then docker compose up -d from this folder when using the app/testing. Use docker compose up --build -d after source changes. Open http://localhost:3000/app/folders. Stop the stack/quit Docker when finished; volumes/data are preserved.
-- Back up before direct alembic upgrade head (016_library_recovery); Docker startup migrates. Cancellation/discard history guards downgrade. Restore a pre-upgrade backup for unrepresentable rollback; object backups are separate. Never commit credentials/dumps/test manifests.
-- Use Move on managed completed files; Restore elsewhere for changed location/name; CANCEL UPLOADS for tracked pending folder transfers; DISCARD only for no-reference legacy metadata. Restore cannot resume cancelled uploads. Keep dispatcher/cleanup running while the app is active; provider lag may delay reclamation.
-- Run python scripts/docker_smoke.py and python scripts/upload_smoke.py after starting services. Destructive tests must use disposable databases/buckets, never app data. Failed browser teardown uses matching TEST_S3 settings and scripts/account_e2e_stack.py --cleanup-storage.
-- Docker WSL cap is 4 GB; separate image builds from full DB/browser workloads. Project/Codex/Docker data remain on D; shared Windows/system temp may still use C.
+Normal CloudVault services are restored at http://localhost:3000. App schema was already
+019 before restoration; it was not downgraded or targeted by tests. Fresh ignored backup:
+.local/backups/cloudvault-before-phase16-app-restore-20261016.sql (174758 bytes).
+This is an existing-019 backup, not a pre-017 backup. Earlier pre-upgrade backups remain.
+Phase16 restored-app UI/API/private-storage smoke and email/previews/storage health all passed;
+all six normal storage stages refreshed at that checkpoint. Evidence: .local/phase16-app-smoke.log and
+.local/phase16-app-health.log.
+Storage health can warm up for a six-stage rotation (about six minutes at the normal
+60-second schedule). Keep workers/Beat with the app; don't run legacy loops alongside them.
+Back up before future upgrades. Guarded lossy downgrade requires a suitable pre-upgrade
+backup; object backup/restore is separate. Never commit credentials/dumps/manifests.
 
-Next Exact Phase:
-Phase 15 — File Preview, including L09 safe preview/detected-type acceptance. Phase 16 automatically includes L37 and its other due limitation/provider decisions. Do not advance with unfinished assigned checks.
+Docker socket recovery previously required the user's ordinary Windows PowerShell rename
+of the stale docker-secrets-engine folder; Codex got OS access denied. Do not reset Docker,
+unregister WSL, prune app volumes or rewrite ACLs. WSL cap remains 4 GB; run heavy suites
+sequentially. Windows reported paging-file/allocation errors while Firefox used about 2 GB;
+free unused apps before heavy testing. Do not close unrelated apps without authorization.
 
-Standing user instruction:
-An ordinary "continue" includes the scheduled step's limitation fixes and acceptance checks automatically. Every numbered/lettered phase report must include "Limitations requiring explicit work" with inherited/new IDs, behavior/impact, tasks, checkpoint and evidence, synchronized with the roadmap/register/CONTINUE. Keep genuine external dependencies explicit while completing independent work. No background execution, push/deploy/spending/destructive-data authorization is implied.
+## Next exact action
 
-Last Commit:
-98a4a70 — Complete Phase 14A version transfers and retention lifecycle. Phase 14B implementation and verification are included in this handoff commit.
+Review/commit Phase 15/16 work when requested, then continue Phase 17 with its due limitations.
+The user explicitly resumed Phase15 verification. Its fresh complete suite passed 22/22
+in 2.3m, including previews and the large-version full-byte length/SHA-256 check. The initial
+resumed run exposed a rapid-navigation Trash cache race; it is fixed, with two unit cases.
+Full frontend: 105 passed in 56.71s; lint/build pass. No backend change or new migration.
+The old bucket manifest and final unique browser bucket were cleaned. Both prior disposable
+PG databases are absent; current temp SQLite data was removed after all test listeners exited.
+Evidence: .local/phase15-browser-final-complete.log, phase15-completion-frontend.log,
+phase15-completion-eslint.log, phase15-completion-build.log, phase15-prior-browser-cleanup.log,
+phase15-completion-docker-build.log, phase15-completion-app-restore.log and
+phase15-completion-app-smoke.log. The rebuilt frontend includes the fix; app volumes remain.
+After Phase15 restoration, UI/API/private storage smoke passes and email/previews are healthy.
+Storage is running and refreshing stale stage observations on its normal six-minute rotation;
+see .local/phase15-completion-job-health.log. No worker logic changed in this completion.
+
+## Limitations requiring explicit work
+
+- L20/L25/L37/L38 Phase16 local scope passes. Actual AWS/provider outage/replay and long
+  lifecycle windows stay 26/31; decoder/security/abuse review 27; representative load 32.
+- L22/L23/P04: AWS selection and local unversioned/refusal policy complete; AWS compatibility,
+  IAM/encryption/public-access/CORS/lifecycle/paired restore remain deployment gates. Issued
+  capabilities/received bytes cannot be recalled; delivery/revocation review stays 27.
+- L09 Phase15 local preview checkpoint passes; scanning/quarantine remains Phase17.
+- L19 quota/reservations/derivative/ambiguous-write accounting is Phase19. L21/L36 audit and
+  retained job/ref metadata policy is Phase20. Realtime is 18; navigation/rich search is 22A.
+- L25 API readiness remains DB-only; feature-aware probes/alerts are Phase28. Retained intent
+  counts are recheck populations, not orphan-byte or purge proofs. No production benchmark.
+- L01 remote CI awaits separately authorized push/dispatch tied to the tested commit. SMTP,
+  MFA, maintained storage deployment, security, monitoring, paired restore and other L24–L35
+  gates keep their recorded checkpoints. Community MinIO is local development only.
+- Bounds remain explicit: preview source 10 MiB, image 16M pixels, PNG 1600 edge/1 MiB,
+  PDF 1000 source/100 browseable pages, text 65,536 characters, video 120s/H264/VP8/VP9 and
+  bounded 4K pixels. Cancellation/expiry retain refs and delay byte cleanup; no scan guarantee.
+- D01–D08 retain capability/SMTP ambiguity, transfer/hierarchy, serialization, cleanup-delay,
+  guarded rollback/metadata and platform constraints. See docs/LIMITATIONS_BACKLOG.md.
+
+Standing user instruction: ordinary continue automatically includes all due assigned limitations,
+implementation and acceptance. Every phase report must record inherited/new IDs, actual evidence
+and future checkpoints, synchronized with roadmap/register/CONTINUE. Don't advance past unfinished
+acceptance. The previous Phase15 browser deferral is now closed. No automatic commit/push, external
+spending or destructive application-data authorization is implied.

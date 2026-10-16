@@ -1,0 +1,36 @@
+# Dedicated disposable project. Never use this override with the application project name.
+x-test-environment: &test-environment
+  DATABASE_URL: postgresql+asyncpg://cloudvault:cloudvault@postgres:5432/phase16_acceptance
+  S3_PUBLIC_ENDPOINT: http://127.0.0.1:49916
+  FRONTEND_URL: http://127.0.0.1:43916
+  CORS_ORIGINS: '["http://127.0.0.1:43916"]'
+  UPLOAD_CLEANUP_INTERVAL_SECONDS: "5"
+  JOB_LEASE_SECONDS: "240"
+
+services:
+  postgres:
+    ports: !override ["127.0.0.1:45916:5432"]
+    environment:
+      POSTGRES_DB: phase16_acceptance
+  redis:
+    ports: !reset []
+  minio:
+    ports: !override ["127.0.0.1:49916:9000"]
+    environment:
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://127.0.0.1:43916"
+  mailpit:
+    ports: !override ["127.0.0.1:48916:8025"]
+  backend:
+    ports: !reset []
+    environment: *test-environment
+  email-worker:
+    environment: *test-environment
+  upload-cleanup:
+    environment: *test-environment
+  preview-worker:
+    environment: *test-environment
+  job-scheduler:
+    environment:
+      UPLOAD_CLEANUP_INTERVAL_SECONDS: "5"
+  frontend:
+    ports: !override ["127.0.0.1:43916:80"]

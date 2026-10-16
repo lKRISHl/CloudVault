@@ -168,6 +168,9 @@ async def test_multipart_migration_preserves_basic_data_and_guards_part_records(
                     storage_bucket="cv-preserved",
                     fingerprint="a" * 64,
                     expires_at=datetime.now(UTC) + timedelta(hours=1),
+                    # Exercise the original intent guard with a legacy unknown-scope row.
+                    # Scoped Phase 16 rows correctly trigger migration 018's earlier guard.
+                    scope_recorded=False,
                 )
             )
             await db.commit()

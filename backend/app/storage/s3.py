@@ -12,6 +12,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from app.core.config import Settings
 from app.storage.base import (
     MAX_INTERNAL_BYTES,
+    MAX_PROCESSING_BYTES,
     MultipartNotFoundError,
     ObjectConflictError,
     ObjectInfo,
@@ -110,9 +111,14 @@ class S3ObjectStorage:
         )
 
     async def read_small(self, ref: ObjectRef, max_bytes: int = MAX_INTERNAL_BYTES) -> bytes:
-        key = self.key(ref)
         if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_INTERNAL_BYTES:
             raise ValueError("Internal object reads require a limit from 1 byte to 1 MiB")
+        return await self.read_for_processing(ref, max_bytes)
+
+    async def read_for_processing(self, ref: ObjectRef, max_bytes: int) -> bytes:
+        key = self.key(ref)
+        if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_PROCESSING_BYTES:
+            raise ValueError("Processing reads require a limit from 1 byte to 16 MiB")
         info = await self.head(ref)
         if info.size_bytes > max_bytes:
             raise ValueError("Object exceeds the internal read limit")

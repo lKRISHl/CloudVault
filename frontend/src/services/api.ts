@@ -4,6 +4,7 @@ import type { ShareLink } from '../types';
 import type { TrashEntry } from '../types';
 import type { VersionPage, VersionStart, VersionTicket } from '../types';
 import type { VersionMultipartTicket } from '../types';
+import type { PreviewJob, PreviewResult } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -130,7 +131,33 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
   return data;
 }
 
+function previewDelay(signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); reject(new DOMException('Preview cancelled', 'AbortError')); };
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve(); }, 1500);
+    if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, { once: true });
+  });
+}
+
+async function queuedPreview(id: string, version_id: string | null, page: number, signal?: AbortSignal): Promise<PreviewResult> {
+  const base = `${API_V1}/files/${id}/preview-jobs`;
+  let job: PreviewJob | undefined;
+  try {
+    job = await fetchApi<PreviewJob>(base, { method: 'POST', body: JSON.stringify({ version_id, page, request_id: crypto.randomUUID() }), signal });
+    for (let poll = 0; poll < 600; poll += 1) {
+      if (job.state === 'ready' && job.preview) return job.preview;
+      if (job.state === 'failed' || job.state === 'cancelled') throw new Error('Preview failed, expired or cancelled. Refresh to try again.');
+      await previewDelay(signal);
+      job = await fetchApi<PreviewJob>(`${base}/${job.id}`, { signal });
+    }
+    throw new Error('Preview wait expired. Refresh to try again.');
+  } finally {
+    if (signal?.aborted && job) void fetchApi(`${base}/${job.id}`, { method: 'DELETE' }).catch(() => {});
+  }
+}
+
 export const api = {
+  preview: (id: string, version_id: string | null, page = 0, signal?: AbortSignal) => queuedPreview(id, version_id, page, signal),
   startVersionMultipart: (id: string, payload: VersionStart & { part_size: number; checksums: string[] }, signal?: AbortSignal) => fetchApi<VersionMultipartTicket>(`${API_V1}/files/${id}/versions/multipart`, { method: 'POST', body: JSON.stringify(payload), signal }),
   versionProgress: (id: string, version: string, signal?: AbortSignal) => fetchApi<VersionMultipartTicket>(`${API_V1}/files/${id}/versions/${version}/progress`, { signal }),
   resumeVersion: (id: string, version: string, checksums: string[], signal?: AbortSignal) => fetchApi<VersionMultipartTicket>(`${API_V1}/files/${id}/versions/${version}/resume`, { method: 'POST', body: JSON.stringify({ checksums }), signal }),

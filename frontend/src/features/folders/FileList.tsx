@@ -44,6 +44,7 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
       <p>Declared type: {file.declared_content_type ?? 'Type unspecified'}</p>
       <p>{file.can_write ? 'Creator or manager access' : 'Read only'}</p>
       {file.status === 'uploaded' && <DownloadButton id={file.id} name={file.name} />}
+      {file.status === 'uploaded' && <Link className="secondary-button ml-3" to={`/app/files/${file.id}/preview`} aria-label={`Preview ${file.name}`}>Preview</Link>}
       {file.status === 'uploaded' && <Link className="secondary-button ml-3" to={`/app/files/${file.id}/versions`} aria-label={`Versions of ${file.name}`}>Versions</Link>}
       {file.status === 'uploaded' && file.can_manage && <Link className="secondary-button ml-3" to={`/app/files/${file.id}/shares`} aria-label={`Share ${file.name}`}>Share</Link>}
       {file.can_manage && <Link className="secondary-button ml-3" to={`/app/permissions/files/${file.id}`} aria-label={`Permissions for ${file.name}`}>Permissions</Link>}

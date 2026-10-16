@@ -25,8 +25,7 @@ function Trash() {
       if (purge) await api.purgeTrash(id, confirmation);
       else if (destination !== undefined) await api.restoreTrash(id, { use_original: false, destination_id: destination, name: restoreName });
       else await api.restoreTrash(id);
-      if (!alive.current) return;
-      setSelected(null); setConfirmation(''); setRestoreId(null);
+      if (alive.current) { setSelected(null); setConfirmation(''); setRestoreId(null); }
       await cache.invalidateQueries({ predicate: entry => ['trash', 'files', 'folders', 'file-search', 'shares', 'permissions', 'folder-destination'].includes(String(entry.queryKey[0])) });
       if (alive.current) setMessage(purge ? 'Permanent deletion queued. Restoration is disabled; storage cleanup may take time.' : 'Restored with its original permissions. Older independent trash stays in trash.');
     } catch (failure) { if (alive.current) setError(failure instanceof Error ? failure.message : 'Trash operation failed'); }

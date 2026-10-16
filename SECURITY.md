@@ -149,3 +149,42 @@ Phase 14A multipart replacements commit candidate/part declarations before provi
 Completed-file moves require creator/manager authority, live file/all-ancestor read, writable source/destination parents and expected current source location under tenant serialization. Namespace conflicts roll back; location changes revoke links and keep immutable object/version keys. Restore elsewhere requires current readable trash creator/manager authority and a writable active destination. Folder recovery checks all creators, full subtree height/cycles and conflicts; only that batch restores. Purge state/expiry still blocks restoration. Existing bytes/issued URLs cannot be recalled, and resource-local grants survive movement/recovery.
 
 Folder cancellation is separately confirmed with CANCEL UPLOADS, limits cancellation to 100 live pending records and requires managers for mixed creators. upload_cancelled_at/aborted state commits with trash before any provider effect. After restore, retry/grants/completion remain denied. Existing PUT/part capabilities can still write, so pending cleanup retains exact refs and original expiry/grace/settle, verifies provider abort/delete absence and retries late writes. Legacy DISCARD requires no object/version/intent reference, preserves tombstone metadata and releases the live name; contradictory refs fail closed. Metadata/cancellation markers prevent unsafe downgrade. No immediate byte reclamation, aggregate quota, full audit, scan, load or erasure certification is implied; production/remote-CI gates remain open.
+
+## Preview boundaries (Phase 15, locally verified)
+Declared MIME/extensions are untrusted. Completed retained versions require current membership/file/ancestor access, matching provider HEAD and conditional bounded read/full basic or composite digest, with live authority/version rechecks after processing. Strict UTF-8 text is escaped; format controls are exposed. Native image/PDF input becomes fresh static PNG in a separate network-disabled credential-free read-only non-root renderer, with dropped capabilities/no-new-privileges and job/resource/output/time bounds. No raw active PDF/HTML/SVG/video embeds or API host native fallback. Responses are no-store/nosniff/sandboxed; transient browser blobs are revoked on leaving. Received pixels/text cannot be recalled after access is revoked.
+
+Unscanned is the only scan label. Parsing/detection/checksums are not quarantine, malware scanning or a safety certificate; Phase 17 must implement release policy. Oversized/unsupported/malformed content uses explicit failure/download fallback. L38 assigns bounded video/queued jobs and stale-result invalidation to 16/26; decoder sandbox/patching and abuse/capacity reviews remain 27/32. Direct Windows API native previews need isolated deployment. Actual container restrictions/native/live API/provider smokes now pass scripts/preview_smoke.py. Final PostgreSQL/provider regression now passes 306 tests; the final browser rerun still requires Docker recovery; these smokes are not independent security certification. The E2E fixture renderer is explicitly test-only and must never become production host fallback. See docs/phases/phase15.md.
+
+## Phase 16 queue boundary (locally verified)
+Maintenance messages are argument-free JSON on private Redis queues, without account tokens, recipients, file bytes or presigned URLs. Disable pickle, remote control, task results/events; use separate email/storage/previews workers and a scheduler without application credentials. Durable ownership leases fence stale metadata completion; resource-level locks/deadlines and provider absence proof still govern byte deletion. Sanitized retry exceptions suppress sensitive cause tracebacks. Redis is localhost-bound for development, AOF-backed and capped with no-eviction backpressure; local broker restart and actual prefork crash/real-clock lease recovery pass. Production authentication/TLS/IAM/network policy and AWS failure certification remain open. Operator probes/aggregate backlog ages and per-stage failures supplement execution health; none establish delivery or byte removal. No tenant IDs, keys or payloads are output by health probes. API feature readiness and production alerts remain pending. AWS S3 was chosen; versioning/Object Lock remain disabled under existing cleanup limitations. Actual local Enabled/Suspended cleanup refusal passes. No independent security or production certification is claimed.
+
+Reference reconciliation is a separate trusted DB-operator CLI, with no public route.
+Read-only inventories contain private exact object identities; do not publish their output.
+Mutations require an explicit apply flag and matching file UUID; cancellation commits before
+provider work and preserves deadlines/refs. Retirement refuses retained completed content,
+changed buckets, cross-tenant contradictions and versioned providers. Adoption additionally
+requires an active verified workspace owner/admin, live folder access and matching retained
+provider metadata, and refuses trashed/cancelled/retired/pruned/purged sources. Normal history
+and share invalidation apply. A DB operator can impersonate identities by changing data;
+this command is not a substitute for protecting DB credentials or production audit controls.
+Historical unmaterialized unknown-scope intent retries fail closed. Migration 018 guards
+rollback that would lose recorded scope/cancellation. Real PG/local-provider failure/late-write
+checks pass; AWS certification and independent security review remain open.
+
+Queued previews keep raw PNG/UTF-8 derivatives only in private S3, under server-generated
+immutable identities retained before provider writes. No public derivative grants are issued.
+Requester/tenant/current membership, ancestor/file access, prune/trash and optional current
+generation are rechecked before publication and before/after every result read; derivative
+digests are verified. Lease tokens/expiry and cancellation fence stale publication. Cleanup
+waits fixed deadlines and keeps references even after confirmed absence; versioned/changed
+providers fail closed. Creation/cancel/poll limits are documented in docs/phases/phase16.md;
+they are not aggregate storage or abuse certification. Quota/accounting remains L19 in 19.
+
+FFmpeg/FFprobe run only in the credential-free renderer target, with allowed protocols,
+disabled MOV external references, codec/duration/pixel/decode limits, bounded temporary
+storage and process-group termination. Static posters are not playback or a malware safety
+certificate. Native tool contract tests use mocks; the ordinary host fixture skips without
+tools. Actual owned-video decoding passed inside the constrained container, alongside local
+provider/restart and dedicated browser checks. Independent security/load and AWS reviews remain
+required. Phase 15's separate full browser suite subsequently passed 22/22 after the user
+resumed it; generated-fixture browser rendering is not independent isolation certification.

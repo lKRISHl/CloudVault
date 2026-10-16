@@ -263,6 +263,31 @@ async def test_signed_download_is_scoped_attachment_and_header_safe(storage):
 
 
 @pytest.mark.asyncio
+async def test_processing_reads_are_bounded_conditional_and_tenant_scoped(storage):
+    from app.storage.base import MAX_PROCESSING_BYTES
+
+    ref = reference(storage)
+    body = b"p" * (MAX_INTERNAL_BYTES + 1)
+    stream = StreamingBody(io.BytesIO(body), len(body))
+    with Stubber(storage.client) as stub:
+        stub.add_response(
+            "head_object",
+            {"ContentLength": len(body), "ETag": '"verified"', "LastModified": datetime.now(UTC)},
+        )
+        stub.add_response("get_object", {"Body": stream}, {
+            "Bucket": storage.bucket, "Key": ref.key,
+            "Range": f"bytes=0-{len(body)}", "IfMatch": '"verified"',
+        })
+        assert await storage.read_for_processing(ref, len(body)) == body
+        assert stream._raw_stream.closed
+    for maximum in (0, True, MAX_PROCESSING_BYTES + 1):
+        with pytest.raises(ValueError):
+            await storage.read_for_processing(ref, maximum)
+    with pytest.raises(ValueError, match="storage tenant"):
+        await storage.read_for_processing(ObjectRef(uuid4(), ref.file_id, ref.object_id), 10)
+
+
+@pytest.mark.asyncio
 async def test_multipart_grants_and_operations_preserve_scope(storage):
     from urllib.parse import parse_qs, urlsplit
 

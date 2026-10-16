@@ -154,11 +154,24 @@ export interface FileMetadata {
   can_write: boolean;
 }
 
+export interface PreviewResult {
+  kind: 'image' | 'pdf' | 'video' | 'text' | 'unsupported';
+  file_id: string; version_id: string; version_number: number; generation: number; name: string;
+  detected_type: string | null; scan_status: 'unscanned'; image_base64: string | null;
+  text: string | null; reason: string | null; width: number | null; height: number | null;
+  page: number; pages: number; truncated: boolean;
+}
+
 export interface FilePage {
   items: FileMetadata[];
   offset: number;
   limit: number;
   has_more: boolean;
+}
+
+export interface PreviewJob {
+  id: string; state: 'queued' | 'running' | 'ready' | 'failed' | 'cancelled';
+  expires_at: string; preview: PreviewResult | null;
 }
 
 export interface FileSearchQuery {

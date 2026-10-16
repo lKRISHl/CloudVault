@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.pw.ts',
+  // This journey has its own real-queue stack/configuration and manifest.
+  testIgnore: '**/phase16.pw.ts',
   workers: 1,
   globalTeardown: './e2e/storage-teardown.ts',
   timeout: 45000,

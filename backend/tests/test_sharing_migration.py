@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -106,7 +107,7 @@ async def test_sharing_upgrade_alignment_preservation_and_guarded_rollback(tmp_p
         async with engine.connect() as conn:
             assert (
                 await conn.scalar(text("SELECT version_num FROM alembic_version"))
-                == "016_library_recovery"
+                == ScriptDirectory(str(backend / "migrations")).get_current_head()
             )
     finally:
         await engine.dispose()

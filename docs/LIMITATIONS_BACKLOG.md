@@ -1,9 +1,19 @@
 # CloudVault — Limitations and Closure Schedule
 
-Reviewed 2026-10-15 against the phase reports currently present (2, 2A, 2B, 3–14B),
+2026-10-16 update: the user resumed Phase 15's deferred verification; 22/22 browser journeys,
+105 frontend tests, lint/build and cleanup pass. The navigation cache race found during
+completion is fixed and covered. Phase 16 local scope also passes decoder/isolation, Redis restart,
+prefork kill/real-clock recovery, PostgreSQL/local-provider cleanup and its dedicated browser
+journey. The original full regression's four failures were resolved/retested; exact evidence
+and the remaining host FFmpeg skip are recorded in docs/phases/phase16.md. 103 frontend tests
+and lint/build evidence remain. L20/L25/L37/L38 production extensions keep their later checkpoints.
+AWS S3 is selected (ADR-037).
+The earlier sequencing exception is closed; all later assigned acceptance remains mandatory.
+
+Reviewed 2026-10-15 against the phase reports currently present (2, 2A, 2B, 3–15),
 CONTINUE.md, SECURITY.md and DEVELOPMENT_PLAN.md. Phases 0/1 are represented by the
 roadmap/security notes; separate phase0/phase1 reports are not present. Selected current
-code checks confirm file moves/avatars are absent, readiness checks only the DB, and
+code includes file moves/bounded previews; avatars are absent, readiness checks only the DB, and
 refresh rotation does not yet implement the documented token-family replay response.
 This is a documentation/scope reconciliation, not a new security audit or test run.
 
@@ -14,7 +24,7 @@ Repeated limitations are consolidated; a feature mentioned by several phases has
 "When" below means implementation order, not a promised date or effort estimate.
 Open items stay open until the acceptance check has recorded evidence. Assigning a phase
 does not implement or verify anything. Original phase numbers remain unchanged; lettered
-follow-ups are additions. The current task collects/schedules work only.
+follow-ups are additions. Phase 15's container/provider/browser checkpoint is locally complete.
 
 ## Execution order
 
@@ -123,6 +133,13 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   6/7/14 §J. **When: 15 safe bounded preview/detected-type handling; 17 quarantine/scanning.**
   Verify hostile/oversized inputs, restricted rendering, ACL checks for derived artifacts,
   fail-closed scan/release states and no inference that attachment/octet-stream means safe.
+  **Phase 15 local checkpoint complete:** verified-source transient text/static-PNG previews, bounded native
+  renderer configuration, live authority/version rechecks and unit/SQLite/frontend checks
+  exist. Actual container restrictions/native PNG/PDF and live API/provider current/history
+  smokes pass. PostgreSQL/provider baseline passes all 306 tests. Final browser rerun passes
+  22/22, with 105 frontend tests/lint/build and disposable cleanup complete. A navigation cache
+  race found during the resumed run was fixed with two late-response regression tests.
+  Quarantine/scanning remain 17. See [15](phases/phase15.md); video/job expansion is L38.
 - **L10 — Sharing covers files only; no folder links or recipient editing/upload.**
   Source: [11 §J](phases/phase11.md#j-operations-and-limitations). **When: 18A folder-read
   sharing; editing/upload remains decision P02.** Verify subtree/current-ancestor boundaries,
@@ -172,16 +189,21 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   31 deployed provider verification.** Preserve durable exact-key intents, inventory cursors
   and late-write refs; verify provider abort/delete retries and configured stale expiry/scan
   timing. Local injected time does not establish a 24-hour provider lifecycle guarantee.
+  **16 local scope complete:** actual broker restart, prefork kill, real four-minute lease
+  recovery, six-stage progress, bounded two-tenant cleanup and retained late-write retry pass.
+  Long provider lifecycle windows and AWS failure/load evidence remain 26/31.
 - **L21 — Hidden tombstones, intents, revoked links, grants and change metadata grow.**
   Sources: 9/11/12/13/14 §J. **When: 20 technical/audit retention implementation;
   27 privacy/security review; 33 operational policy sign-off.** Classify retention purposes,
   compact only when safe, and test that no live authorization, late-write cleanup identity
   or restoration proof is lost. Content pruning is L04; legal erasure is L35.
-- **L22 — Community MinIO is local-only/archived; maintained production provider undecided.**
+- **L22 — Community MinIO is local-only/archived; AWS S3 selected, not yet certified.**
   Sources: 2A onward. **When: select in 16, certify in 26/31 before public deployment.**
   Record maintained S3/R2/provider choice and test checksums/composite HEAD, conditional PUT/
   completion, pagination, public signer endpoints, clock/credential expiry and abort/delete.
   Local MinIO results are not evidence for another provider.
+  User selected AWS S3 on 2026-10-16 (ADR-037). Provider selection is recorded; actual AWS
+  compatibility/configuration and release certification remain open in 26/31.
 - **L23 — No provider VersionId purge or protection against out-of-band overwrite/delete.**
   Sources: 5/7/9/13/14 §J. **When: 16 explicit provider/versioning decision; 26/31 enforce
   and verify selected policy.** Default release policy remains unversioned immutable app keys.
@@ -198,6 +220,12 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   Sources: 5/6/9 §J; current health API. **When: 16 job health/backlog semantics; 28 dependency
   probes/alerts.** Define feature-aware readiness and bounded non-destructive S3/Redis checks,
   appropriate degraded responses, cleanup age/error alerts and tests for dependency failure.
+  Phase 16 now records durable rotation, provider-bound cursors, individual stage failures/
+  deferred work, aggregate backlog counts/ages and operator Redis/bucket/versioning checks.
+  Initialization intents are labeled recheck populations, not orphan-byte counts. None of
+  these establish backlog completion or per-effect success. Live stage fairness/broker-loss/
+  restart/PG/local-provider proofs now pass in Phase 16; API feature gating/alerts remain 28;
+  see docs/phases/phase16.md. AWS/provider expansion remains 26/31.
 - **L26 — Production SMTP transport/domain/TLS/delivery failures not verified.**
   Sources: 2A/2B §J. **When: 28 delivery monitoring, 31 actual provider verification before
   customer mail.** Test configured sender/domain/transport, failure/retry behavior and alerting.
@@ -308,6 +336,32 @@ before claiming support; if excluded, document the boundary for the resume demo/
   still use C: despite project/Codex/Docker data living on D:. These are documented platform
   boundaries, not file-storage feature failures.
 
+## Newly tracked in Phase 15
+
+- **L38 — Queued previews/static video posters require live certification.** Source:
+  [15 §D/E/J](phases/phase15.md#j-limitations-requiring-explicit-work). Phase 15 preview was
+  transient UTF-8/static PNG with a 10 MiB source cap; video/unknown formats use an explicit
+  authorized download fallback. **When: 16 bounded isolated video/poster jobs, retries and
+  version-aware publication/invalidation; 26 chosen-provider/browser/failure validation;
+  27 decoder/isolation security review.** Preserve limits/unsupported states; test malformed,
+  oversized, cancellation, stale generation, live ACL/ancestor/prune/trash races and worker
+  failures without publishing stale content. Record actual container resource/isolation and
+  provider evidence. Production job/backlog monitoring is L25; load is L33. Direct Windows
+  APIs require a deliberate isolated native-renderer deployment, never unsafe host fallback.
+  This work is automatically included at those checkpoints. The original Phase 15 scope was
+  transient; Phase 16 extends it below. Full video playback and scan certification are not claimed.
+  **Implemented in source during 16:** durable version/requester/generation-bound jobs,
+  private S3-only UTF-8/PNG results, three-attempt leases/recovery, publication/read authority
+  rechecks, explicit cancellation and retained late-write cleanup. Static MP4/WebM posters
+  use credential-free isolated FFmpeg with protocol/codec/duration/pixel/time bounds;
+  no moving playback is claimed. Migration 019 preserves cleanup refs/guards downgrade.
+  127 targeted backend checks pass with one real-video skip; 103 frontend tests/lint/build
+  pass. Actual isolated FFmpeg decode, Redis/prefork recovery, PG/local-provider cleanup and
+  the dedicated Phase 16 browser journey now pass. Ordinary host FFmpeg remains unavailable;
+  the actual decoder proof is inside the container. AWS expansion stays 26 and security review 27.
+  Derivative/reserved/ambiguous-write accounting is explicitly L19 in 19; retained job/ref
+  metadata policy is L21 in 20. See ADR-040 and docs/phases/phase16.md for bounds/evidence.
+
 ## Maintenance rule
 
 Standing user instruction: assigned limitation work is mandatory phase scope. When the user
@@ -344,7 +398,15 @@ while implementing these tasks is fixed before proceeding, regardless of its pla
   proves cleanup, and then retires metadata without inventing bytes or losing retries. Test
   lost acknowledgements, changed bucket/provider errors, late writes and authorization. This
   follow-up is automatically included when continuing those phases; current safe refusal remains.
-  Initialization intents without a materialized File row remain under existing exact-key
-  maintenance, outside the folder's tracked pending-record cancellation list. Include folder-
-  scoped intent discovery/cancellation and stale initialization-retry invalidation after
-  trash/recovery in the Phase 16 reconciliation work; preserve every original deadline/ref.
+  Before Phase 16, initialization intents without a materialized File row were outside the
+  folder's tracked pending-record cancellation list. Phase 16 adds folder-scoped discovery/
+  cancellation and stale initialization-retry invalidation after trash/recovery, preserving
+  every original deadline/ref.
+  **Implemented in source during 16:** retained folder/scope/cancellation, subtree intent
+  cancellation with manager/cap checks, stale-retry invalidation and fail-closed historical
+  unknown scope. DB-operator diagnostics page all refs; explicit confirmed multi-pass
+  retirement waits all deadlines, aborts/deletes/checks absence and retains exact keys.
+  Completed snapshots can be adopted after active owner/admin and verified provider checks,
+  using normal version activation/share invalidation/history. Migration 018 preserves old
+  unknown scope and guards lossy rollback. See ADR-039/phase16 report for local evidence;
+  actual PG/local-provider lost-ACK/late-write checks pass. AWS certification remains 26/31.

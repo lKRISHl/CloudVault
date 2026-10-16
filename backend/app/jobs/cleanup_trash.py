@@ -16,7 +16,9 @@ from app.storage.s3 import S3ObjectStorage
 logger = logging.getLogger(__name__)
 
 
-async def tick(factory=async_session_maker):
+async def tick(factory=async_session_maker, *, limit=10, report=None):
+    if type(limit) is not int or not 1 <= limit <= 10:
+        raise ValueError("Invalid trash batch size")
     now = datetime.now(UTC)
     async with factory() as db:
         candidates = list(
@@ -29,14 +31,17 @@ async def tick(factory=async_session_maker):
                 .order_by(
                     TrashEntry.checked_at.asc().nullsfirst(), TrashEntry.trashed_at, TrashEntry.id
                 )
-                .limit(10)
+                .limit(limit)
             )
         )
     for entry_id, tenant_id in candidates:
         storage = S3ObjectStorage(settings, tenant_id)
         try:
             async with factory() as db:
-                await TrashCleanupService(db, storage).sweep(entry_id, tenant_id, now)
+                result = await TrashCleanupService(db, storage).sweep(entry_id, tenant_id, now)
+                if report is not None:
+                    report["inspected"] = report.get("inspected", 0) + 1
+                    report["deferred"] = report.get("deferred", 0) + (not result)
         finally:
             await storage.close()
     logger.info("Trash maintenance checked %s batches", len(candidates))

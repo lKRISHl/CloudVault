@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     APP_NAME: str = "CloudVault API"
     APP_VERSION: str = "0.1.0"
+    PREVIEW_SOCKET: str = "/preview/renderer.sock"
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
 
@@ -26,6 +27,8 @@ class Settings(BaseSettings):
     DATABASE_ECHO: bool = False
 
     REDIS_URL: str = "redis://localhost:6379/0"
+    JOB_LEASE_SECONDS: int = Field(default=300, ge=240, le=900)
+    STORAGE_STAGE_BATCH_SIZE: int = Field(default=5, ge=1, le=10)
 
     S3_ENDPOINT: str | None = None
     S3_PUBLIC_ENDPOINT: str | None = None

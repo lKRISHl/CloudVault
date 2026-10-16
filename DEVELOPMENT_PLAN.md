@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phase 14B is implemented and locally verified: completed-file moves, explicit trash destination/name recovery, confirmed tracked pending-upload cancellation with folder trash, and safe legacy metadata discard. Immutable content/version refs and live authority remain protected. Phase 14A is committed as 98a4a70; Phase 14B implementation and verification are included in this handoff commit. Verified development schema 016_library_recovery. See CONTINUE.md and docs/phases/phase14b.md. Remote CI/production provider/load gates and L37 reconciliation remain pending.
+Current state: Phases 15 and 16 are implemented and locally verified. Phase 15's resumed full Chromium suite passes 22/22; a navigation cache race is fixed with regression tests, and all 105 frontend tests/lint/build pass. Phase 16's actual isolated video decoding, Redis restart, prefork kill/real-clock recovery, PostgreSQL/local-provider cleanup and dedicated browser checks pass. Its exact backend baseline/focused reruns and host FFmpeg skip are recorded in docs/phases/phase16.md. AWS certification remains 26/31; source/application schema is 019_preview_jobs. No browser deferral remains. Phase 15/16 changes remain uncommitted.
 
-Next planned implementation: Phase 15 safe previews/detected-type handling (L09). Phase 18A follows 18 and precedes 19; Phase 22A follows 22 and precedes 23. Phase 25A follows 25 and precedes 26. These remaining follow-ups are planned, not implemented.
+Next action: review/commit Phase 15/16 work when requested, then continue Phase 17 and its assigned limitations. Keep production-provider, security, quota, monitoring and recovery gates assigned to their later phases.
 
 ## Limitations ownership and closure
 
@@ -14,7 +14,7 @@ Standing user instruction: an ordinary "continue" authorizes the next scheduled 
 
 Do not mark a phase complete or advance past it with an unresolved assigned acceptance check. Complete independent work when an external dependency is unavailable, keep the affected item explicitly open, and report the exact dependency and next action. Ask only for genuinely missing product decisions, credentials, externally controlled prerequisites or actions requiring separate authorization; an existing agreed scope is not a reason to ask again. Deliberate D constraints are reviewed/documented, not falsely promised to disappear. This instruction governs active development when work resumes; it does not create background/scheduled execution or authorize remote push, external CI dispatch, publication, paid resources or destructive data removal.
 
-[Limitations backlog and schedule](docs/LIMITATIONS_BACKLOG.md) is the current register of historical gaps, resolved items, planned closures, product decisions and intentional constraints. It contains 36 open work/verification items, four explicit product-scope decisions, eight resolved groups and eight design/platform boundaries. Historical phase reports remain records of their original scope, not the live backlog.
+[Limitations backlog and schedule](docs/LIMITATIONS_BACKLOG.md) is the current register of historical gaps, resolved items, planned closures, product decisions and intentional constraints. Entries now extend through L38; closed local scope, open verification, product decisions and design boundaries are labelled individually. Historical phase reports remain records of their original scope, not the live backlog.
 
 Every phase must reference the relevant register IDs and record actual acceptance evidence. Scheduling does not close an item. Security/data-loss defects block further work immediately. Remote CI requires separate push/dispatch authorization; production readiness is not inferred from completed phase numbers. Phase order is a dependency schedule, not a calendar-date or duration promise.
 
@@ -277,9 +277,9 @@ Completion criteria:
 
 ## PHASE 15 — File Preview
 
-Limitations closure work: L09: bounded safe preview/detected-type handling with tenant/version-aware derived artifacts; scan integration follows in 17.
+Limitations closure work: L09: bounded safe preview/detected-type handling with tenant/version-aware derived output; scan integration follows in 17. Current derivatives are transient. L38 tracks bounded video/queued-preview lifecycle in 16/26; source/pixel/page/timeout limits remain explicit.
 
-Status: Not started.
+Status: Implemented and locally verified; deferred work resumed/completed 2026-10-16. Full Chromium passes 22/22, frontend passes 105 tests/lint/build, and disposable cleanup is complete. Shared-cache refresh after navigation was fixed and regression-tested. Earlier 306 backend and native/live smoke evidence remains valid; this completion changes frontend behavior only. See docs/phases/phase15.md.
 
 - images
 - PDFs
@@ -289,9 +289,11 @@ Status: Not started.
 
 ## PHASE 16 — Redis + Background Jobs
 
-Limitations closure work: L20/L22/L23/L25/L37 and P04 provider decision: reliable jobs/inventory cursors and exact-reference lifecycle, safe operator reconciliation for contradictory legacy metadata/intents, choose maintained production storage before integration certification, decide/enforce unversioned versus fully version-aware provider policy, and define job/backlog health. Never enable bucket versioning without verified cleanup for every path.
+Completed locally 2026-10-16: maintenance leases/stages/health, L37 reconciliation and L38 queued previews/static posters. Actual decoder/isolation, broker restart, prefork crash/real-clock lease recovery, two-tenant bounded cleanup, PG migrations/provider lost-ACK/late-write/versioning refusal and the Phase16-only browser journey pass. Source/application head 019. AWS certification remains 26/31. Phase 15's separate final browser checks subsequently passed. See docs/phases/phase16.md for exact results and initial failures resolved by reruns.
 
-Status: Not started.
+Limitations closure work: L20/L22/L23/L25/L37/L38 and P04 provider decision: reliable jobs/inventory cursors and exact-reference lifecycle, safe operator reconciliation for contradictory legacy metadata/intents, bounded isolated video/poster jobs and version-aware queued previews/retries/invalidation, choose maintained production storage before integration certification, decide/enforce unversioned versus fully version-aware provider policy, and define job/backlog health. Verify preview decoder limits, cancellation and live ACL/prune/trash races; retain unsupported fallback. Never enable bucket versioning without verified cleanup for every path.
+
+Status: Implemented and locally verified. AWS deployment/security/load extensions retain their assigned checkpoints.
 
 - Redis
 - Celery

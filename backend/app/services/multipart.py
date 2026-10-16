@@ -157,6 +157,11 @@ class MultipartService:
         await self.limit(actor, ip, "multipart-start")
         intent = await self.prepare_intent(actor, payload)
         role = await self.files.folders.authorize(actor, write=True)
+        if intent is not None:
+            # Recheck under the tenant lock: trash may have cancelled between transactions.
+            await self.db.refresh(intent)
+            if intent.cancelled_at:
+                raise HTTPException(410, "Initialization cancelled; start a new upload")
         existing = await self.db.scalar(
             select(File).where(
                 File.tenant_id == actor.tenant_id,
@@ -167,6 +172,8 @@ class MultipartService:
         created = None
         try:
             if existing:
+                if existing.upload_cancelled_at:
+                    raise HTTPException(410, "Upload cancelled; start a new upload")
                 if existing.upload_cleanup_at is not None:
                     raise HTTPException(410, "Upload expired and was cleaned; start a new upload")
                 if (
@@ -243,6 +250,10 @@ class MultipartService:
 
     async def prepare_intent(self, actor, payload):
         """Commit the exact key before any provider create; no file bytes or upload URL."""
+        role = await self.files.folders.authorize(actor, write=True)
+        path = await self.files.folders.ancestors(actor, payload.folder_id)
+        if path:
+            await self.files.folders.require_write(actor, role, path[-1])
         existing_file = await self.db.scalar(
             select(File.id).where(
                 File.tenant_id == actor.tenant_id,
@@ -269,6 +280,7 @@ class MultipartService:
                 request_id=payload.request_id,
                 storage_bucket=settings.S3_BUCKET_NAME,
                 fingerprint=fingerprint,
+                folder_id=payload.folder_id,
                 expires_at=datetime.now(UTC) + timedelta(seconds=settings.MULTIPART_UPLOAD_SECONDS),
             )
             self.db.add(intent)
@@ -281,6 +293,15 @@ class MultipartService:
             raise HTTPException(503, "Cannot reserve upload initialization")
         if intent.fingerprint != fingerprint:
             raise HTTPException(409, "Upload request ID belongs to different metadata")
+        if intent.cancelled_at:
+            raise HTTPException(410, "Initialization cancelled; start a new upload")
+        if not intent.scope_recorded:
+            raise HTTPException(
+                409, "Legacy initialization has unknown location; start a new upload request"
+            )
+        if intent.folder_id is not None and intent.folder_id != payload.folder_id:
+            raise HTTPException(409, "Initialization location is inconsistent")
+        intent.folder_id = payload.folder_id
         if intent.storage_bucket != settings.S3_BUCKET_NAME:
             raise HTTPException(503, "Upload storage configuration changed")
         if utc(intent.expires_at) <= datetime.now(UTC):

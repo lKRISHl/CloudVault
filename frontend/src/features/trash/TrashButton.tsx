@@ -11,8 +11,7 @@ export function TrashButton({ kind, id, name }: { kind: 'files' | 'folders'; id:
     setBusy(true); setError('');
     try {
       if (cancel) await api.cancelUploadsAndTrash(id, confirmation); else await api.moveToTrash(kind, id);
-      if (!alive.current) return;
-      setCancelUploads(false); setConfirmation('');
+      if (alive.current) { setCancelUploads(false); setConfirmation(''); }
       await cache.invalidateQueries({ predicate: query => ['trash', 'files', 'folders', 'file-search', 'shares', 'permissions'].includes(String(query.queryKey[0])) });
     } catch (failure) { if (alive.current) setError(failure instanceof Error ? failure.message : 'Unable to move to trash'); }
     finally { if (alive.current) setBusy(false); }

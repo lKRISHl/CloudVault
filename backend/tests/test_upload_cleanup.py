@@ -176,3 +176,43 @@ async def test_orphan_scan_skips_live_known_recent_and_nonmanaged_keys(
     monkeypatch.setattr(cleanup_uploads, "S3ObjectStorage", Scoped)
     assert await cleanup_uploads.sweep_orphans(Inventory(), db_factory, now=now) is None
     assert aborted == ["unknown-old"]
+
+
+@pytest.mark.asyncio
+async def test_bounded_upload_stage_reduces_unconfirmed_backlog_and_rotates(
+    client,
+    db_factory,
+    storage,
+    monkeypatch,
+):
+    from app.services.job_backlog import backlog
+
+    owner = await register_user(client)
+    tickets = [await start(client, owner, name=f"bounded-{i}.bin") for i in range(3)]
+    now = datetime.now(UTC)
+    async with db_factory() as db:
+        for ticket in tickets:
+            file = await db.get(File, UUID(ticket["file"]["id"]))
+            file.upload_expires_at = now - timedelta(hours=3)
+        await db.commit()
+
+    class Provider(CleanupContract):
+        client = SimpleNamespace(get_bucket_versioning="versioning")
+
+        async def call(self, operation):
+            assert operation == "versioning"
+            return {}
+
+        async def close(self):
+            pass
+
+    provider = Provider()
+    monkeypatch.setattr(cleanup_uploads, "S3ObjectStorage", lambda *_: provider)
+    assert (await backlog(db_factory, "storage"))["unconfirmed_expired_uploads"]["count"] == 3
+    report = {}
+    await cleanup_uploads.tick(db_factory, stage="uploads", batch_size=2, report=report)
+    assert report == {"inspected": 2, "deferred": 0}
+    assert (await backlog(db_factory, "storage"))["unconfirmed_expired_uploads"]["count"] == 1
+    await cleanup_uploads.tick(db_factory, stage="uploads", batch_size=2)
+    assert (await backlog(db_factory, "storage"))["unconfirmed_expired_uploads"]["count"] == 0
+    assert len(set(provider.aborted)) == 3

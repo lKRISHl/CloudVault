@@ -17,9 +17,9 @@ def require(response, status):
     return response.json()
 
 
-def verify_email(api, email):
+def verify_email(api, email, inbox_url="http://localhost:8025"):
     token = None
-    with httpx.Client(base_url="http://localhost:8025", timeout=10) as inbox:
+    with httpx.Client(base_url=inbox_url, timeout=10) as inbox:
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline and token is None:
             messages = require(
@@ -81,6 +81,9 @@ def main():
         uploaded = require(api.post(f"/files/{ticket['file']['id']}/complete"), 200)
         assert uploaded["status"] == "uploaded" and uploaded["size_bytes"] == len(body)
         assert uploaded["checksum_sha256"] == checksum
+        preview = require(api.post(f"/files/{uploaded['id']}/preview", json={}), 200)
+        assert preview["kind"] == "text" and preview["text"] == body.decode()
+        assert preview["scan_status"] == "unscanned" and preview["version_number"] == 1
         download_response = api.post(f"/files/{uploaded['id']}/download-url")
         download = require(download_response, 200)
         assert download_response.headers["cache-control"] == "no-store"
