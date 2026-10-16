@@ -26,6 +26,36 @@ async def backlog(factory, name, now=None):
         }
 
     async with factory() as db:
+        if name == "scans":
+            live = (
+                FileVersion.status == "uploaded",
+                FileVersion.cleaned_at.is_(None),
+                FileVersion.purged_at.is_(None),
+                FileVersion.prune_requested_at.is_(None),
+            )
+            return {
+                "quarantined_scans": await measure(
+                    db,
+                    FileVersion,
+                    FileVersion.completed_at,
+                    *live,
+                    FileVersion.scan_status.in_(("pending", "scanning")),
+                ),
+                "failed_scans": await measure(
+                    db,
+                    FileVersion,
+                    FileVersion.completed_at,
+                    *live,
+                    FileVersion.scan_status == "error",
+                ),
+                "blocked_scans": await measure(
+                    db,
+                    FileVersion,
+                    FileVersion.completed_at,
+                    *live,
+                    FileVersion.scan_status.in_(("blocked", "oversized")),
+                ),
+            }
         if name == "previews":
             return {
                 "due_previews": await measure(

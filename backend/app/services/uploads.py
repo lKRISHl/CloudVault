@@ -28,6 +28,7 @@ class UploadService:
         await self.files.folders.authorize(actor)
         return UploadConfiguration(
             max_bytes=settings.UPLOAD_MAX_BYTES,
+            scan_max_bytes=settings.SCAN_MAX_BYTES,
             enabled=bool(settings.S3_BUCKET_NAME),
             multipart_max_bytes=settings.MULTIPART_MAX_BYTES,
             multipart_part_size=settings.MULTIPART_PART_BYTES,

@@ -31,7 +31,7 @@ class PreviewRead(PreviewContent):
     version_number: int
     name: str
     generation: int
-    scan_status: Literal["unscanned"] = "unscanned"
+    scan_status: Literal["clean"] = "clean"
 
 
 class PreviewJobRequest(PreviewRequest):

@@ -37,7 +37,7 @@ test('folders support nested browsing, rename, safe destination moves and worksp
   const email = `folders-owner-${suffix}@example.com`;
   await register(page, request, email, 'Folder Team');
   await expect(page.getByText('No file metadata here.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Files' })).toContainText('Files remain unscanned');
+  await expect(page.getByRole('region', { name: 'Files' })).toContainText('Uploaded content stays quarantined');
   await create(page, 'Projects');
   await create(page, 'Archive');
   await page.getByRole('button', { name: 'Open folder Projects', exact: true }).click();

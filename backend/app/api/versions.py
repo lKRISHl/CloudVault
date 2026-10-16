@@ -26,6 +26,17 @@ from app.services.versions import VersionService
 router = APIRouter()
 
 
+@router.post("/{file_id}/versions/{version_id}/scan", status_code=202)
+async def retry_scan(
+    file_id: UUID, version_id: UUID, actor: WorkspaceUser, db: Database, request: Request
+):
+    from app.services.scans import ScanService
+
+    return await ScanService(db).retry(
+        actor, file_id, version_id, request.client.host if request.client else ""
+    )
+
+
 @router.post("/{file_id}/versions/{version_id}/upload-url", response_model=VersionTicket)
 async def retry(
     file_id: UUID,

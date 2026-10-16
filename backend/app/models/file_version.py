@@ -18,6 +18,7 @@ from app.core.database import Base
 
 # Exact immutable content metadata. Names, ACLs and locations belong to the logical file.
 CONTENT_FIELDS = (
+    "scan_status",
     "object_id",
     "storage_bucket",
     "upload_expires_at",
@@ -46,6 +47,24 @@ class FileVersion(Base):
         UniqueConstraint("storage_bucket", "object_id", name="uq_file_versions_object"),
         CheckConstraint("number >= 1 AND declared_size_bytes >= 0", name="ck_file_versions_size"),
         CheckConstraint("status IN ('pending', 'uploaded')", name="ck_file_versions_status"),
+        CheckConstraint(
+            "scan_status IN ('pending','scanning','clean','blocked','error','oversized')",
+            name="ck_version_scan_status",
+        ),
+        CheckConstraint("scan_attempts BETWEEN 0 AND 3", name="ck_version_scan_attempts"),
+        CheckConstraint(
+            "(scan_status = 'scanning' AND scan_lease_id IS NOT NULL "
+            "AND scan_lease_until IS NOT NULL) OR "
+            "(scan_status <> 'scanning' AND scan_lease_id IS NULL "
+            "AND scan_lease_until IS NULL)",
+            name="ck_version_scan_lease",
+        ),
+        CheckConstraint(
+            "scan_status NOT IN ('clean','blocked') OR (scanned_at IS NOT NULL "
+            "AND scan_policy IS NOT NULL "
+            "AND scan_fingerprint IS NOT NULL AND scan_engine IS NOT NULL)",
+            name="ck_version_scan_verdict",
+        ),
         CheckConstraint("cancelled_at IS NULL OR status = 'pending'", name="ck_versions_cancelled"),
         CheckConstraint(
             "(prune_requested_at IS NULL AND prune_not_before IS NULL) OR "
@@ -62,8 +81,22 @@ class FileVersion(Base):
         ),
         Index("ix_file_versions_history", "tenant_id", "file_id", "number"),
         Index("ix_file_versions_cleanup", "status", "checked_at", "upload_expires_at"),
+        Index(
+            "ix_version_scan_dispatch", "scan_status", "scan_next_attempt_at", "scan_lease_until"
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    scan_status: Mapped[str] = mapped_column(
+        String(16), default="pending", server_default="pending"
+    )
+    scan_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    scan_lease_id: Mapped[UUID | None] = mapped_column()
+    scan_lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scan_next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scan_policy: Mapped[str | None] = mapped_column(String(64))
+    scan_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    scan_engine: Mapped[str | None] = mapped_column(String(128))
     tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
     file_id: Mapped[UUID] = mapped_column(ForeignKey("files.id"))
     number: Mapped[int] = mapped_column(Integer)

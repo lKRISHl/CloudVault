@@ -24,11 +24,17 @@ celery_app.conf.update(
     worker_max_memory_per_child=131072,
     worker_cancel_long_running_tasks_on_connection_loss=True,
     task_routes={
+        "cloudvault.maintenance.scans": {"queue": "scans"},
         "cloudvault.maintenance.email": {"queue": "email"},
         "cloudvault.maintenance.storage": {"queue": "storage"},
         "cloudvault.maintenance.previews": {"queue": "previews"},
     },
     beat_schedule={
+        "scans": {
+            "task": "cloudvault.maintenance.scans",
+            "schedule": 5.0,
+            "options": {"expires": 10, "queue": "scans"},
+        },
         "previews": {
             "task": "cloudvault.maintenance.previews",
             "schedule": 5.0,

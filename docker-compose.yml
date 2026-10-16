@@ -84,6 +84,11 @@ services:
     environment: &backend-environment
       - DATABASE_URL=postgresql+asyncpg://cloudvault:cloudvault@postgres:5432/cloudvault
       - REDIS_URL=redis://redis:6379/0
+      - CLAMD_HOST=clamav
+      - CLAMD_PORT=3310
+      - SCAN_MAX_BYTES=${SCAN_MAX_BYTES:-104857600}
+      - SCAN_TIMEOUT_SECONDS=${SCAN_TIMEOUT_SECONDS:-90}
+      - SCAN_DEFINITION_MAX_AGE_SECONDS=${SCAN_DEFINITION_MAX_AGE_SECONDS:-86400}
       - STORAGE_STAGE_BATCH_SIZE=${STORAGE_STAGE_BATCH_SIZE:-5}
       - S3_ENDPOINT=http://minio:9000
       - S3_PUBLIC_ENDPOINT=http://localhost:9000
@@ -257,6 +262,77 @@ services:
     networks:
       - cloudvault-network
 
+  clamav:
+    build:
+      context: ./infra/clamav
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 3g
+    cpus: 1
+    environment:
+      TZ: UTC
+    volumes:
+      - clamav_signatures:/var/lib/clamav:ro
+    tmpfs:
+      - /tmp:size=512m,mode=1777,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping=1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 180s
+    restart: on-failure
+    networks:
+      - scan-network
+
+  clamav-updater:
+    build:
+      context: ./infra/clamav
+    entrypoint: ["freshclam"]
+    command: ["--daemon", "--foreground=true", "--stdout", "--config-file=/etc/clamav/freshclam.conf"]
+    # The parent image probes clamd, which is not in the updater container.
+    # scan-worker probes the daemon's loaded definition freshness instead.
+    healthcheck:
+      disable: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1536m
+    cpus: 1
+    environment:
+      TZ: UTC
+    volumes:
+      - clamav_signatures:/var/lib/clamav
+    tmpfs:
+      - /tmp:size=16m,mode=1777,noexec,nosuid,nodev
+    restart: on-failure
+    networks:
+      - cloudvault-network
+
+  scan-worker:
+    build:
+      context: ./backend
+    command: ["celery", "-A", "app.jobs.celery_app:celery_app", "worker", "--loglevel=WARNING", "--pool=prefork", "--concurrency=1", "--queues=scans", "--hostname=scans@%h"]
+    environment: *backend-environment
+    mem_limit: 512m
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.jobs.check_jobs", "--job", "scans", "--scanner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+    restart: on-failure
+    networks:
+      - cloudvault-network
+      - scan-network
+
   frontend:
     build:
       context: ./frontend
@@ -272,7 +348,10 @@ volumes:
   minio_data:
   preview_ipc:
   redis_data:
+  clamav_signatures:
 
 networks:
+  scan-network:
+    internal: true
   cloudvault-network:
     driver: bridge

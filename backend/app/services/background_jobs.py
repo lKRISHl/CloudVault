@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.models import BackgroundJob
 from app.services.uploads import utc
 
-JOBS = frozenset(("email", "storage", "previews"))
+JOBS = frozenset(("email", "storage", "previews", "scans"))
 STORAGE_STAGES = ("uploads", "intents", "orphans", "policies", "versions", "trash")
 
 
@@ -250,7 +250,7 @@ class BackgroundJobService:
         now = now or datetime.now(UTC)
         maximum_age = (
             60
-            if name in ("email", "previews")
+            if name in ("email", "previews", "scans")
             else max(300, settings.UPLOAD_CLEANUP_INTERVAL_SECONDS * 3)
         )
         async with self.factory() as db:

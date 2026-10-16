@@ -70,7 +70,7 @@ function ShareManager({ fileId }: { fileId: string }) {
       {query.data?.items.length === 0 && <p>No share links yet.</p>}
       <div className="flex gap-3"><button className="secondary-button" disabled={!offset || query.isFetching || busy} onClick={() => setOffset(offset - 25)}>Previous links</button><button className="secondary-button" disabled={!query.data?.has_more || query.isFetching || busy || offset >= 10000} onClick={() => setOffset(offset + 25)}>Next links</button></div>
     </section>
-    <p className="text-sm text-gray-500">Revocation blocks new grants. Already issued storage URLs work until expiry. Files are unscanned. Removing a publisher or changing their role revokes their links.</p>
+    <p className="text-sm text-gray-500">Revocation blocks new grants. Already issued storage URLs work until expiry. Only successfully scanned content can be shared; scanning does not guarantee safety. Removing a publisher or changing their role revokes their links.</p>
   </main>;
 }
 
@@ -119,7 +119,7 @@ export function PublicSharePage() {
     {!token && <p role="alert">Open the complete share link supplied by the sender.</p>}
     <form onSubmit={access} className="space-y-4"><label className="block">Link password<input className="block border rounded p-2 w-full" type="password" maxLength={128} autoComplete="off" value={password} onChange={event => { setPassword(event.target.value); setFile(null); }} /></label><button className="primary-button" disabled={busy || !token}>Open shared file</button></form>
     {error && <p role="alert">{error}</p>}
-    {file && <section aria-label="Shared file" className="space-y-3"><h2 className="text-xl font-semibold break-words">{file.name}</h2><p>{file.size_bytes.toLocaleString()} bytes · Unscanned</p><p>Expires {new Date(file.expires_at).toLocaleString()}</p>{file.allow_download ? <button className="primary-button" disabled={busy} onClick={() => void download()}>Download shared file</button> : <p>Downloads disabled or grant limit reached.</p>}{file.grants_remaining !== null && <p>{file.grants_remaining} download grants remaining</p>}</section>}
+    {file && <section aria-label="Shared file" className="space-y-3"><h2 className="text-xl font-semibold break-words">{file.name}</h2><p>{file.size_bytes.toLocaleString()} bytes · Scan complete; no safety guarantee</p><p>Expires {new Date(file.expires_at).toLocaleString()}</p>{file.allow_download ? <button className="primary-button" disabled={busy} onClick={() => void download()}>Download shared file</button> : <p>Downloads disabled or grant limit reached.</p>}{file.grants_remaining !== null && <p>{file.grants_remaining} download grants remaining</p>}</section>}
     <Link className="text-blue-600 underline" to="/login">Sign in to CloudVault</Link>
   </div></AuthLayout>;
 }

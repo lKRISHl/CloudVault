@@ -23,6 +23,8 @@ class VersionRestore(BaseModel):
 
 
 class VersionRead(BaseModel):
+    scan_status: str = "pending"
+    scanned_at: datetime | None = None
     upload_method: str = "basic"
     multipart_state: str | None = None
     part_size: int | None = None

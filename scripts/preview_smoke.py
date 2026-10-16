@@ -11,7 +11,7 @@ from uuid import uuid4
 
 import httpx
 from PIL import Image
-from upload_smoke import require, verify_email
+from upload_smoke import require, verify_email, wait_scan_release
 
 
 def digest(content):
@@ -19,6 +19,7 @@ def digest(content):
 
 
 def preview_response(api, fid, values, queued):
+    wait_scan_release(api, fid, values.get("version_id"))
     if not queued:
         return api.post(f"/files/{fid}/preview", json=values)
     job = require(
@@ -96,7 +97,7 @@ def api_roundtrips(
             response = preview_response(api, fid, {}, queued)
             result = require(response, 200)
             assert result["kind"] == "image" and result["detected_type"] == "image/png"
-            assert result["scan_status"] == "unscanned"
+            assert result["scan_status"] == "clean"
             assert response.headers["cache-control"] == "no-store"
             assert response.headers["x-content-type-options"] == "nosniff"
             original = result["version_id"]

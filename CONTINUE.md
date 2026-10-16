@@ -1,122 +1,111 @@
 # CloudVault — Current State
 
-Current Phase: Phase 16 — Redis/Background Jobs, implemented and locally verified 2026-10-16.
-Phase 15's previously deferred work is also completed and locally verified 2026-10-16:
-22/22 Chromium journeys, 105 frontend tests, lint/build and disposable cleanup pass.
-A navigation race in shared Trash/file cache invalidation was fixed and regression-tested.
-No Phase 17 work yet. Both phase reports are current; no browser deferral remains.
-Project: D:\CloudVault-Dev\Project\CloudVault. Source/application schema: 019_preview_jobs.
-Last commit: a933798 (Phase 14B); Phase 15/16 changes remain uncommitted. No push/remote CI.
+Current phase: Phase 17 — Malware Scanning, implemented and locally verified 2026-10-16.
+Next phase: 18 — Realtime, including L15 and its assigned acceptance. Not started.
+Project: D:\CloudVault-Dev\Project\CloudVault. Application/source schema: 020_malware_scanning.
+Phase15/16 baseline: 6bf868f. Phase17 changes and verification notes are included in this commit.
+No push/remote CI. Phase18 has not started.
 
-## Completed Phase 16 scope
+## Completed Phase 17 scope
 
-- Celery Beat and separate JSON-only email/storage/preview queues; persistent capped Redis.
-- PostgreSQL UUID leases/fencing, durable six-stage storage rotation committed before I/O,
-  provider-bound orphan cursors and safe operator execution/stage/backlog health.
-- L37 retained intent folder/scope/cancellation, subtree cancellation/stale-retry invalidation,
-  paged DB-operator diagnostics, explicit bounded retirement and verified snapshot adoption.
-  Original deadlines/exact references survive errors and remain available for late writes.
-- L38 requester/tenant/version/generation-bound queued previews, private S3 derivatives,
-  cancellation/publication fencing, bounded retries and retained-reference cleanup.
-- Actual credential-free, network-disabled, read-only constrained FFmpeg renderer for bounded
-  static MP4/WebM posters. No moving playback, native host fallback or scan certification.
-- AWS S3 selected (ADR-037); unversioned immutable-key release policy retained. Actual AWS
-  resources/credentials/spending were not provisioned. Production verification stays 26/31.
+- Private ClamAV daemon/signature updater, separate Celery scans queue and one prefork worker.
+- Every completed original/replacement/historical version starts quarantined. Migration 020
+  backfills all previous content to pending and cancels old preview jobs. No grandfather bypass.
+- Conditional bounded S3 streaming, exact size/ETag/basic/composite SHA-256 verification,
+  fresh definitions and complete verdict consumption are required before release. No bytes
+  enter PostgreSQL or Redis. Tenant/version/namespace/policy/lifecycle/lease rechecks fence I/O.
+- Current/history downloads, share creation/anonymous access, transient previews and queued
+  preview request/publication/result all enforce the same release policy. Old cached outputs
+  cannot survive source release invalidation. Live resource permissions remain mandatory.
+- Three attempts/backoff and expiring UUID leases; authorized writers can retry errors from
+  version history. Row locking prevents manual retry from overriding a running worker claim.
+  Blocked/oversized content has no manual clean override. Policy/provider changes rescan.
+- Visible browser scan states, release polling and error retry. Successful scans say no known
+  threats detected, never guarantee safety. Supported scan input is at most 100 MiB: larger
+  allowed uploads remain quarantined and cannot be downloaded/shared/previewed.
+- Operator scan health probes loaded definition freshness and provider access/versioning.
+  FreshClam's inherited daemon health check is disabled; active scanner checks verify the
+  actual definitions. Independent updater alerts remain Phase28 work. See ADR-041/L39.
 
 ## Verification and evidence
 
-- Affected backend milestone: 127 passed, one host-FFmpeg skip. 103 frontend tests, lint/build
-  passed at that milestone. Latest Phase15 completion adds two frontend regression cases:
-  all 105 tests pass. Successful Trash mutations now invalidate shared caches after unmount.
-- Full new PostgreSQL/local-provider suite: 357 passed, four failed, one host-FFmpeg skip,
-  698.55s. Two obsolete migration expectations were fixed (legacy unknown-scope fixture and
-  current-head assertion). Two were Windows MemoryError/Argon2 allocation failures. A leaked
-  test transaction caused by failed session.close was terminated only in its disposable DB
-  to release teardown. Never describe this original full run as all green.
-- Focused rerun of all four failures, neighboring upload case and two new actual-provider
-  cleanup cases: seven passed in 66.67s after stopping unused test services. Final provider
-  rerun: two passed in 4.60s, including real Enabled/Suspended bucket refusal.
-- Real PostgreSQL 016–019 upgrade, legacy intent preservation, model alignment, downgrade and
-  re-upgrade pass in a separate owned DB. Initial suite DBs were confirmed removed.
-- Actual renderer isolation/generated PNG/PDF/MP4, queued API/S3 current PDF/historical PNG/
-  static poster and real queued SMTP/Mailpit round trips pass. Host FFmpeg skip remains;
-  actual video decoding was proved inside the constrained container.
-- Final live Redis AOF restart, actual prefork-child SIGKILL during provider I/O, committed
-  cursor/lease retention and actual 240-second lease expiry/recovery pass. All six stages
-  progress; bounded passes remove objects for 12 seeded expired refs across two tenants,
-  retaining exact refs. Final all-job/all-stage health is healthy. This is no load benchmark.
-- Phase16-only Chromium journey: one passed in 18.7s, using actual queues/provider/renderer:
-  verify, upload, stop preview worker, cancel known queued job (DELETE 200), restart worker,
-  refresh to static poster, inert/mobile display. No fixture dispatcher/mocked responses.
-- Ruff, Compose static validation and final frontend ESLint pass.
-- Evidence: .local/phase16-live-preview.log, phase16-postgres-migrations.log,
-  phase16-postgres-full.log, phase16-postgres-rerun.log, phase16-provider-final.log,
-  phase16-live-queue.log, phase16-live-health.log, phase16-browser.log,
-  phase16-acceptance-eslint.log, phase16-test-cleanup.log, phase16-app-restore.log.
-- Earlier observer/container interruptions are not successful recovery evidence. The final
-  scenario independently passed. All acceptance DBs/buckets/volumes were separate from app
-  data. The owned acceptance project/volumes were removed with its validated manifest.
+- Actual ClamAV 1.5.4/database 28155: clean content accepted, harmless EICAR detected.
+  Real owned API/PG/private S3/Redis/prefork round trip proves pre-scan denial, clean exact-byte
+  release and detected-content download/preview quarantine. No release/scanner substitution.
+- Dedicated real-engine Chromium journey: 1 passed in 5.5s. Full legacy Chromium regression:
+  final 22/22 passed in 2.3m. Legacy browser fixtures explicitly substitute only the scanner
+  dependency and still stream/verify real provider bytes; they do not certify detection.
+- Frontend: 113 tests, lint/build pass. Includes scan-state and authorized retry/cache cases.
+- Initial full PG/provider run: 377 passed, five failed, one host-FFmpeg skip, 433.18s.
+  Three legacy resource tests needed an explicit successful-scan dependency; two old migration
+  tests expected rollback past quarantine. All five were fixed; the guard remains strict.
+  Focused PG rerun: 100 passed in 76.07s. Final scan/config PG checks: 22 passed in 12.50s;
+  additional cached-preview-release regression: 1 passed on PG. Scan SQLite checkpoint:
+  21 passed; final storage/scanner health-only regression passed after dependency-probe work.
+  Do not describe the original full backend run as all green.
+- Browser initial failures included hard-coded provider routes, Windows resource allocation,
+  invitation-click timeout and resumed downloads racing scan release. Routes follow the test
+  endpoint; byte assertions now wait for release. Final complete 22-case run passes.
+- App backup/020 upgrade preserved all 31 File and 41 FileVersion records before workers ran.
+  All 26 original eligible versions were scanned. After unique live smoke demo data, final
+  checkpoint: 32 eligible versions clean, zero pending/error/blocked eligible scans.
+- Normal UI/API/private-storage smoke and full actual SMTP/basic/multipart/replacement/history
+  transfers, sharing/ACLs, retention, movement/recovery/cancel-folder and trash/purge smoke pass.
+  The first upload smoke needed replacement scan waits (423); corrected full rerun passes.
+  Unique smoke accounts/files remain as documented development demo data.
+- Owned test DBs/buckets/queue bindings removed; browser storage manifest absent. Destructive
+  pytest fixtures never targeted application data. No unrelated apps closed or WSL cap changed.
+- Detailed logs and exact scopes: docs/phases/phase17.md. Reports for completed Phase15/16
+  retain their earlier full acceptance evidence; the old Phase15 browser deferral is closed.
 
 ## Operation
 
-Normal CloudVault services are restored at http://localhost:3000. App schema was already
-019 before restoration; it was not downgraded or targeted by tests. Fresh ignored backup:
-.local/backups/cloudvault-before-phase16-app-restore-20261016.sql (174758 bytes).
-This is an existing-019 backup, not a pre-017 backup. Earlier pre-upgrade backups remain.
-Phase16 restored-app UI/API/private-storage smoke and email/previews/storage health all passed;
-all six normal storage stages refreshed at that checkpoint. Evidence: .local/phase16-app-smoke.log and
-.local/phase16-app-health.log.
-Storage health can warm up for a six-stage rotation (about six minutes at the normal
-60-second schedule). Keep workers/Beat with the app; don't run legacy loops alongside them.
-Back up before future upgrades. Guarded lossy downgrade requires a suitable pre-upgrade
-backup; object backup/restore is separate. Never commit credentials/dumps/manifests.
+Normal app is restored at http://localhost:3000/app/folders. Refresh the browser for the new UI.
+After source changes: docker compose up --build -d.
+Operator scanner check: docker compose exec -T scan-worker python -m app.jobs.check_jobs --job scans --scanner.
+API readiness remains DB-only. Scan-worker health also checks definitions/provider.
+Other jobs: docker compose exec -T backend python -m app.jobs.check_jobs.
+All storage stages have refreshed after restart; the last trash pass reported one deferred
+reference while due_trash was zero at observation. Retained cleanup still honors original
+capability/late-write deadlines. Health is not a byte-purge or SMTP-delivery guarantee.
 
-Docker socket recovery previously required the user's ordinary Windows PowerShell rename
-of the stale docker-secrets-engine folder; Codex got OS access denied. Do not reset Docker,
-unregister WSL, prune app volumes or rewrite ACLs. WSL cap remains 4 GB; run heavy suites
-sequentially. Windows reported paging-file/allocation errors while Firefox used about 2 GB;
-free unused apps before heavy testing. Do not close unrelated apps without authorization.
+Ignored pre-020 DB backup: .local/backups/cloudvault-before-phase17-20261016.sql (176448 bytes).
+Earlier pre-upgrade backups remain. Back up before future migrations. Downgrade cannot remove
+quarantine from uploaded content or active scan ownership: restore a suitable coordinated
+backup instead. Object backup/restore is separate. Never commit dumps/secrets/manifests.
 
-## Next exact action
+Direct installs need a privately reachable ClamD/updater plus Celery scans worker and Beat.
+Synchronize DB/signing/S3 endpoint/region/bucket and scan settings across API/workers; provider
+identity is part of scan proofs. There is no always-clean or API-native-scanner fallback.
 
-Review/commit Phase 15/16 work when requested, then continue Phase 17 with its due limitations.
-The user explicitly resumed Phase15 verification. Its fresh complete suite passed 22/22
-in 2.3m, including previews and the large-version full-byte length/SHA-256 check. The initial
-resumed run exposed a rapid-navigation Trash cache race; it is fixed, with two unit cases.
-Full frontend: 105 passed in 56.71s; lint/build pass. No backend change or new migration.
-The old bucket manifest and final unique browser bucket were cleaned. Both prior disposable
-PG databases are absent; current temp SQLite data was removed after all test listeners exited.
-Evidence: .local/phase15-browser-final-complete.log, phase15-completion-frontend.log,
-phase15-completion-eslint.log, phase15-completion-build.log, phase15-prior-browser-cleanup.log,
-phase15-completion-docker-build.log, phase15-completion-app-restore.log and
-phase15-completion-app-smoke.log. The rebuilt frontend includes the fix; app volumes remain.
-After Phase15 restoration, UI/API/private storage smoke passes and email/previews are healthy.
-Storage is running and refreshing stale stage observations on its normal six-minute rotation;
-see .local/phase15-completion-job-health.log. No worker logic changed in this completion.
+Docker socket recovery previously required the user's ordinary PowerShell rename of the
+stale docker-secrets-engine folder. Do not reset Docker, unregister WSL, prune app volumes
+or rewrite ACLs. WSL cap remains 4 GB; heavy suites run sequentially. Windows memory pressure
+recurred during browsers while Firefox used substantial RAM. Pause unused development
+services first; never close unrelated apps without authorization. Services are restored now.
 
 ## Limitations requiring explicit work
 
-- L20/L25/L37/L38 Phase16 local scope passes. Actual AWS/provider outage/replay and long
-  lifecycle windows stay 26/31; decoder/security/abuse review 27; representative load 32.
-- L22/L23/P04: AWS selection and local unversioned/refusal policy complete; AWS compatibility,
-  IAM/encryption/public-access/CORS/lifecycle/paired restore remain deployment gates. Issued
-  capabilities/received bytes cannot be recalled; delivery/revocation review stays 27.
-- L09 Phase15 local preview checkpoint passes; scanning/quarantine remains Phase17.
-- L19 quota/reservations/derivative/ambiguous-write accounting is Phase19. L21/L36 audit and
-  retained job/ref metadata policy is Phase20. Realtime is 18; navigation/rich search is 22A.
-- L25 API readiness remains DB-only; feature-aware probes/alerts are Phase28. Retained intent
-  counts are recheck populations, not orphan-byte or purge proofs. No production benchmark.
-- L01 remote CI awaits separately authorized push/dispatch tied to the tested commit. SMTP,
-  MFA, maintained storage deployment, security, monitoring, paired restore and other L24–L35
-  gates keep their recorded checkpoints. Community MinIO is local development only.
-- Bounds remain explicit: preview source 10 MiB, image 16M pixels, PNG 1600 edge/1 MiB,
-  PDF 1000 source/100 browseable pages, text 65,536 characters, video 120s/H264/VP8/VP9 and
-  bounded 4K pixels. Cancellation/expiry retain refs and delay byte cleanup; no scan guarantee.
+- L09 local preview/quarantine/scanning scope is complete. L39 automatically assigns retained
+  quarantine quota accounting to 19; pinned/maintained scanner and AWS deployment/paired
+  recovery to 26/31; scan-size/format/retroactive rescan/threat-response review to 27;
+  freshness/oldest pending/failed/updater alerts to 28; measured memory/latency/fairness/size
+  limits to 32. A point-in-time clean scan cannot guarantee safety or recall received bytes.
+- L15 realtime cross-tab/progress/cache/roster/ACL/reconnect work is Phase18. L10/L11/L13/P02
+  collaboration completion and explicit MVP scope decisions are 18A before quota Phase19.
+- L19 reservations, all retained versions/derivatives/quarantine and ambiguous writes are 19.
+  L21/L36 audit/job/ref metadata retention is 20. Navigation/rich search is 22A.
+- L20/L25/L37/L38 Phase16 local scope passes. Actual AWS/provider replay/lifecycle/decoder
+  deployment and long failure windows keep 26/31, security/abuse 27 and load 32.
+- L22/L23/P04: AWS selected; unversioned local/refusal policy implemented. Actual AWS IAM,
+  encryption/public access/CORS/lifecycle/paired restore and maintained deployment remain.
+- L01 remote CI needs separately authorized push/dispatch tied to the tested commit. SMTP,
+  MFA, broader security, monitoring, paired restore and L24–L35 retain assigned checkpoints.
+  Community MinIO is local development only. No production benchmark/certification is claimed.
 - D01–D08 retain capability/SMTP ambiguity, transfer/hierarchy, serialization, cleanup-delay,
   guarded rollback/metadata and platform constraints. See docs/LIMITATIONS_BACKLOG.md.
 
-Standing user instruction: ordinary continue automatically includes all due assigned limitations,
-implementation and acceptance. Every phase report must record inherited/new IDs, actual evidence
-and future checkpoints, synchronized with roadmap/register/CONTINUE. Don't advance past unfinished
-acceptance. The previous Phase15 browser deferral is now closed. No automatic commit/push, external
-spending or destructive application-data authorization is implied.
+Standing user instruction: ordinary continue automatically includes all due limitations,
+implementation and acceptance. Each phase report records inherited/new IDs, evidence and
+future checkpoints synchronized with roadmap/register/CONTINUE. Do not advance past open
+acceptance. No automatic commit/push, external spending or destructive app-data authorization.

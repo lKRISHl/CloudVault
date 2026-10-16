@@ -1,5 +1,10 @@
 # Changelog
 
+## Phase 17 — Malware Scanning (2026-10-16, locally verified)
+- Exact-version quarantine, full verified streaming hashes and private ClamAV verdicts gate current/history downloads, sharing and preview results. Migration 020 quarantines existing uploads and guards unsafe rollback.
+- Dedicated Celery scan queue, UUID leases, three attempts, authorized error retry, signature-freshness health and safe browser scan states. Oversized files remain quarantined; supported scan input is at most 100 MiB.
+- Real engine/API/provider/Redis/prefork and dedicated Chromium checks pass; 22/22 legacy browser journeys and 113 frontend tests pass. Migration 020 and existing-content scanning are applied to the backed-up application; regression evidence and production extensions are in docs/phases/phase17.md.
+
 ## Phase 16 — Redis and Background Jobs (2026-10-16, locally verified)
 - Durable private preview jobs (migration 019), dedicated queue/worker, lease-fenced retries/publication, fixed expiry/cancellation and authority/generation/prune/trash rechecks on private result reads. PNG/UTF-8 bytes stay in S3 with retained cleanup identities.
 - Isolated MP4/WebM static video posters with codec/duration/pixel/protocol/resource bounds and decoder process-group cleanup. Actual FFmpeg/container/API/S3 verification passes; no moving playback or scanning claim.

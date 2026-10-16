@@ -61,6 +61,8 @@ class VersionService:
                     "declared_size_bytes",
                     "checksum_sha256",
                     "checksum_kind",
+                    "scan_status",
+                    "scanned_at",
                 )
             },
             is_current=version.status == "uploaded" and version.number == file.current_version,

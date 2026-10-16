@@ -42,6 +42,10 @@ class File(Base):
             sqlite_where=text("version_keep_last IS NOT NULL"),
         ),
         CheckConstraint("status IN ('pending', 'uploaded')", name="ck_files_status"),
+        CheckConstraint(
+            "scan_status IN ('pending','scanning','clean','blocked','error','oversized')",
+            name="ck_files_scan_status",
+        ),
         CheckConstraint("visibility IN ('workspace', 'private')", name="ck_files_visibility"),
         CheckConstraint(
             "upload_cleanup_at IS NULL OR (status = 'pending' AND "
@@ -156,6 +160,9 @@ class File(Base):
         ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    scan_status: Mapped[str] = mapped_column(
+        String(16), default="pending", server_default="pending"
+    )
     upload_cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     current_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     version_generation: Mapped[int] = mapped_column(Integer, default=1, server_default="1")

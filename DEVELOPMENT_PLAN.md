@@ -2,9 +2,9 @@
 
 This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
 
-Current state: Phases 15 and 16 are implemented and locally verified. Phase 15's resumed full Chromium suite passes 22/22; a navigation cache race is fixed with regression tests, and all 105 frontend tests/lint/build pass. Phase 16's actual isolated video decoding, Redis restart, prefork kill/real-clock recovery, PostgreSQL/local-provider cleanup and dedicated browser checks pass. Its exact backend baseline/focused reruns and host FFmpeg skip are recorded in docs/phases/phase16.md. AWS certification remains 26/31; source/application schema is 019_preview_jobs. No browser deferral remains. Phase 15/16 changes remain uncommitted.
+Current state: Phase 17 is implemented and locally verified on application schema 020_malware_scanning. Real ClamAV/queue/provider release and detection, quarantine/browser tests, migration and app rescans pass; 113 frontend tests and 22/22 browser regression journeys pass. Exact backend baseline/focused reruns and the host FFmpeg skip are recorded in docs/phases/phase17.md. Phases 15/16 are committed in 6bf868f; Phase17 is committed with its verification notes. No browser deferral remains. AWS/production certification retains 26/31 and other assigned gates.
 
-Next action: review/commit Phase 15/16 work when requested, then continue Phase 17 and its assigned limitations. Keep production-provider, security, quota, monitoring and recovery gates assigned to their later phases.
+Next action when requested: Phase 18 realtime and its due limitations. Phase18 has not started. Keep production-provider, security, quota, monitoring and recovery gates assigned to their later phases.
 
 ## Limitations ownership and closure
 
@@ -305,7 +305,7 @@ Status: Implemented and locally verified. AWS deployment/security/load extension
 
 Limitations closure work: L09: quarantine, verified release and malicious/oversized content failure handling; uploaded is not synonymous with safe.
 
-Status: Not started.
+Status: Implemented and locally verified. Exact-version quarantine/release, private ClamAV, durable scan queue, retries/health, migration, real-provider/queue/browser checks and application upgrade pass. See docs/phases/phase17.md, ADR-041 and L39 for explicit production extensions.
 
 - asynchronous scanning
 - quarantine
@@ -342,6 +342,8 @@ Completion criteria:
 ## PHASE 19 — Storage Quotas
 
 Limitations closure work: L19 and L04 accounting: concurrent reservations, retained/current/history/trash/pending accounting, orphan reconciliation and safe over-quota behavior. Introduce bounded AI budgets before AI enablement; integrate subscription entitlements in 25A.
+
+L39: explicitly count retained quarantined/blocked/oversized content and scan reservations; test retries/cleanup without double counting or silently exempting bytes.
 
 Status: Not started.
 
@@ -454,6 +456,8 @@ Completion criteria:
 
 Limitations closure work: L20/L22/L23/L31/L33/L35: actual chosen-provider/browser/outage/replay matrix, real-clock lifecycle evidence, initial query/lock profiling/timeouts, migration failures and paired DB/object recovery tests.
 
+L39: verify actual AWS scan streams, immutable conditional reads, scanner image pinning/private deployment and failure/recovery, including outstanding pre-upgrade capabilities.
+
 Status: Not started.
 
 - unit tests
@@ -470,6 +474,8 @@ Completion criteria:
 ## PHASE 27 — Security Hardening
 
 Limitations closure work: L15/L21/L24/L27–L30/L32 and P04 delivery decision: MFA/recovery codes and inaccessible-mailbox support policy, refresh-family replay handling, trusted proxies/rate/CPU/timing abuse review, provider/retention/logging policies and independent assessment requirements before public release.
+
+L39: review scan-size/format/encrypted/archive policy, false negatives and parser isolation; implement/verify the selected retroactive rescan, signature-change threat-response and released-content revocation policy.
 
 Status: Not started.
 
@@ -489,6 +495,8 @@ Completion criteria:
 ## PHASE 28 — Observability
 
 Limitations closure work: L25/L26/L32/L36: feature-aware dependency probes, cleanup/backlog age/errors, real SMTP alerts, secret-safe logs/traces/metrics and clearly labeled provider-observed download telemetry.
+
+L39: alert on signature freshness/updater failure, unavailable scanner, oldest pending/failed scan and quarantine counts; verify alerts on actual failures and recovery.
 
 Status: Not started.
 
@@ -526,6 +534,8 @@ Status: Not started.
 
 Limitations closure work: L20/L22–L26/L31/L34/L35: verify the actual maintained storage/SMTP providers, IAM/encryption/CORS/TLS/clock/credential/lifecycle settings, hosted services and paired backup configuration before exposing production traffic.
 
+L39: deploy pinned maintained ClamAV/updater with private networking, protected signatures, production resource limits/monitoring and a coordinated quarantine rollout/recovery plan.
+
 Status: Not started.
 
 - production database
@@ -540,6 +550,8 @@ Status: Not started.
 ## PHASE 32 — Load Testing
 
 Limitations closure work: L18/L29/L33: measure representative tenant-lock, search/ACL/history, transfer, queue and abuse workloads; tune only from recorded results.
+
+L39: measure scanner RAM/CPU, source-size/format limits, queue delay and tenant fairness using representative files; record supported production scan limits from results.
 
 Status: Not started.
 

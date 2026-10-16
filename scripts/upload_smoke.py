@@ -17,6 +17,21 @@ def require(response, status):
     return response.json()
 
 
+def wait_scan_release(api, file_id, version_id=None):
+    """Observe durable scan state without consuming grant/action rate limits."""
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        versions = require(api.get(f"/files/{file_id}/versions"), 200)["items"]
+        version = next((row for row in versions if (
+            row["id"] == version_id if version_id else row["is_current"])), None)
+        if version and version["scan_status"] == "clean":
+            return
+        if version and version["scan_status"] in ("blocked", "oversized"):
+            raise RuntimeError("Owned smoke content remains quarantined by scan policy")
+        time.sleep(0.5)
+    raise RuntimeError("Owned smoke scan did not complete; inspect scan-worker health")
+
+
 def verify_email(api, email, inbox_url="http://localhost:8025"):
     token = None
     with httpx.Client(base_url=inbox_url, timeout=10) as inbox:
@@ -81,9 +96,10 @@ def main():
         uploaded = require(api.post(f"/files/{ticket['file']['id']}/complete"), 200)
         assert uploaded["status"] == "uploaded" and uploaded["size_bytes"] == len(body)
         assert uploaded["checksum_sha256"] == checksum
+        wait_scan_release(api, uploaded["id"])
         preview = require(api.post(f"/files/{uploaded['id']}/preview", json={}), 200)
         assert preview["kind"] == "text" and preview["text"] == body.decode()
-        assert preview["scan_status"] == "unscanned" and preview["version_number"] == 1
+        assert preview["scan_status"] == "clean" and preview["version_number"] == 1
         download_response = api.post(f"/files/{uploaded['id']}/download-url")
         download = require(download_response, 200)
         assert download_response.headers["cache-control"] == "no-store"
@@ -160,6 +176,7 @@ def main():
                 completed["checksum_kind"] == "sha256-composite"
                 and completed["checksum_sha256"] == multipart_checksum
             )
+            wait_scan_release(api, file_id)
             download = require(api.post(f"/files/{file_id}/download-url"), 200)
             received = transfer.get(download["download_url"])
             assert received.status_code == 200 and received.content == b"".join(chunks)
@@ -370,6 +387,7 @@ def main():
                 (original, body),
                 (version["version"], replacement),
             ]:
+                wait_scan_release(api, fid, record["id"])
                 grant = require(
                     api.post(f"/files/{fid}/versions/{record['id']}/download-url"), 200
                 )
@@ -435,6 +453,7 @@ def main():
             )
             selected = require(api.post(version_root + f"/{vid}/complete"), 200)
             assert selected["checksum_kind"] == "sha256-composite"
+            wait_scan_release(api, fid, vid)
             grant = require(api.post(version_root + f"/{vid}/download-url"), 200)
             assert transfer.get(grant["download_url"]).content == b"".join(chunks)
             reverted = require(

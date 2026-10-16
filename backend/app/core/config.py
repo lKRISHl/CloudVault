@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "CloudVault API"
     APP_VERSION: str = "0.1.0"
     PREVIEW_SOCKET: str = "/preview/renderer.sock"
+    CLAMD_HOST: str = "clamav"
+    CLAMD_PORT: int = Field(default=3310, ge=1, le=65535)
+    SCAN_MAX_BYTES: int = Field(default=100 * 1024**2, ge=1, le=100 * 1024**2)
+    SCAN_TIMEOUT_SECONDS: int = Field(default=90, ge=5, le=120)
+    SCAN_DEFINITION_MAX_AGE_SECONDS: int = Field(default=86400, ge=3600, le=172800)
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
 

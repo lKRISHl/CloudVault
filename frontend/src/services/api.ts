@@ -157,6 +157,7 @@ async function queuedPreview(id: string, version_id: string | null, page: number
 }
 
 export const api = {
+  retryScan: (id: string, version: string, signal?: AbortSignal) => fetchApi<{ detail: string }>(`${API_V1}/files/${id}/versions/${version}/scan`, { method: 'POST', signal }),
   preview: (id: string, version_id: string | null, page = 0, signal?: AbortSignal) => queuedPreview(id, version_id, page, signal),
   startVersionMultipart: (id: string, payload: VersionStart & { part_size: number; checksums: string[] }, signal?: AbortSignal) => fetchApi<VersionMultipartTicket>(`${API_V1}/files/${id}/versions/multipart`, { method: 'POST', body: JSON.stringify(payload), signal }),
   versionProgress: (id: string, version: string, signal?: AbortSignal) => fetchApi<VersionMultipartTicket>(`${API_V1}/files/${id}/versions/${version}/progress`, { signal }),
@@ -191,7 +192,7 @@ export const api = {
     Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
     return fetchApi<FileSearchPage>(`${API_V1}/files/search?${params}`, { signal });
   },
-  uploadConfiguration: () => fetchApi<{ max_bytes: number; enabled: boolean; multipart_max_bytes?: number; multipart_part_size?: number }>(`${API_V1}/files/upload-configuration`),
+  uploadConfiguration: () => fetchApi<{ max_bytes: number; scan_max_bytes?: number; enabled: boolean; multipart_max_bytes?: number; multipart_part_size?: number }>(`${API_V1}/files/upload-configuration`),
   startUpload: (payload: { name: string; folder_id: string | null; declared_size_bytes: number; declared_content_type: string | null; checksum_sha256: string; request_id: string }) => fetchApi<UploadTicket>(`${API_V1}/files/uploads`, { method: 'POST', body: JSON.stringify(payload) }),
   retryUpload: (id: string, checksum_sha256: string) => fetchApi<UploadTicket>(`${API_V1}/files/${id}/upload-url`, { method: 'POST', body: JSON.stringify({ checksum_sha256 }) }),
   downloadTicket: (id: string, signal?: AbortSignal) => fetchApi<DownloadTicket>(`${API_V1}/files/${id}/download-url`, { method: 'POST', signal }),

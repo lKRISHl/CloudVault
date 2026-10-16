@@ -11,6 +11,44 @@ from app.main import app
 from app.models import RefreshToken, Tenant, User  # noqa: F401
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def legacy_successful_scan_dependency(request, monkeypatch):
+    """Prior resource tests isolate their original contracts under a successful scan boundary.
+
+    Scan-enforcement tests keep the real release gate; actual ClamAV/queue/browser acceptance
+    is separate. This fixture never changes application configuration or shipped behavior.
+    """
+    # Freeze the legacy dependency substitution to the original resource modules.
+    # New modules exercise the real gate by default; never silently exempt future tests.
+    legacy_modules = {
+        "test_downloads",
+        "test_previews",
+        "test_preview_jobs",
+        "test_shares",
+        "test_versions",
+        "test_version_transfers",
+        "test_permissions",
+        "test_uploads_integration",
+        "test_versions_integration",
+        "test_version_transfers_integration",
+        "test_previews_integration",
+        "test_library_recovery_integration",
+        "test_trash_integration",
+        "test_library_recovery",
+        "test_trash",
+        "test_multipart_integration",
+    }
+    if (
+        request.module.__name__.rsplit(".", 1)[-1] in legacy_modules
+        and request.node.get_closest_marker("scan_enforcement") is None
+    ):
+
+        async def released(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr("app.services.scans.require_released", released)
+
+
 @pytest_asyncio.fixture
 async def db_factory(tmp_path):
     # TEST_DATABASE_URL must point to a disposable test database.

@@ -64,7 +64,7 @@ export function UploadForm({ folderId, retryId, finished, multipartRetry = false
   }
   return <form ref={formRef} onSubmit={(event) => void submit(event)} className="upload-panel space-y-3">
     <div className="upload-heading"><span className="upload-icon"><Icon name="upload" /></span><div><h3>{retryId ? 'Resume your upload' : 'Bring your work here'}</h3><p>{retryId ? 'Choose the original file to retry this pending upload.' : 'Upload a file to this folder.'}</p></div></div>
-    {config.data && <p>Maximum file size: {config.data.max_bytes.toLocaleString()} bytes. Uploads remain unscanned.</p>}
+    {config.data && <p>Maximum file size: {config.data.max_bytes.toLocaleString()} bytes. Uploads remain quarantined until scanning completes. Scanner limit: {config.data.scan_max_bytes?.toLocaleString() ?? 'unavailable'} bytes; larger files cannot be released.</p>}
     {!!config.data?.multipart_max_bytes && !retryId && <><p>Multipart limit: {config.data.multipart_max_bytes.toLocaleString()} bytes. Larger files use chunked upload automatically.</p><label className="flex items-center gap-2"><input type="checkbox" checked={multipart} disabled={busy} onChange={event => setMultipart(event.target.checked)} />Use multipart upload</label></>}
     {config.data && !config.data.enabled && <p>Uploads are not configured.</p>}
     {saved.data && <><p role="status">Saved progress: {Math.floor(saved.data.confirmed_bytes / saved.data.file.declared_size_bytes * 100)}% · {saved.data.confirmed_bytes.toLocaleString()} of {saved.data.file.declared_size_bytes.toLocaleString()} bytes confirmed.</p>

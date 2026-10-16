@@ -286,3 +286,44 @@
 - FFmpeg/FFprobe are installed only in the dedicated credential-free network-disabled renderer target. Supported MP4/WebM H.264/VP8/VP9 input produces one first-frame static PNG, not moving playback/audio. Keep 10 MiB source, 120-second/4096-dimension/8,294,400-pixel video bounds, bounded source probing, 4/5-second subprocess deadlines, existing native CPU/address-space/container/PID/time limits and bounded tmpfs. Whitelist file/pipe protocols; disable MOV external/absolute references; kill decoder process groups at worker exit. No API/queue host parsing fallback.
 - A busy renderer is retryable rather than permanently unsupported. Malformed/resource-limited/unsupported inputs retain explicit download fallback and unscanned status. 019 refuses rollback that loses any cleanup ref or an active preview lease. Local lifecycle/contract tests do not certify actual FFmpeg, Linux isolation, Redis/prefork/restart, PostgreSQL, provider behavior or browser acceptance. Docker was stopped and native video tools absent; no engine restart, app migration or deferred Phase 15 browser run occurred. Phase 16 remains open for live acceptance; later L38 provider/browser/security checkpoints remain 26/27.
 - Primary references: [FFmpeg protocol whitelist](https://ffmpeg.org/ffmpeg-protocols.html), [MOV external-reference controls](https://ffmpeg.org/ffmpeg-formats.html). See docs/phases/phase16.md for evidence and operation.
+## ADR-041: Exact-Version Quarantine and Bounded ClamAV Release
+
+- 2026-10-16: uploaded confirms provider integrity; it does not authorize content release.
+  Migration 020 puts all existing File/FileVersion content into pending quarantine and
+  cancels pre-existing preview jobs. No old object is grandfathered into release.
+- A dedicated private Celery queue scans one immutable version per durable maintenance
+  hint. PostgreSQL UUID leases, three attempts, bounded backoff and expiry fence publication.
+  Read-only and foreign-tenant users cannot retry. Authorized writers can retry errors;
+  blocked/oversized content cannot be manually marked clean.
+- Before release, conditional provider reads must match retained size, ETag, octet-stream,
+  bucket and full basic/composite SHA-256. Bytes stream in at most 64 KiB chunks to ClamD
+  INSTREAM; no file bytes enter PostgreSQL or Redis. A scanner must consume the complete
+  verified stream before any verdict can publish. Recheck exact metadata, policy, namespace,
+  cleanup/prune state and lease under the tenant lock after scanner I/O.
+- Current and historical downloads, share creation/resolution, transient previews and queued
+  derivative request/publication/result require the same exact-version release gate. Existing
+  signed URLs are capabilities until expiry and cannot be recalled (D01). Previously delivered
+  bytes cannot be recalled. Deployment must account for outstanding pre-upgrade capabilities.
+- ClamAV runs non-root with a read-only root, dropped capabilities, CPU/RAM/PID/temp bounds,
+  a private internal network, no published port and no API/DB/S3 credentials. A separate
+  credential-free updater has outbound access and writes the signatures volume; the daemon
+  mounts it read-only. Disable concurrent database reload to bound memory on the 4 GiB WSL
+  development host. This is defense in depth, not a production sandbox certification.
+- Definitions must be at most 24 hours old by default (configuration maximum 48 hours).
+  Missing/stale/malformed replies, timeouts, provider changes and hashing failures fail closed.
+  Changing the scan-size policy or provider namespace invalidates release and queues a fresh
+  scan. Signature updates do not retroactively certify/rescan released bytes; continuous
+  rescanning and threat response require explicit later security/operations work.
+- Default and maximum supported scanner input is 100 MiB; upload limits remain independent.
+  Larger completed multipart content is retained/quarantined and cannot be downloaded,
+  shared or previewed. No silent size-limit bypass. Archive limits, encrypted content,
+  macros and malformed supported media trigger conservative scanner policy where supported.
+  Unsupported detection and antivirus false negatives remain possible: UI says no known
+  threats detected and never guarantees safety. Quota/billing for retained quarantined bytes
+  is due in 19; provider/security/monitoring/load gates remain 26/27/28/31/32 (L39).
+- Rollback refuses retained uploaded content or active scan leases because removing quarantine
+  would restore unsafe grants. Use a suitable coordinated pre-upgrade backup, with storage
+  recovery separately planned. Never weaken rollback to satisfy historical migration tests.
+- Official protocol/deployment references: https://docs.clamav.net/manual/Installing/Docker.html
+  and https://docs.clamav.net/manual/Usage/Scanning.html . Local real-engine/queue evidence and
+  remaining verification are recorded in docs/phases/phase17.md.

@@ -36,13 +36,13 @@ function Preview({ id, version }: { id: string; version: string | null }) {
   return <main className="space-y-5">
     <header><p className="eyebrow">Read your content</p><h1 className="page-title">File preview</h1><p className="break-words">{result?.name}</p></header>
     <div className="flex flex-wrap gap-3"><Link className="secondary-button" to="/app/folders">Back to files</Link><Link className="secondary-button" to={`/app/files/${id}/versions`}>Versions and downloads</Link></div>
-    <p>Content is unscanned. Images, PDF pages and video posters are rendered as static PNGs; UTF-8 content is displayed as text. Video posters support selected MP4/WebM videos up to two minutes. Only supported content up to 10 MiB can be previewed.</p>
+    <p>Previews require a successful scan; this does not guarantee safety. Images, PDF pages and video posters are rendered as static PNGs; UTF-8 content is displayed as text. Video posters support selected MP4/WebM videos up to two minutes. Only supported content up to 10 MiB can be previewed.</p>
     <button className="secondary-button" disabled={busy} onClick={() => { setPage(0); setReload(reload + 1); }}>Refresh preview</button>
     {busy && <button className="secondary-button" onClick={() => { pending.current?.abort(); setBusy(false); setError('Preview cancelled. Refresh to try again.'); }}>Cancel preview</button>}
     {busy && <p role="status">Preparing bounded preview…</p>}
     {error && <p role="alert">{error}</p>}
     {result && <section className="content-card p-4 space-y-3">
-      <p>Version {result.version_number} · {result.detected_type ?? 'Unsupported type'} · Unscanned</p>
+      <p>Version {result.version_number} · {result.detected_type ?? 'Unsupported type'} · {result.scan_status === 'clean' ? 'No known threats detected' : 'Scan status unavailable'}</p>
       {result.kind === 'video' && <p>Static video poster. Use Versions and downloads for playback of the original.</p>}
       {result.kind === 'unsupported' && <p role="status">{result.reason} Use Versions and downloads for the original.</p>}
       {result.kind === 'text' && <pre aria-label="Text preview" className="whitespace-pre-wrap break-words overflow-auto max-h-[70vh]">{result.text}</pre>}

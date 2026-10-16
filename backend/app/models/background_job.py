@@ -12,7 +12,9 @@ class BackgroundJob(Base):
 
     __tablename__ = "background_jobs"
     __table_args__ = (
-        CheckConstraint("name IN ('email', 'storage', 'previews')", name="ck_background_job_name"),
+        CheckConstraint(
+            "name IN ('email', 'storage', 'previews', 'scans')", name="ck_background_job_name"
+        ),
         CheckConstraint("runs >= 0 AND failures >= 0", name="ck_background_job_counts"),
     )
 

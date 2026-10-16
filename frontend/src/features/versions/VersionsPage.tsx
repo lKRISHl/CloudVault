@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
 import type { FileVersion } from '../../types';
 import { forgetVersionManifest, loadVersionManifest, transferVersion } from './versionTransfers';
+import { ScanStatus } from '../folders/ScanStatus';
 
 export function VersionsPage() {
   const { fileId = '' } = useParams(); const { user } = useAuth();
@@ -27,7 +28,7 @@ function Versions({ fileId }: { fileId: string }) {
   const controller = useRef(new AbortController()); const transfer = useRef<AbortController | null>(null);
   const cancelRequested = useRef(false); const input = useRef<HTMLInputElement>(null);
   useEffect(() => { controller.current = new AbortController(); return () => { controller.current.abort(); transfer.current?.abort(); }; }, []);
-  const query = useQuery({ queryKey: ['versions', user?.tenant?.id, user?.id, fileId, offset], queryFn: ({ signal }) => api.versions(fileId, offset, signal) });
+  const query = useQuery({ queryKey: ['versions', user?.tenant?.id, user?.id, fileId, offset], queryFn: ({ signal }) => api.versions(fileId, offset, signal), refetchInterval: query => query.state.data?.items.some(version => version.status === 'uploaded' && ['pending', 'scanning'].includes(version.scan_status ?? '')) ? 2000 : false });
   const config = useQuery({ queryKey: ['version-configuration', user?.tenant?.id, user?.id], queryFn: () => api.uploadConfiguration() });
   const data = query.data; const working = busy || cancelling;
   async function invalidate() {
@@ -80,7 +81,7 @@ function Versions({ fileId }: { fileId: string }) {
   }
   return <main className="space-y-6">
     <header className="page-heading"><div><p className="eyebrow">File history</p><h1>Versions</h1><p>{data?.file.name ?? 'Retained content and current version'}</p></div><Link className="secondary-button" to={`/app/folders${data?.file.folder_id ? `?folder=${data.file.folder_id}` : ''}`}>Back to files</Link></header>
-    <p>Versions keep the file’s current name, location and permissions. Content changes revoke external links. Files remain unscanned. Queued history deletion is irreversible and waits for safe storage cleanup.</p>
+    <p>Versions keep the file’s current name, location and permissions. Content changes revoke external links. Each version must pass scanning before downloads, previews or sharing. Queued history deletion is irreversible and waits for safe storage cleanup.</p>
     {query.isPending && <p>Loading versions…</p>}
     {query.error && <p role="alert">{query.error instanceof Error ? query.error.message : 'Unable to load versions'}</p>}
     <button className="secondary-button" disabled={working || query.isFetching} onClick={() => void query.refetch()}>Refresh versions</button>
@@ -106,6 +107,8 @@ function Versions({ fileId }: { fileId: string }) {
       }); }}><h2 className="section-title">History retention</h2><p>Current policy: {data.file.version_keep_last ? `keep newest ${data.file.version_keep_last} plus current if older` : 'keep all history'}. Applying a smaller policy queues older history for deletion. Disabling the policy does not undo queued deletions.</p><label className="block">Keep newest versions (blank keeps all)<input aria-label="Keep newest versions" type="number" min="1" max="1000" value={keep} disabled={working} onChange={event => setKeep(event.target.value)} /></label><label className="block">Type PRUNE to apply retention<input aria-label="Type PRUNE to apply retention" value={policyConfirmation} disabled={working} onChange={event => setPolicyConfirmation(event.target.value)} /></label><button className="secondary-button" disabled={working || policyConfirmation !== 'PRUNE'}>Apply retention policy</button></form>}
       <ul className="content-card divide-y">{data.items.map(version => <li className="p-5 space-y-2" key={version.id}>
         <h2 className="font-semibold">Version {version.number}{version.is_current ? ' · Current' : ''}</h2>
+        {version.status === 'uploaded' && <ScanStatus state={version.scan_status} />}
+        {data.file.can_write && version.scan_status === 'error' && !version.prune_requested_at && <button className="secondary-button" disabled={working} onClick={() => void action(async () => { const result = await api.retryScan(fileId, version.id, controller.current.signal); await invalidate(); setMessage(result.detail); })}>Retry scan version {version.number}</button>}
         <p>{version.status === 'uploaded' ? `${version.size_bytes?.toLocaleString()} verified bytes` : `${version.declared_size_bytes.toLocaleString()} declared bytes · Pending`}{version.cancelled_at ? ' · Cancelled; cleanup pending' : ''}{version.prune_requested_at ? ' · Deletion queued' : ''}</p>
         <p className="break-words">Created {new Date(version.created_at).toLocaleString()} · Uploader {version.created_by}</p>
         <div className="flex flex-wrap gap-3">

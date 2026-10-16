@@ -42,6 +42,9 @@ class PreviewJobService:
         versions = VersionService(self.db)
         file, _ = await versions.access(actor, job.file_id)
         version = await versions.find(actor, file, job.version_id)
+        from app.services.scans import require_released
+
+        await require_released(self.db, file, version)
         if (
             version.status != "uploaded"
             or job.generation
@@ -67,6 +70,9 @@ class PreviewJobService:
             )
         )
         version = await versions.find(actor, file, version_id)
+        from app.services.scans import require_released
+
+        await require_released(self.db, file, version)
         if version.status != "uploaded":
             raise HTTPException(409, "Only completed versions can be previewed")
         if version.storage_bucket != settings.S3_BUCKET_NAME:

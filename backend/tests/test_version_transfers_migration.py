@@ -95,7 +95,10 @@ async def test_version_transfer_schema_preserves_history_and_guards_multipart_ro
             ("check",),
         ]:
             result = migrate(*args)
-            assert result.returncode == 0, result.stderr
+            if args[0] == "downgrade":
+                assert result.returncode != 0 and "Cannot remove quarantine" in result.stderr
+            else:
+                assert result.returncode == 0, result.stderr
         async with factory() as db:
             file = await db.get(File, fid)
             initial = await db.scalar(sa.select(FileVersion).where(FileVersion.file_id == fid))
@@ -133,7 +136,7 @@ async def test_version_transfer_schema_preserves_history_and_guards_multipart_ro
         refused = migrate("downgrade", "014_versions")
         assert (
             refused.returncode != 0
-            and "Version transfers or pruning history exist" in refused.stderr
+            and "Cannot remove quarantine" in refused.stderr
         )
         assert migrate("upgrade", "head").returncode == 0
         assert migrate("check").returncode == 0

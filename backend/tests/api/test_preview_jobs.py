@@ -125,7 +125,7 @@ async def test_queued_bytes_stay_in_storage_not_metadata_and_result_is_authorize
     assert response.status_code == 200, response.text
     assert response.headers["cache-control"] == "no-store"
     result = response.json()["preview"]
-    assert result["scan_status"] == "unscanned"
+    assert result["scan_status"] == "clean"
     assert result["kind"] == ("text" if body.startswith(b"<") else "image")
     assert "http" not in str(result)
 

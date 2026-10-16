@@ -93,7 +93,7 @@ def test_celery_queues_are_json_only_late_ack_and_have_no_result_backend():
         < celery_app.conf.broker_transport_options["visibility_timeout"]
     )
     assert not celery_app.conf.worker_enable_remote_control
-    assert set(celery_app.conf.beat_schedule) == {"email", "storage", "previews"}
+    assert set(celery_app.conf.beat_schedule) == {"email", "storage", "previews", "scans"}
     assert all(
         not item.get("args") and not item.get("kwargs")
         for item in celery_app.conf.beat_schedule.values()

@@ -29,6 +29,7 @@ test('real replacement and historical downloads retain both contents and restore
   await expect(page.getByRole('status')).toContainText('Version uploaded and verified');
   await expect(page.getByText('Current: version 2', { exact: true })).toBeVisible();
   for (const [number, bytes] of [[1, original], [2, updated]] as const) {
+    await expect(page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: new RegExp(`^Version ${number}( · Current)?$`) }) })).toContainText('Scan complete:', { timeout: 30000 });
     const event = page.waitForEvent('download'); await page.getByRole('button', { name: `Download version ${number}`, exact: true }).click();
     const downloaded = await event; expect(await readFile((await downloaded.path())!)).toEqual(bytes);
     expect(downloaded.suggestedFilename()).toBe('Versioned.txt');
@@ -77,11 +78,11 @@ test('multipart replacement resumes after reload, supports cancellation and prot
     if (route.request().method() === 'PUT' && route.request().url().includes('partNumber=2')) await route.fulfill({ status: 503, headers: { 'Access-Control-Allow-Origin': 'http://127.0.0.1:43000' }, body: 'Provider outage for test' });
     else await route.continue();
   };
-  await page.route('http://localhost:9000/**', outage);
+  await page.route(`${process.env.TEST_S3_ENDPOINT}/**`, outage);
   await page.getByLabel('Replacement file', { exact: true }).setInputFiles(originalPath);
   await page.getByRole('button', { name: 'Upload new version', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Version part transfer failed');
-  await page.unroute('http://localhost:9000/**', outage); await page.reload();
+  await page.unroute(`${process.env.TEST_S3_ENDPOINT}/**`, outage); await page.reload();
   await expect(page.getByText(/Resume record:/)).toBeVisible();
   const before = puts; const wrong = Buffer.from(body); wrong[0] = 87;
   await writeFile(changedPath, wrong);
@@ -92,6 +93,7 @@ test('multipart replacement resumes after reload, supports cancellation and prot
   await page.getByRole('button', { name: 'Upload new version', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Version uploaded and verified'); expect(puts).toBe(before + 1);
   await expect(page.getByText('Current: version 2', { exact: true })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Version 2 · Current', exact: true }) })).toContainText('Scan complete:', { timeout: 30000 });
   const downloadEvent = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download version 2', exact: true }).click();
   const received = await readFile((await (await downloadEvent).path())!);
   expect(received.length).toBe(body.length);
@@ -103,11 +105,11 @@ test('multipart replacement resumes after reload, supports cancellation and prot
   await page.getByLabel('Type DELETE to remove history').fill('DELETE'); await page.getByRole('button', { name: 'Confirm history deletion' }).click();
   await expect(page.getByRole('status')).toContainText('deletion queued');
   await expect(page.getByRole('button', { name: 'Download version 1', exact: true })).toHaveCount(0);
-  await page.route('http://localhost:9000/**', outage);
+  await page.route(`${process.env.TEST_S3_ENDPOINT}/**`, outage);
   await page.getByLabel('Replacement file', { exact: true }).setInputFiles(originalPath);
   await page.getByRole('button', { name: 'Upload new version', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Version part transfer failed');
-  await page.unroute('http://localhost:9000/**', outage);
+  await page.unroute(`${process.env.TEST_S3_ENDPOINT}/**`, outage);
   await page.getByRole('button', { name: 'Cancel active upload', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Cancellation recorded');
   await expect(page.getByText('Current: version 2', { exact: true })).toBeVisible();

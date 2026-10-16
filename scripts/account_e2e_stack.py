@@ -120,6 +120,36 @@ async def serve():
         asyncio.create_task(preview_fixture_loop())
         if os.getenv("TEST_PREVIEW_FIXTURE_RENDERER") == "1" else None
     )
+    async def scan_fixture_loop():
+        # Generated legacy browser fixtures only. Real Phase17 acceptance uses ClamAV
+        # and Celery instead; this dependency never bypasses the release gate or hashing.
+        from app.core.config import settings
+        from app.services.scans import ScanService
+        from app.storage.s3 import S3ObjectStorage
+
+        class FixtureScanner:
+            async def scan(self, chunks):
+                async for _ in chunks:
+                    pass
+                return "clean", "browser-fixture-dependency"
+
+        while True:
+            async with async_session_maker() as db:
+                service = ScanService(db, scanner=FixtureScanner())
+                job = await service.claim()
+                if job:
+                    storage = S3ObjectStorage(settings, job.tenant_id)
+                    try:
+                        service.storage = storage
+                        await service.process(job)
+                    finally:
+                        await storage.close()
+            await asyncio.sleep(0.05)
+
+    scan_dispatcher = (
+        asyncio.create_task(scan_fixture_loop())
+        if os.getenv("TEST_SCAN_FIXTURE") == "1" and os.getenv("TEST_S3_ENDPOINT") else None
+    )
     try:
         await uvicorn.Server(
             uvicorn.Config(
@@ -131,6 +161,10 @@ async def serve():
             )
         ).serve()
     finally:
+        if scan_dispatcher:
+            scan_dispatcher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await scan_dispatcher
         dispatcher.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await dispatcher

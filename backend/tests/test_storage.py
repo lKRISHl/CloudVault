@@ -44,6 +44,39 @@ def reference(store):
     return ObjectRef(store.tenant_id, uuid4(), uuid4())
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "actual,declared,etag",
+    [
+        (b"exact", 5, '"same"'),
+        (b"short", 6, '"same"'),
+        (b"overflow", 5, '"same"'),
+        (b"exact", 5, '"other"'),
+    ],
+)
+async def test_scan_stream_is_conditional_bounded_and_closes_body(storage, actual, declared, etag):
+    ref = reference(storage)
+    raw = io.BytesIO(actual)
+    body = StreamingBody(raw, len(actual))
+    with Stubber(storage.client) as stub:
+        stub.add_response(
+            "get_object",
+            {"Body": body, "ContentLength": declared, "ETag": etag},
+            {"Bucket": storage.bucket, "Key": ref.key, "IfMatch": '"same"'},
+        )
+        if len(actual) == declared and etag == '"same"':
+            assert (
+                b"".join(
+                    [part async for part in storage.stream_for_scanning(ref, '"same"', declared)]
+                )
+                == actual
+            )
+        else:
+            with pytest.raises(StorageUnavailableError):
+                _ = [part async for part in storage.stream_for_scanning(ref, '"same"', declared)]
+        assert raw.closed
+
+
 @pytest.mark.parametrize(
     "values",
     [
@@ -274,10 +307,16 @@ async def test_processing_reads_are_bounded_conditional_and_tenant_scoped(storag
             "head_object",
             {"ContentLength": len(body), "ETag": '"verified"', "LastModified": datetime.now(UTC)},
         )
-        stub.add_response("get_object", {"Body": stream}, {
-            "Bucket": storage.bucket, "Key": ref.key,
-            "Range": f"bytes=0-{len(body)}", "IfMatch": '"verified"',
-        })
+        stub.add_response(
+            "get_object",
+            {"Body": stream},
+            {
+                "Bucket": storage.bucket,
+                "Key": ref.key,
+                "Range": f"bytes=0-{len(body)}",
+                "IfMatch": '"verified"',
+            },
+        )
         assert await storage.read_for_processing(ref, len(body)) == body
         assert stream._raw_stream.closed
     for maximum in (0, True, MAX_PROCESSING_BYTES + 1):

@@ -13,6 +13,14 @@ async def run_job(name):
     engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
+        if name == "scans":
+            from app.jobs.scan_queue import tick as scan_tick
+
+            async def handle_scan(cursor):
+                await scan_tick(factory)
+                return None
+
+            return await BackgroundJobService(factory).run(name, handle_scan)
         if name == "previews":
             from app.jobs.preview_queue import tick
 
@@ -93,3 +101,8 @@ def storage_maintenance(self):
 @celery_app.task(bind=True, name="cloudvault.maintenance.previews")
 def preview_maintenance(self):
     return execute(self, "previews")
+
+
+@celery_app.task(bind=True, name="cloudvault.maintenance.scans")
+def scan_maintenance(self):
+    return execute(self, "scans")

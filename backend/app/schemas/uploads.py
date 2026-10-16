@@ -36,6 +36,7 @@ class UploadTicket(BaseModel):
 
 class UploadConfiguration(BaseModel):
     max_bytes: int
+    scan_max_bytes: int
     enabled: bool
     multipart_max_bytes: int = 0
     multipart_part_size: int = 8 * 1024 * 1024

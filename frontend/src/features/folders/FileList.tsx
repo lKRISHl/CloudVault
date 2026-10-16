@@ -9,6 +9,7 @@ import { DownloadButton } from './DownloadButton';
 import { RenameFile } from './RenameFile';
 import { TrashButton } from '../trash/TrashButton';
 import { FileRecoveryActions } from './FileRecoveryActions';
+import { ScanStatus } from './ScanStatus';
 
 export function FileList({ folderId, writable = false }: { folderId: string | null; writable?: boolean }) {
   const { user } = useAuth();
@@ -24,10 +25,11 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
   const [offset, setOffset] = useState(0);
   const [retryId, setRetryId] = useState<string | null>(null);
   const query = useQuery({ queryKey: ['files', user?.tenant?.id, user?.id, folderId, offset],
-    queryFn: () => api.files(folderId, offset) });
+    queryFn: () => api.files(folderId, offset),
+    refetchInterval: query => query.state.data?.items.some(file => file.status === 'uploaded' && ['pending', 'scanning'].includes(file.scan_status ?? '')) ? 2000 : false });
   return <section aria-label="Files" className="file-section space-y-3">
     <h2 className="section-title">Files <span>Workspace library</span></h2>
-    <p>Resource and containing folder permissions govern access. Files remain unscanned; open only content you trust.</p>
+    <p>Resource and containing folder permissions govern access. Uploaded content stays quarantined until scanning succeeds; open only content you trust.</p>
     {writable && <UploadForm key={retryId ?? 'new-upload'} folderId={folderId} retryId={retryId}
       multipartRetry={query.data?.items.some(file => file.id === retryId && file.upload_method === 'multipart') ?? false}
       finished={() => setRetryId(null)} />}
@@ -39,7 +41,8 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
     </>}
     <ul className="file-list content-card divide-y">{query.data?.items.map((file) => <li key={file.id} className="file-row p-4">
       <p className="file-name font-medium"><span className="file-icon"><Icon name="file" /></span><span>{file.name}</span><span className={`status-badge ${file.status}`}>{file.status === 'uploaded' ? 'Uploaded' : file.multipart_state === 'aborted' ? 'Cancelled' : 'Pending'}</span></p>
-      <p>{file.status === 'uploaded' ? `Uploaded · Verified size: ${file.size_bytes?.toLocaleString()} bytes · Unscanned` : `Pending upload · Declared size: ${file.declared_size_bytes.toLocaleString()} bytes`}</p>
+      <p>{file.status === 'uploaded' ? `Uploaded · Verified size: ${file.size_bytes?.toLocaleString()} bytes` : `Pending upload · Declared size: ${file.declared_size_bytes.toLocaleString()} bytes`}</p>
+      {file.status === 'uploaded' && <ScanStatus state={file.scan_status} />}
       {file.upload_method === 'multipart' && <p>{file.multipart_state === 'aborted' ? 'Multipart upload cancelled. The name stays reserved until cleanup.' : 'Chunked upload'}</p>}
       <p>Declared type: {file.declared_content_type ?? 'Type unspecified'}</p>
       <p>{file.can_write ? 'Creator or manager access' : 'Read only'}</p>

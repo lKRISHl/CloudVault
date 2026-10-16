@@ -125,6 +125,9 @@ class PreviewService:
             )
         )
         version = await self.versions.find(actor, file, version_id)
+        from app.services.scans import require_released
+
+        await require_released(self.db, file, version)
         if version.status != "uploaded":
             raise HTTPException(409, "Only completed retained versions can be previewed")
         if version.storage_bucket != settings.S3_BUCKET_NAME:
@@ -184,6 +187,7 @@ class PreviewService:
         version = await self.versions.find(actor, file, version_id)
         if payload.version_id is None and file.version_generation != generation:
             raise HTTPException(409, "Current version changed; refresh preview")
+        await require_released(self.db, file, version)
         return PreviewRead(
             **result.model_dump(),
             file_id=file.id,

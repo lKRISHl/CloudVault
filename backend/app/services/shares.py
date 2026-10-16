@@ -82,7 +82,10 @@ class ShareService:
         password_hash = (
             await asyncio.to_thread(hash_password, payload.password) if payload.password else None
         )
-        await self.managed_file(actor, file_id, write=True)
+        file = await self.managed_file(actor, file_id, write=True)
+        from app.services.scans import require_released
+
+        await require_released(self.db, file)
         raw = secrets.token_urlsafe(32)
         link = ShareLink(
             file_id=file_id,
@@ -195,6 +198,9 @@ class ShareService:
         publisher = SimpleNamespace(id=link.created_by, tenant_id=link.tenant_id)
         try:
             await PermissionService(self.db).require_file(publisher, publisher_role, file)
+            from app.services.scans import require_released
+
+            await require_released(self.db, file)
         except HTTPException:
             raise denied from None
         remaining = (

@@ -139,7 +139,10 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   smokes pass. PostgreSQL/provider baseline passes all 306 tests. Final browser rerun passes
   22/22, with 105 frontend tests/lint/build and disposable cleanup complete. A navigation cache
   race found during the resumed run was fixed with two late-response regression tests.
-  Quarantine/scanning remain 17. See [15](phases/phase15.md); video/job expansion is L38.
+  **Phase 17 local checkpoint complete:** exact-version quarantine, verified streaming hashes,
+  real ClamAV/queue detection/release, guarded backfill, browser status/retry and existing app
+  rescans pass. See [17](phases/phase17.md). Explicit scan size/coverage/retention/rescan and
+  production deployment extensions are L39; video/job expansion remains L38.
 - **L10 — Sharing covers files only; no folder links or recipient editing/upload.**
   Source: [11 §J](phases/phase11.md#j-operations-and-limitations). **When: 18A folder-read
   sharing; editing/upload remains decision P02.** Verify subtree/current-ancestor boundaries,
@@ -410,3 +413,20 @@ while implementing these tasks is fixed before proceeding, regardless of its pla
   using normal version activation/share invalidation/history. Migration 018 preserves old
   unknown scope and guards lossy rollback. See ADR-039/phase16 report for local evidence;
   actual PG/local-provider lost-ACK/late-write checks pass. AWS certification remains 26/31.
+## Newly tracked in Phase 17
+
+- **L39 — Bounded antivirus coverage, quarantined retention and operational release gates.**
+  Source: [Phase 17](phases/phase17.md), ADR-041. Default/maximum supported scan input is
+  100 MiB; larger uploads stay quarantined. Definitions can miss threats and supported
+  formats/archives have conservative bounds. Successful scan is a point-in-time result;
+  signature updates do not automatically rescan previously released versions. No manual
+  override converts blocked/oversized content to clean. Prior signed URLs retain expiry.
+  **When: 19** account for every retained quarantined byte/reservation in quotas;
+  **26/31** verify chosen AWS provider, pinned maintained scanner images and private network/
+  signature-update deployment, backup/restore and outstanding capability rollout;
+  **27** review detection/format/size policy, retroactive rescanning/threat response and
+  released-content revocation; **28** monitor definition freshness, unavailable scanner,
+  oldest pending/failed scan, quarantine counts and signature-updater failures;
+  **32** measure memory/CPU, queue delay/fairness and throughput with representative objects,
+  then record the supported production scan-size/service limits. These are automatically
+  required work when continuing those phases; they are not closed by installing ClamAV.

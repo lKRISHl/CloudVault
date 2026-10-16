@@ -33,7 +33,7 @@ async def storage_dependency():
             await storage.close()
 
 
-async def inspect(names):
+async def inspect(names, probe_scanner=False):
     engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
     try:
         factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -42,6 +42,18 @@ async def inspect(names):
         for name in names:
             result = await service.health(name)
             result["backlog"] = await backlog(factory, name)
+            if name == "scans":
+                if result["backlog"]["failed_scans"]["count"] and result["state"] == "ok":
+                    result["state"] = "degraded"
+                if probe_scanner:
+                    from app.scanning.clamd import ClamdScanner
+
+                    try:
+                        await ClamdScanner().version()
+                        result["scanner_dependency"] = "ok"
+                    except Exception:
+                        result["scanner_dependency"] = "unavailable_or_stale"
+                        result["state"] = "dependency_unavailable"
             if (
                 name == "email"
                 and result["state"] == "ok"
@@ -61,7 +73,7 @@ async def inspect(names):
                 and result["state"] == "ok"
             ):
                 result["state"] = "degraded"
-            if name in ("storage", "previews"):
+            if name in ("storage", "previews", "scans"):
                 result["storage_dependency"] = await storage_dependency()
                 if result["storage_dependency"] != "ok":
                     result["state"] = "dependency_unavailable"
@@ -74,13 +86,17 @@ async def inspect(names):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--job", choices=sorted(JOBS), action="append")
-    names = parser.parse_args().job or sorted(JOBS)
+    parser.add_argument(
+        "--scanner", action="store_true", help="Probe private scanner from scan-worker"
+    )
+    args = parser.parse_args()
+    names = args.job or sorted(JOBS)
     try:
         with Redis.from_url(
             settings.REDIS_URL, socket_connect_timeout=2, socket_timeout=2
         ) as client:
             client.ping()
-        results = asyncio.run(inspect(names))
+        results = asyncio.run(inspect(names, probe_scanner=args.scanner))
     except Exception:
         print(json.dumps({"state": "dependency_unavailable"}))
         raise SystemExit(1) from None

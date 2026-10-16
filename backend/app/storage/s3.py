@@ -150,6 +150,32 @@ class S3ObjectStorage:
     async def delete(self, ref: ObjectRef) -> None:
         await self.call(self.client.delete_object, Key=self.key(ref))
 
+    async def stream_for_scanning(self, ref: ObjectRef, etag: str, size: int):
+        """Conditional full read in bounded chunks; never buffer the user object in RAM."""
+        key = self.key(ref)
+        if type(size) is not int or not 0 <= size <= 100 * 1024**2:
+            raise ValueError("Scan source exceeds supported bound")
+        result = await self.call(self.client.get_object, Key=key, IfMatch=etag)
+        body = result["Body"]
+        try:
+            if result.get("ContentLength") != size or result.get("ETag") != etag:
+                raise StorageUnavailableError("Scan source changed")
+            total = 0
+            while True:
+                chunk = await asyncio.to_thread(body.read, min(65536, size - total + 1))
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > size:
+                    raise StorageUnavailableError("Scan source exceeds verified size")
+                yield chunk
+            if total != size:
+                raise StorageUnavailableError("Incomplete scan source")
+        except (BotoCoreError, OSError):
+            raise StorageUnavailableError("Scan source unavailable") from None
+        finally:
+            body.close()
+
     async def close(self) -> None:
         if self.signer is not self.client:
             await asyncio.to_thread(self.signer.close)

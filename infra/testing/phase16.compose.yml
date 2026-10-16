@@ -29,6 +29,8 @@ services:
     environment: *test-environment
   preview-worker:
     environment: *test-environment
+  scan-worker:
+    environment: *test-environment
   job-scheduler:
     environment:
       UPLOAD_CLEANUP_INTERVAL_SECONDS: "5"

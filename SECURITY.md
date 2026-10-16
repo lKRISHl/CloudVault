@@ -188,3 +188,32 @@ tools. Actual owned-video decoding passed inside the constrained container, alon
 provider/restart and dedicated browser checks. Independent security/load and AWS reviews remain
 required. Phase 15's separate full browser suite subsequently passed 22/22 after the user
 resumed it; generated-fixture browser rendering is not independent isolation certification.
+## Phase 17 quarantine policy
+
+Migration 020 supersedes earlier unscanned-download behavior. Every retained completed
+version starts quarantined; only a complete, matching size/ETag/basic-or-composite SHA-256
+stream with a successful fresh-definition ClamAV verdict can be released. All current and
+historical download, anonymous share and preview grant/result paths check this version-bound
+policy. Tenant/membership/resource permissions remain independently required. A scan result
+does not guarantee safety. No public quarantine-override endpoint exists.
+
+Blocked, oversized, failed, pending and scanning content cannot receive new grants. Failed
+scans have three bounded worker attempts; authorized writers can explicitly retry errors.
+Lease tokens/expiry, lifecycle checks and current policy/namespace fingerprint fence scan
+publication after I/O. Scan-policy/provider changes require rescanning. Source reads are
+conditional and chunked; neither PostgreSQL nor Redis receives file bytes.
+
+ClamAV's private internal network has no host port or application credentials. Its separate
+updater has outbound access and write access only to the shared definitions volume. The daemon
+has read-only definitions/root, resource/PID/temp bounds and no capabilities. Definitions
+default to a maximum age of 24h. Malformed/stale/unavailable scanner results fail closed;
+operator checks from scan-worker include definition freshness. Production image pinning,
+signature-update monitoring, parser/format/size review and threat response remain L39 gates.
+
+The supported scan limit is 100 MiB. Larger allowed multipart objects remain quarantined;
+users must replace/delete them. Encrypted/limited/malformed supported formats can be blocked
+by conservative engine policy. Signature changes do not automatically rescan past releases.
+Prior presigned URLs remain usable until expiry and received bytes cannot be recalled.
+Plan the upgrade capability window accordingly. Downgrade refuses retained uploaded bytes or
+active scan ownership; use a suitable coordinated backup instead of removing quarantine.
+See ADR-041 and docs/phases/phase17.md for exact local evidence and pending release gates.

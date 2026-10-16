@@ -20,6 +20,9 @@ class FileMetadataCreate(FolderName):
 
 
 class FileRead(BaseModel):
+    scan_status: Literal["pending", "scanning", "clean", "blocked", "error", "oversized"] = (
+        "pending"
+    )
     upload_cancelled_at: datetime | None = None
     legacy_metadata: bool = False
     current_version: int = 1

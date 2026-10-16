@@ -91,7 +91,7 @@ async def test_text_ignores_declared_mime_binds_version_and_has_safe_headers(cli
     assert result["kind"] == "text" and result["text"] == storage.body.decode()
     assert (
         result["detected_type"] == "text/plain; charset=utf-8"
-        and result["scan_status"] == "unscanned"
+        and result["scan_status"] == "clean"
     )
     assert result["version_number"] == 1 and result["file_id"] == fid
     assert response.headers["cache-control"] == "no-store"

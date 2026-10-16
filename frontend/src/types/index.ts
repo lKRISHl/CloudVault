@@ -125,6 +125,7 @@ export interface FolderPage {
 }
 
 export interface FileMetadata {
+  scan_status?: 'pending' | 'scanning' | 'clean' | 'blocked' | 'error' | 'oversized';
   upload_cancelled_at?: string | null;
   legacy_metadata?: boolean;
   current_version?: number;
@@ -157,7 +158,7 @@ export interface FileMetadata {
 export interface PreviewResult {
   kind: 'image' | 'pdf' | 'video' | 'text' | 'unsupported';
   file_id: string; version_id: string; version_number: number; generation: number; name: string;
-  detected_type: string | null; scan_status: 'unscanned'; image_base64: string | null;
+  detected_type: string | null; scan_status: 'clean'; image_base64: string | null;
   text: string | null; reason: string | null; width: number | null; height: number | null;
   page: number; pages: number; truncated: boolean;
 }
@@ -204,7 +205,7 @@ export interface ShareLink {
 export interface SharedFile { name: string; size_bytes: number; expires_at: string; allow_download: boolean; grants_remaining: number | null }
 export interface TrashEntry { id: string; resource_id: string; kind: 'files' | 'folders'; name: string; trashed_at: string; retain_until: string; not_before: string; purge_requested_at: string | null }
 export interface FileVersion extends VersionTransferState { id: string; number: number; created_by: string; created_at: string; completed_at: string | null; status: 'pending' | 'uploaded'; size_bytes: number | null; declared_size_bytes: number; checksum_sha256: string | null; checksum_kind: string; is_current: boolean; expires_at: string; can_complete: boolean }
-export interface VersionTransferState { upload_method?: 'basic' | 'multipart'; multipart_state?: string | null; part_size?: number | null; cancelled_at?: string | null; prune_requested_at?: string | null; prune_not_before?: string | null }
+export interface VersionTransferState { scan_status?: FileMetadata['scan_status']; scanned_at?: string | null; upload_method?: 'basic' | 'multipart'; multipart_state?: string | null; part_size?: number | null; cancelled_at?: string | null; prune_requested_at?: string | null; prune_not_before?: string | null }
 export interface VersionMultipartTicket { version: FileVersion & VersionTransferState; part_size: number; parts: PartTicket[]; expires_at: string; can_resume: boolean; confirmed_bytes: number }
 export interface VersionPage { file: FileMetadata; items: FileVersion[]; offset: number; has_more: boolean; retained_bytes: number; pending_bytes: number }
 export interface VersionStart { request_id: string; base_generation: number; declared_size_bytes: number; declared_content_type: string | null; checksum_sha256: string }

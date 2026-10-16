@@ -8,7 +8,7 @@ import type { PreviewResult } from '../types';
 
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ user: { id: 'me', tenant: { id: 'tenant' } } }) }));
 const result: PreviewResult = { kind: 'text', file_id: 'file', version_id: 'version', version_number: 1,
-  generation: 1, name: 'Unsafe.html', detected_type: 'text/plain; charset=utf-8', scan_status: 'unscanned',
+  generation: 1, name: 'Unsafe.html', detected_type: 'text/plain; charset=utf-8', scan_status: 'clean',
   image_base64: null, text: '<script>window.unwanted=true</script>', reason: null,
   width: null, height: null, page: 0, pages: 1, truncated: false };
 function show(url = '/app/files/file/preview') {

@@ -33,6 +33,7 @@ test('real Celery queued poster, cancellation and retry work through the browser
   await page.getByLabel('File to upload').setInputFiles({ name: 'Queue poster.mp4', mimeType: 'video/mp4', buffer: video });
   await page.getByRole('button', { name: 'Upload file', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'File uploaded and verified' })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Queue poster.mp4' })).toContainText('Scan complete:', { timeout: 60000 });
   const compose = (...args: string[]) => execFileSync('docker', ['compose', '-p', manifest.project,
     '-f', '../docker-compose.yml', '-f', '../infra/testing/phase16.compose.yml', ...args]);
   // A stopped real worker keeps the request queued without mocking browser responses.

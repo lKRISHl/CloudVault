@@ -94,11 +94,15 @@ async def test_versions_backfill_objects_empty_rollback_and_retained_reference_g
             ("check",),
         ]:
             result = migrate(*args)
-            assert result.returncode == 0, result.stderr
+            if args[0] == "downgrade":
+                assert result.returncode != 0 and "Cannot remove quarantine" in result.stderr
+            else:
+                assert result.returncode == 0, result.stderr
         async with factory() as db:
             file = await db.get(File, fid)
             initial = await db.scalar(sa.select(FileVersion).where(FileVersion.file_id == fid))
             assert file.current_version == file.version_generation == 1
+            assert file.scan_status == initial.scan_status == "pending"
             assert (
                 initial.object_id == file.object_id == oid and initial.storage_etag == '"original"'
             )
@@ -122,7 +126,7 @@ async def test_versions_backfill_objects_empty_rollback_and_retained_reference_g
         refused = migrate("downgrade", "013_trash")
         assert (
             refused.returncode != 0
-            and "Version history or cleanup references exist" in refused.stderr
+            and "Cannot remove quarantine" in refused.stderr
         )
         assert migrate("upgrade", "head").returncode == 0
         assert migrate("check").returncode == 0

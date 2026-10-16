@@ -40,6 +40,7 @@ dev = [
 include = ["app*"]
 
 [tool.pytest.ini_options]
+markers = ["scan_enforcement: real quarantine/release boundary tests (no legacy dependency mock)"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 

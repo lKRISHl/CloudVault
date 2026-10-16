@@ -47,7 +47,7 @@ function SearchWorkspace({ folderId }: { folderId: string | null }) {
     setDraft(defaults); setFilters({ scope: 'workspace', sort: 'name', direction: 'asc' }); setOffset(0); setError('');
   }
   return <main className="file-search-page space-y-6">
-    <header className="page-heading"><div><p className="eyebrow">WORKSPACE LIBRARY</p><h1>Find your files.</h1><p>Search filenames across your workspace. Files remain unscanned.</p></div><Link to="/app/folders" className="secondary-button">Files & folders</Link></header>
+    <header className="page-heading"><div><p className="eyebrow">WORKSPACE LIBRARY</p><h1>Find your files.</h1><p>Search filenames across your workspace. Quarantined files cannot be downloaded, shared or previewed.</p></div><Link to="/app/folders" className="secondary-button">Files & folders</Link></header>
     <form onSubmit={submit} className="content-card p-5 space-y-4" aria-label="File search">
       <label className="block">Filename<input type="search" maxLength={128} value={draft.q} onChange={event => setDraft({ ...draft, q: event.target.value })} placeholder="Search by part of a filename" className="block w-full" /></label>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

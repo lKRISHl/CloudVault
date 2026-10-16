@@ -22,6 +22,16 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); });
 
+it('offers authorized retry for failed scans and invalidates version state', async () => {
+  vi.mocked(api.versions).mockResolvedValue({ ...page, items: [{ ...page.items[0], scan_status: 'error' }] });
+  vi.spyOn(api, 'retryScan').mockResolvedValue({ detail: 'Scan queued; content remains quarantined' });
+  const cache = show(); const invalidate = vi.spyOn(cache, 'invalidateQueries');
+  await screen.findByText(/Quarantined: scanning failed/);
+  await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Retry scan version 1' })); });
+  expect(api.retryScan).toHaveBeenCalledWith('file', 'old', expect.any(AbortSignal));
+  expect(invalidate).toHaveBeenCalled();
+});
+
 it('shows scoped history and restores only after confirmation using the generation', async () => {
   const cache = show(); await screen.findByText('Report.txt');
   expect(screen.getByText('Retained bytes: 17 · Pending declared bytes: 0')).toBeVisible();

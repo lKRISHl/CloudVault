@@ -44,6 +44,9 @@ class DownloadService:
         self, file: File, ttl: int, actor: User | None = None, deadline: datetime | None = None
     ) -> str:
         """Caller establishes authority; reuse verified object checks for share grants."""
+        from app.services.scans import require_released
+
+        await require_released(self.db, file)
         if file.storage_bucket != settings.S3_BUCKET_NAME:
             raise HTTPException(status_code=503, detail="Download storage configuration changed")
         ref = ObjectRef(file.tenant_id, file.id, file.object_id)
@@ -67,11 +70,13 @@ class DownloadService:
             if actor is not None:
                 role = await self.files.folders.authorize(actor)
                 await self.files.require_read(actor, role, file)
+            await require_released(self.db, file)
             if deadline is not None:
                 ttl = min(ttl, int((deadline - datetime.now(UTC)).total_seconds()))
                 if ttl < 1:
                     raise HTTPException(404, "Share unavailable or credentials incorrect")
             url = await self.storage.presign_download(ref, file.name, ttl)
+            await require_released(self.db, file)
             if actor is not None:
                 role = await self.files.folders.authorize(actor)
                 await self.files.require_read(actor, role, file)
