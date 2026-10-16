@@ -20,16 +20,21 @@ def require(response, status):
 def wait_scan_release(api, file_id, version_id=None):
     """Observe durable scan state without consuming grant/action rate limits."""
     deadline = time.monotonic() + 120
+    last_state = "not_found"
     while time.monotonic() < deadline:
         versions = require(api.get(f"/files/{file_id}/versions"), 200)["items"]
         version = next((row for row in versions if (
             row["id"] == version_id if version_id else row["is_current"])), None)
+        last_state = version["scan_status"] if version else "not_found"
         if version and version["scan_status"] == "clean":
             return
         if version and version["scan_status"] in ("blocked", "oversized"):
             raise RuntimeError("Owned smoke content remains quarantined by scan policy")
         time.sleep(0.5)
-    raise RuntimeError("Owned smoke scan did not complete; inspect scan-worker health")
+    raise RuntimeError(
+        f"Owned smoke scan did not complete (last state: {last_state}); "
+        "inspect scan-worker health and clamav-updater/clamav/job-scheduler logs"
+    )
 
 
 def verify_email(api, email, inbox_url="http://localhost:8025"):

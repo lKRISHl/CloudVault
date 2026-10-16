@@ -1,5 +1,10 @@
 # Changelog
 
+## Docker CI scan startup follow-up (2026-10-16, verification pending)
+- Add a bounded fresh-scanner/broker/storage/scan-worker readiness gate before CI uploads and scan dependency diagnostics on failure. Smoke timeouts report the last durable scan state.
+- Probe scanner freshness before claiming queued uploads so dependency outages cannot consume all per-version scan attempts. Quarantine and per-scan checks remain enforced. Authored outage/recovery and readiness deadline tests are unexecuted; remote rerun remains pending.
+
+
 ## Phase 17 — Malware Scanning (2026-10-16, locally verified)
 - Exact-version quarantine, full verified streaming hashes and private ClamAV verdicts gate current/history downloads, sharing and preview results. Migration 020 quarantines existing uploads and guards unsafe rollback.
 - Dedicated Celery scan queue, UUID leases, three attempts, authorized error retry, signature-freshness health and safe browser scan states. Oversized files remain quarantined; supported scan input is at most 100 MiB.

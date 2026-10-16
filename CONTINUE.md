@@ -1,5 +1,24 @@
 # CloudVault — Current State
 
+## Docker CI follow-up — implemented, verification pending
+
+Run38908641680/job116998545388 on cb85538 passed build/UI/API/storage checks but failed
+scripts/upload_smoke.py at the first upload's120-second scan-release wait (user traceback).
+The exact remote scanner/updater/queue failure still requires container logs; the timeout
+alone does not establish whether definitions were stale, the updater failed or dispatch stalled.
+Found/fixed a startup gap: CI had no fresh-scanner/queue readiness gate, and scan_queue
+claimed versions before checking scanner availability, potentially exhausting all3 attempts
+during a cold-start/outage. It now probes fresh scanner availability before claiming and
+retains quarantine/attempt budget during dependency outages. Actual per-file failures retain
+normal3 attempts and scan-time verification. CI waits at most600s for real scanner/broker/
+storage/worker health before upload creation, then fails with diagnostics rather than bypassing
+freshness. Smoke timeout reports the last durable scan status. No existing error rows reset.
+Added queue-outage/recovery and readiness retry/deadline regressions; not executed under
+the requested paired cadence. Fix committed separately; no Docker rebuild, push or remote rerun.
+At the paired checkpoint include scripts/tests/test_scan_readiness.py and the scan queue
+regression, then actual cold-start/outage/recovery. Remote green CI remains open L01.
+
+
 Current phase: Phase 17 — Malware Scanning, implemented and locally verified 2026-10-16.
 Next phase: 18 — Realtime, including L15 and its assigned acceptance. Not started.
 Project: D:\CloudVault-Dev\Project\CloudVault. Application/source schema: 020_malware_scanning.

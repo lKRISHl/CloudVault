@@ -77,6 +77,50 @@ async def run_scan(db_factory, store, scanner=None):
         return await service.process(job)
 
 
+async def test_queue_waits_for_scanner_without_spending_upload_attempts(
+    client, db_factory, monkeypatch
+):
+    from app.jobs.scan_queue import tick
+
+    owner, store, fid, vid = await uploaded(client, db_factory, monkeypatch)
+
+    async def unavailable(self):
+        raise ScannerUnavailableError("Scanner unavailable or definitions stale")
+
+    monkeypatch.setattr(ClamdScanner, "version", unavailable)
+    # Three failed dependency probes must not permanently exhaust the uploaded version.
+    for _ in range(3):
+        with pytest.raises(ScannerUnavailableError):
+            await tick(db_factory)
+    async with db_factory() as db:
+        version = await db.get(FileVersion, vid)
+        assert version.scan_status == "pending"
+        assert version.scan_attempts == 0
+        assert version.scan_lease_id is None
+    assert (await client.post(
+        f"/api/v1/files/{fid}/download-url", headers=bearer(owner)
+    )).status_code == 423
+
+    async def ready(self):
+        return "1.5/1234"
+
+    async def close():
+        pass
+
+    async def scan(self, chunks):
+        return await Scanner().scan(chunks)
+
+    monkeypatch.setattr(ClamdScanner, "version", ready)
+    monkeypatch.setattr(ClamdScanner, "scan", scan)
+    monkeypatch.setattr("app.jobs.scan_queue.S3ObjectStorage", lambda *_: store)
+    monkeypatch.setattr(store, "close", close, raising=False)
+    assert await tick(db_factory) == "clean"
+    async with db_factory() as db:
+        version = await db.get(FileVersion, vid)
+        assert version.scan_attempts == 1
+        assert (await require_released(db, await db.get(File, fid))).id == vid
+
+
 async def test_quarantine_blocks_all_grant_surfaces_then_clean_scan_releases(
     client, db_factory, monkeypatch
 ):

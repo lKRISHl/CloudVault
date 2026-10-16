@@ -327,3 +327,22 @@
 - Official protocol/deployment references: https://docs.clamav.net/manual/Installing/Docker.html
   and https://docs.clamav.net/manual/Usage/Scanning.html . Local real-engine/queue evidence and
   remaining verification are recorded in docs/phases/phase17.md.
+
+## ADR-043: Separate Scanner Dependency Availability from Version Attempts
+
+- 2026-10-16: the supplied GitHub run38908641680/job116998545388 traceback timed out
+  waiting for the first completed upload to become clean. Build, UI/API and storage checks
+  passed. The traceback does not identify the remote updater/daemon/queue failure.
+- Before claiming any version, the scan maintenance hint probes ClamD with the existing
+  strict definition-freshness check, outside a DB transaction. Missing/stale scanner fails
+  the maintenance execution visibly without spending a version attempt. Once available,
+  normal claim/lease/process checks and three-attempt limits remain unchanged, including
+  the per-scan freshness probe. A dependency can still fail after preflight; processing
+  then retains its normal error/retry behavior. Never reset existing terminal errors silently.
+- CI waits at most600seconds for the real operator scan health check (broker, storage,
+  recent worker execution and fresh reachable scanner) before creating smoke uploads.
+  Failure collects safe health/status and existing container logs. Do not weaken freshness,
+  substitute a clean verdict or extend user upload deadlines to make CI pass.
+- Outage/recovery and readiness timeout regressions are authored but unexecuted under the
+  user's paired testing cadence. Exact remote root cause and a successful CI rerun remain
+  pending; this is a startup/retry-budget correction, not proof that the remote outage is fixed.
