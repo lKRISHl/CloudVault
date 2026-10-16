@@ -13,12 +13,14 @@ import { AccountActionPage } from '../features/accounts/AccountActionPage';
 import { FoldersPage } from '../features/folders/FoldersPage';
 import { FileSearchPage } from '../features/search/FileSearchPage';
 import { PublicSharePage, ShareManagementPage } from '../features/sharing/SharingPages';
+import { GroupsPage } from '../features/organizations/GroupsPage';
 import { PermissionsPage } from '../features/permissions/PermissionsPage';
 import { TrashPage } from '../features/trash/TrashPage';
 import { VersionsPage } from '../features/versions/VersionsPage';
 import { PreviewPage } from '../features/previews/PreviewPage';
 import { AppShell } from '../components/AppShell';
 import { ApiRequestError } from '../services/api';
+import { RealtimeProvider } from '../realtime/RealtimeProvider';
 
 function ProtectedRoute() {
   const { user, isLoading } = useAuth();
@@ -63,6 +65,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <RealtimeProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/share" element={<PublicSharePage />} />
@@ -81,6 +84,8 @@ function App() {
               <Route path="/app/folders" element={<FoldersPage />} />
               <Route path="/app/search" element={<FileSearchPage />} />
               <Route path="/app/files/:fileId/shares" element={<ShareManagementPage />} />
+              <Route path="/app/folders/:folderId/shares" element={<ShareManagementPage />} />
+              <Route path="/app/groups" element={<GroupsPage />} />
               <Route path="/app/permissions/:kind/:id" element={<PermissionsPage />} />
               <Route path="/app/trash" element={<TrashPage />} />
               <Route path="/app/files/:fileId/versions" element={<VersionsPage />} />
@@ -91,6 +96,7 @@ function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
+        </RealtimeProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

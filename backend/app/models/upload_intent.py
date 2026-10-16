@@ -3,7 +3,16 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Index, String, UniqueConstraint, false
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Index,
+    String,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -12,6 +21,9 @@ from app.core.database import Base
 class UploadIntent(Base):
     __tablename__ = "upload_intents"
     __table_args__ = (
+        CheckConstraint(
+            "reserved_bytes IS NULL OR reserved_bytes >= 0", name="ck_intent_reserved_bytes"
+        ),
         UniqueConstraint("tenant_id", "created_by", "request_id", name="uq_upload_intents_request"),
         Index("ix_upload_intents_cleanup", "storage_bucket", "expires_at", "checked_at"),
         Index("ix_upload_intents_folder", "tenant_id", "folder_id"),
@@ -29,3 +41,5 @@ class UploadIntent(Base):
     scope_recorded: Mapped[bool] = mapped_column(Boolean, default=True, server_default=false())
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reserved_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    cleaned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

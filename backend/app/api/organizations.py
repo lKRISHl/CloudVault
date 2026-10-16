@@ -29,6 +29,14 @@ CurrentUser = Annotated[User, Depends(get_workspace_user)]
 VerifiedUser = Annotated[User, Depends(get_verified_user)]
 
 
+@router.get("/current/storage-usage")
+async def storage_usage(actor: CurrentUser, db: Database, response: Response):
+    from app.services.quotas import QuotaService
+
+    response.headers["Cache-Control"] = "no-store"
+    return await QuotaService(db).read(actor)
+
+
 @router.get("", response_model=list[WorkspaceRead])
 async def workspaces(
     actor: VerifiedUser,

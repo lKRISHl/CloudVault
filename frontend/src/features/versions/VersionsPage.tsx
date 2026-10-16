@@ -6,6 +6,7 @@ import { api } from '../../services/api';
 import type { FileVersion } from '../../types';
 import { forgetVersionManifest, loadVersionManifest, transferVersion } from './versionTransfers';
 import { ScanStatus } from '../folders/ScanStatus';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
 
 export function VersionsPage() {
   const { fileId = '' } = useParams(); const { user } = useAuth();
@@ -16,6 +17,7 @@ function Versions({ fileId }: { fileId: string }) {
   const { user } = useAuth(); const cache = useQueryClient();
   const key = `cloudvault.version.${user?.tenant?.id}.${user?.id}.${fileId}`;
   const [offset, setOffset] = useState(0); const [busy, setBusy] = useState(false);
+  const live = useLiveResource({ kind: 'versions', resource_id: fileId, offset }, ['versions', user?.tenant?.id, user?.id, fileId, offset]);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState(''); const [message, setMessage] = useState('');
   const [selected, setSelected] = useState<File | null>(null);
@@ -107,6 +109,7 @@ function Versions({ fileId }: { fileId: string }) {
       }); }}><h2 className="section-title">History retention</h2><p>Current policy: {data.file.version_keep_last ? `keep newest ${data.file.version_keep_last} plus current if older` : 'keep all history'}. Applying a smaller policy queues older history for deletion. Disabling the policy does not undo queued deletions.</p><label className="block">Keep newest versions (blank keeps all)<input aria-label="Keep newest versions" type="number" min="1" max="1000" value={keep} disabled={working} onChange={event => setKeep(event.target.value)} /></label><label className="block">Type PRUNE to apply retention<input aria-label="Type PRUNE to apply retention" value={policyConfirmation} disabled={working} onChange={event => setPolicyConfirmation(event.target.value)} /></label><button className="secondary-button" disabled={working || policyConfirmation !== 'PRUNE'}>Apply retention policy</button></form>}
       <ul className="content-card divide-y">{data.items.map(version => <li className="p-5 space-y-2" key={version.id}>
         <h2 className="font-semibold">Version {version.number}{version.is_current ? ' · Current' : ''}</h2>
+        {version.status === 'pending' && version.created_by === user?.id && live.progress[version.id] !== undefined && <p>Server confirmed {live.progress[version.id].toLocaleString()} of {version.declared_size_bytes.toLocaleString()} declared bytes.</p>}
         {version.status === 'uploaded' && <ScanStatus state={version.scan_status} />}
         {data.file.can_write && version.scan_status === 'error' && !version.prune_requested_at && <button className="secondary-button" disabled={working} onClick={() => void action(async () => { const result = await api.retryScan(fileId, version.id, controller.current.signal); await invalidate(); setMessage(result.detail); })}>Retry scan version {version.number}</button>}
         <p>{version.status === 'uploaded' ? `${version.size_bytes?.toLocaleString()} verified bytes` : `${version.declared_size_bytes.toLocaleString()} declared bytes · Pending`}{version.cancelled_at ? ' · Cancelled; cleanup pending' : ''}{version.prune_requested_at ? ' · Deletion queued' : ''}</p>

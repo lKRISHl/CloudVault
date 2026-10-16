@@ -199,7 +199,7 @@ export interface MultipartTicket { file: FileMetadata; part_size: number; parts:
 export interface MultipartProgress extends MultipartTicket { confirmed_bytes: number; can_resume: boolean }
 export interface MultipartStart { name: string; folder_id: string | null; declared_size_bytes: number; declared_content_type: string | null; request_id: string; part_size: number; checksums: string[] }
 export interface ShareLink {
-  id: string; file_id: string; created_by: string; expires_at: string; revoked_at: string | null;
+  id: string; file_id: string | null; folder_id?: string | null; recipient_email?: string | null; created_by: string; expires_at: string; revoked_at: string | null;
   allow_download: boolean; password_required: boolean; max_downloads: number | null; download_grants: number; created_at: string;
 }
 export interface SharedFile { name: string; size_bytes: number; expires_at: string; allow_download: boolean; grants_remaining: number | null }

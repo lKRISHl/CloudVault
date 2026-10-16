@@ -1,130 +1,138 @@
-# CloudVault — Current State
+# CloudVault - Current State
 
-## Docker CI follow-up — implemented, verification pending
+Current work: Phase18A source implementation prepared2026-10-17, including groups explicitly
+selected by the user. Acceptance is PENDING at the combined18A+20 checkpoint. Source022 is
+unapplied; the running Docker app remains021_storage_quotas. No tests/lint/build, Docker rebuild,
+application migration, push or remote CI were run for18A; only source formatting.
+The user subsequently requested a local checkpoint commit of18/19/18A. This commit
+does not complete the pending18A+20 acceptance or apply022 to the running application.
 
-Run38908641680/job116998545388 on cb85538 passed build/UI/API/storage checks but failed
-scripts/upload_smoke.py at the first upload's120-second scan-release wait (user traceback).
-The exact remote scanner/updater/queue failure still requires container logs; the timeout
-alone does not establish whether definitions were stale, the updater failed or dispatch stalled.
-Found/fixed a startup gap: CI had no fresh-scanner/queue readiness gate, and scan_queue
-claimed versions before checking scanner availability, potentially exhausting all3 attempts
-during a cold-start/outage. It now probes fresh scanner availability before claiming and
-retains quarantine/attempt budget during dependency outages. Actual per-file failures retain
-normal3 attempts and scan-time verification. CI waits at most600s for real scanner/broker/
-storage/worker health before upload creation, then fails with diagnostics rather than bypassing
-freshness. Smoke timeout reports the last durable scan status. No existing error rows reset.
-Added queue-outage/recovery and readiness retry/deadline regressions; not executed under
-the requested paired cadence. Fix committed separately; no Docker rebuild, push or remote rerun.
-At the paired checkpoint include scripts/tests/test_scan_readiness.py and the scan queue
-regression, then actual cold-start/outage/recovery. Remote green CI remains open L01.
+Source: folder read links/current ancestry and publisher ACL/scan checks; named-recipient
+verified email/live-session proof; client-secret/request-ID creation replay; separate resource
+ownership preserving immutable upload/version attribution; authorized member search/readable
+grant identities; manager-controlled groups with local viewer/editor grants. Ancestors always
+apply. Workspace departure clears group memberships. Group/ACL/ownership/trash mutations revoke
+affected external links; already issued storage URLs retain expiry. Bounds100 groups/workspace,
+1000 members/group,100 grants/group,25/page,offset10000. No custom role definitions.
 
+Read docs/phases/phase18a.md, ADR-045 and L42. L10-L14 remain acceptance candidates, not closed.
+Authored API/PG race/migration/React/desktop/mobile coverage has not run. Keep heavy checks
+sequential; use owned disposable DB/Redis/buckets, never destructive fixtures on app data.
+Back up before022. Rollback guards retained ownership/groups/folder/recipient/retry link state.
 
-Current phase: Phase 17 — Malware Scanning, implemented and locally verified 2026-10-16.
-Next phase: 18 — Realtime, including L15 and its assigned acceptance. Not started.
-Project: D:\CloudVault-Dev\Project\CloudVault. Application/source schema: 020_malware_scanning.
-Phase15/16 baseline: 6bf868f. Phase17 changes and verification notes are included in this commit.
-No push/remote CI. Phase18 has not started.
+Next implementation: Phase20 audit/metadata plus due L21/L36/L41, then paired18A+20 acceptance.
+P01-P03 scope decisions are resolved2026-10-17: groups in18A; bounded scanned avatars
+in22A; controlled external uploads/editing in dedicated24A after24 and before25. These are
+automatically required checkpoint work, not current supported features. Preserve
+the18/19/18A checkpoint work. Do not start20 without the user's continuation.
 
-## Completed Phase 17 scope
+## Prior18+19 checkpoint and preservation record
 
-- Private ClamAV daemon/signature updater, separate Celery scans queue and one prefork worker.
-- Every completed original/replacement/historical version starts quarantined. Migration 020
-  backfills all previous content to pending and cancels old preview jobs. No grandfather bypass.
-- Conditional bounded S3 streaming, exact size/ETag/basic/composite SHA-256 verification,
-  fresh definitions and complete verdict consumption are required before release. No bytes
-  enter PostgreSQL or Redis. Tenant/version/namespace/policy/lifecycle/lease rechecks fence I/O.
-- Current/history downloads, share creation/anonymous access, transient previews and queued
-  preview request/publication/result all enforce the same release policy. Old cached outputs
-  cannot survive source release invalidation. Live resource permissions remain mandatory.
-- Three attempts/backoff and expiring UUID leases; authorized writers can retry errors from
-  version history. Row locking prevents manual retry from overriding a running worker claim.
-  Blocked/oversized content has no manual clean override. Policy/provider changes rescan.
-- Visible browser scan states, release polling and error retry. Successful scans say no known
-  threats detected, never guarantee safety. Supported scan input is at most 100 MiB: larger
-  allowed uploads remain quarantined and cannot be downloaded/shared/previewed.
-- Operator scan health probes loaded definition freshness and provider access/versioning.
-  FreshClam's inherited daemon health check is disabled; active scanner checks verify the
-  actual definitions. Independent updater alerts remain Phase28 work. See ADR-041/L39.
+Previous phase:19 — Storage Quotas, implemented and locally verified2026-10-17.
+Phase18 realtime core also completed its combined18+19 local checkpoint. The later18A source/pre-acceptance status is recorded above.
+Project: D:\CloudVault-Dev\Project\CloudVault. Source/running application schema021_storage_quotas.
+Prior commits: Phase17 cb85538; Docker CI startup correction c3cf0ee.
+The subsequent user-requested checkpoint includes18/19/18A; see git log for its identity.
+No push, external CI dispatch or production deployment has been performed.
 
-## Verification and evidence
+## Scope now available
 
-- Actual ClamAV 1.5.4/database 28155: clean content accepted, harmless EICAR detected.
-  Real owned API/PG/private S3/Redis/prefork round trip proves pre-scan denial, clean exact-byte
-  release and detected-content download/preview quarantine. No release/scanner substitution.
-- Dedicated real-engine Chromium journey: 1 passed in 5.5s. Full legacy Chromium regression:
-  final 22/22 passed in 2.3m. Legacy browser fixtures explicitly substitute only the scanner
-  dependency and still stream/verify real provider bytes; they do not certify detection.
-- Frontend: 113 tests, lint/build pass. Includes scan-state and authorized retry/cache cases.
-- Initial full PG/provider run: 377 passed, five failed, one host-FFmpeg skip, 433.18s.
-  Three legacy resource tests needed an explicit successful-scan dependency; two old migration
-  tests expected rollback past quarantine. All five were fixed; the guard remains strict.
-  Focused PG rerun: 100 passed in 76.07s. Final scan/config PG checks: 22 passed in 12.50s;
-  additional cached-preview-release regression: 1 passed on PG. Scan SQLite checkpoint:
-  21 passed; final storage/scanner health-only regression passed after dependency-probe work.
-  Do not describe the original full backend run as all green.
-- Browser initial failures included hard-coded provider routes, Windows resource allocation,
-  invitation-click timeout and resumed downloads racing scan release. Routes follow the test
-  endpoint; byte assertions now wait for release. Final complete 22-case run passes.
-- App backup/020 upgrade preserved all 31 File and 41 FileVersion records before workers ran.
-  All 26 original eligible versions were scanned. After unique live smoke demo data, final
-  checkpoint: 32 eligible versions clean, zero pending/error/blocked eligible scans.
-- Normal UI/API/private-storage smoke and full actual SMTP/basic/multipart/replacement/history
-  transfers, sharing/ACLs, retention, movement/recovery/cancel-folder and trash/purge smoke pass.
-  The first upload smoke needed replacement scan waits (423); corrected full rerun passes.
-  Unique smoke accounts/files remain as documented development demo data.
-- Owned test DBs/buckets/queue bindings removed; browser storage manifest absent. Destructive
-  pytest fixtures never targeted application data. No unrelated apps closed or WSL cap changed.
-- Detailed logs and exact scopes: docs/phases/phase17.md. Reports for completed Phase15/16
-  retain their earlier full acceptance evidence; the old Phase15 browser deferral is closed.
+Quota admission runs under the tenant write lock for new basic/multipart originals,
+replacement versions and queued previews. Deduplicated bucket/file/object references count
+current/history/private/trash/quarantine, pending/cancelled/expired reservations and retained
+preview allocations. Completion does not add a second copy. No premature release on cancel/
+expiry or cleanup failure. Unknown legacy sizes/failed inventory pause new allocations.
+Existing reservations can complete after a plan reduction; reads/cleanup remain available.
 
-## Operation
+StorageQuota is separate from authentication Tenant. Default Free10GiB/Team100GiB plans are
+operator allocations, not billing. Confirmed backend DB-operator CLI changes plan/byte limit;
+customers cannot self-upgrade. Verified managers see no-store aggregate usage in Settings.
+No file names, private object refs or grant credentials enter usage responses.
 
-Normal app is restored at http://localhost:3000/app/folders. Refresh the browser for the new UI.
-After source changes: docker compose up --build -d.
-Operator scanner check: docker compose exec -T scan-worker python -m app.jobs.check_jobs --job scans --scanner.
-API readiness remains DB-only. Scan-worker health also checks definitions/provider.
-Other jobs: docker compose exec -T backend python -m app.jobs.check_jobs.
-All storage stages have refreshed after restart; the last trash pass reported one deferred
-reference while due_trash was zero at observation. Retained cleanup still honors original
-capability/late-write deadlines. Health is not a byte-purge or SMTP-delivery guarantee.
+The seventh storage maintenance stage discovers scoped objects and multipart orphans,
+persists bounded inventory cursors/evidence and exact-rechecks absence. Observed bytes can
+increase an existing bound; unknown/excessive manifests fail closed. Actual MinIO omits live
+multipart uploads from directory Prefix listings, so discovery uses bounded bucket pages
+followed by tenant filtering. No inventory deletion or atomic provider snapshot claim.
+Preview jobs keep a conservative1MiB bound through ambiguous acknowledgements until cleanup.
+See docs/phases/phase19.md, ADR-044, L19/L04/L39 and newL41.
 
-Ignored pre-020 DB backup: .local/backups/cloudvault-before-phase17-20261016.sql (176448 bytes).
-Earlier pre-upgrade backups remain. Back up before future migrations. Downgrade cannot remove
-quarantine from uploaded content or active scan ownership: restore a suitable coordinated
-backup instead. Object backup/restore is separate. Never commit dumps/secrets/manifests.
+Phase18: verified session-bound WebSockets, one-use first-frame Redis tickets, strict Origin,
+fresh authority, own receipt progress, opaque current-view invalidations, reconnect/REST
+fallback and cross-tab Web Locks/secret-free signals. Epoch/generation fences stop stale
+scope. Role refresh remounts protected state; ownership confirmation survives via a scoped
+secret-free navigation receipt. No durable notification history/replay. See phase18/ADR-042.
 
-Direct installs need a privately reachable ClamD/updater plus Celery scans worker and Beat.
-Synchronize DB/signing/S3 endpoint/region/bucket and scan settings across API/workers; provider
-identity is part of scan proofs. There is no always-clean or API-native-scanner fallback.
+## Combined checkpoint — exact evidence
 
-Docker socket recovery previously required the user's ordinary PowerShell rename of the
-stale docker-secrets-engine folder. Do not reset Docker, unregister WSL, prune app volumes
-or rewrite ACLs. WSL cap remains 4 GB; heavy suites run sequentially. Windows memory pressure
-recurred during browsers while Firefox used substantial RAM. Pause unused development
-services first; never close unrelated apps without authorization. Services are restored now.
+- Final focused PG/Redis/private-provider run:66 passed in44.91s. Final quota-only run after
+  operator/1024-part-bound cases:16 passed in8.64s. Earlier targeted local backend51 passed.
+- Initial broad SQLite run:385 passed,15 failed,20 skipped. All15 observed migration/recovery
+  failures pass in the PostgreSQL rerun (171.63s) after storage policy isolation and a known-
+  size legacy fixture correction. Do not call the original full backend run all green.
+- Frontend125 tests, lint/build pass; backend and smoke/helper Ruff checks pass. Three
+  scanner-readiness retry/deadline unit tests pass. The old workspace virtualenv lacked
+  cryptography; tests used the already-installed working Python runtime without package changes.
+- Full Chromium run:23 passed,1 invitation-click timeout. Isolated workspace rerun:2 passed
+  in15.9s. Earlier browser memory failure was rerun sequentially after pausing project workers;
+  no unrelated apps were closed. Dedicated zero-quota browser:1 passed in8.9s; denial creates
+  neither a File nor a provider transfer. Actual Redis two-tab refresh/switch/offline cases pass.
+  Legacy browser scanning/rendering fixtures are explicit dependencies, not engine certification.
+- App schema upgrade preserves36 File,49 FileVersion,24 Tenant,31 User,14 UploadIntent and
+  0 PreviewJob rows and creates24 quota policy rows. Before/after counts are under.local.
+- Rebuilt UI/API/private S3/mc/application-adapter smoke passes. Actual nginx socket upgrade,
+  own confirmed multipart receipts, retained cancelled quota and logout closure4401 pass in
+  scripts/realtime_smoke.py. Direct container quota inventory checks2 refs. Real Celery storage
+  hints execute the new quota turn successfully; all seven stages have fresh execution.
+- Actual scanner freshness/broker/storage/worker readiness gate passes, then full real SMTP/
+  basic/multipart/search/share/ACL/version/history/retention/move/recovery/cancel-folder/trash
+  smoke passes. Unique development demo accounts/metadata remain; aborted uploads retain deadlines.
+- Owned disposable PG database and labelled localhost-only Redis container/anonymous volume
+  removed. Test bucket fixtures/teardown completed; .local/e2e-storage.json absent. App DB,
+  bucket/volumes and existing data were never targeted by destructive fixtures.
 
-## Limitations requiring explicit work
+## Operation and preservation
 
-- L09 local preview/quarantine/scanning scope is complete. L39 automatically assigns retained
-  quarantine quota accounting to 19; pinned/maintained scanner and AWS deployment/paired
-  recovery to 26/31; scan-size/format/retroactive rescan/threat-response review to 27;
-  freshness/oldest pending/failed/updater alerts to 28; measured memory/latency/fairness/size
-  limits to 32. A point-in-time clean scan cannot guarantee safety or recall received bytes.
-- L15 realtime cross-tab/progress/cache/roster/ACL/reconnect work is Phase18. L10/L11/L13/P02
-  collaboration completion and explicit MVP scope decisions are 18A before quota Phase19.
-- L19 reservations, all retained versions/derivatives/quarantine and ambiguous writes are 19.
-  L21/L36 audit/job/ref metadata retention is 20. Navigation/rich search is 22A.
-- L20/L25/L37/L38 Phase16 local scope passes. Actual AWS/provider replay/lifecycle/decoder
-  deployment and long failure windows keep 26/31, security/abuse 27 and load 32.
-- L22/L23/P04: AWS selected; unversioned local/refusal policy implemented. Actual AWS IAM,
-  encryption/public access/CORS/lifecycle/paired restore and maintained deployment remain.
-- L01 remote CI needs separately authorized push/dispatch tied to the tested commit. SMTP,
-  MFA, broader security, monitoring, paired restore and L24–L35 retain assigned checkpoints.
-  Community MinIO is local development only. No production benchmark/certification is claimed.
-- D01–D08 retain capability/SMTP ambiguity, transfer/hierarchy, serialization, cleanup-delay,
-  guarded rollback/metadata and platform constraints. See docs/LIMITATIONS_BACKLOG.md.
+App: http://localhost:3000/app/settings (manager storage panel) and /app/folders.
+Rebuild after future source changes: docker compose up --build -d.
+Pre021 backup: .local/backups/cloudvault-before-phase19-20261017.sql (208310bytes), ignored.
+Earlier backups remain. Back up before future migrations.021 refuses loss of custom policy,
+positive/unknown inventory evidence or unmaterialized size bounds; earlier quarantine/version/
+trash guards remain. Restore a coordinated backup if rollback cannot represent retained state.
+Object backup/recovery remains separate. Never commit dumps, secrets or upload manifests.
 
-Standing user instruction: ordinary continue automatically includes all due limitations,
-implementation and acceptance. Each phase report records inherited/new IDs, evidence and
-future checkpoints synchronized with roadmap/register/CONTINUE. Do not advance past open
-acceptance. No automatic commit/push, external spending or destructive app-data authorization.
+Project scanner/workers are restored; WSL cap remains4GB. Run heavy checks sequentially.
+Current normal worker health: email/previews/scans healthy, scanner definitions/provider
+probed successfully. All7 storage stages fresh including quotas; overall storage reports
+one deferred trash reference in its last pass while due_trash=0. Preserve original retained
+capability/late-write deadlines; do not clear evidence or call deferred cleanup a byte purge.
+API readiness remains DB-only. Operator health: python -m app.jobs.check_jobs; --job scans
+--scanner includes private daemon freshness. This is not SMTP deliverability certification.
+Docker startup initially failed; user started the engine. No resets, WSL unregister, volume
+pruning, ACL rewrites, unrelated app closure or global configuration changes were performed.
+
+## Next work and inherited limitations
+
+- Prior next-stage assignment18A: L10–L14/P01–P03 collaboration/sharing/ownership/candidate lookup and explicit MVP
+  decisions. After this user sequencing exception, continue actual development order with
+  two-phase verification; next pair18A+20 unless the user directs otherwise. Write tests with
+  every feature. Never infer completion from an assigned phase or skip a known safety defect.
+- L15 local core passes; broader refresh-family/security remains27 and production/browser/
+  proxy/load gates remainL40. Notification persistence decision is20, not an implemented inbox.
+- L19/L04/L39 local retained-byte/reservation accounting passes. AI is not enabled: enforce
+  real input/job/daily cost budgets before21. Billing/entitlements/metering remain25A.
+- L41 automatically assigns evidence compaction/L3620, AWS inventory/namespace/late-write26,
+  capability/abuse27, stale/failed/unresolved inventory alerts28, measured query/lock/cycle/
+  fairness32 and invoice-grade metering decisions25A. Conservative allocated bytes are not
+  a provider bill or instantaneous physical-byte total. Do not silently lift manifest bounds.
+- L21/L36 audit/metadata retention20; navigation/search22A. L20/L22/L23/L25/L37/L38 actual AWS/
+  lifecycle/decoder/deployment/recovery26/31, security27 and operational/load28/32 remain open.
+- L39 retains100MiB/point-in-time scan coverage; pinned private scanner/AWS/recovery26/31,
+  retroactive rescan/threat response27, freshness/updater/backlog alerts28 and limits/fairness32.
+- L24 MFA/security27. L01 remote CI needs separately authorized push/dispatch. Community MinIO
+  is local only; AWS selected but not provisioned/certified. D01–D08 received bytes/capabilities,
+  SMTP ambiguity, serialization, delayed cleanup and guarded rollback remain explicit.
+
+Standing instruction: ordinary continue includes every due limitation and acceptance task
+without another request. Keep roadmap/register/report/handoff synchronized for new gaps.
+No automatic commit/push, external spending or destructive application-data authorization.

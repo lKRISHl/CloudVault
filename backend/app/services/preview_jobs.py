@@ -110,6 +110,9 @@ class PreviewJobService:
         )
         if active >= 20:
             raise HTTPException(429, "Workspace preview capacity busy; cancel or wait for expiry")
+        from app.services.quotas import QuotaService
+
+        await QuotaService(self.db).admit(actor.tenant_id, 1024 * 1024)
         job = PreviewJob(
             tenant_id=actor.tenant_id,
             file_id=file_id,
@@ -401,7 +404,7 @@ class PreviewJobService:
                     update(PreviewJob)
                     .execution_options(synchronize_session=False)
                     .where(PreviewJob.id == job.id)
-                    .values(cleanup_failed=False)
+                    .values(cleanup_failed=False, cleaned_at=now, reserved_bytes=0)
                 )
                 await self.db.commit()
                 return "cleaned_reference_retained"

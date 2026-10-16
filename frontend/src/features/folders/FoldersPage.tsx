@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import type { Folder } from '../../types';
 import { FileList } from './FileList';
 import { TrashButton } from '../trash/TrashButton';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
 
 const button = 'border rounded px-3 py-2 disabled:opacity-50';
 const input = 'block border rounded p-2 w-full';
@@ -17,6 +18,7 @@ function MoveDestination({ folder, pending, choose, cancel }: {
   const { user } = useAuth();
   const [parent, setParent] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+  useLiveResource({ kind: 'folders', parent_id: parent, offset }, ['folder-destination', user?.tenant?.id, user?.id, folder.id, parent, offset]);
   const query = useQuery({ queryKey: ['folder-destination', user?.tenant?.id, user?.id, folder.id, parent, offset], queryFn: () => api.folders(parent, offset) });
   const forbidden = query.data?.breadcrumbs.some((item) => item.id === folder.id);
   function browse(id: string | null) { setParent(id); setOffset(0); }
@@ -53,6 +55,7 @@ export function FoldersPage() {
   const [message, setMessage] = useState('');
   const enabled = !!user?.tenant && user.email_verified;
   const key = ['folders', user?.tenant?.id, user?.id];
+  useLiveResource({ kind: 'folders', parent_id: parent, offset }, key, enabled);
   const query = useQuery({ queryKey: [...key, parent, offset], queryFn: () => api.folders(parent, offset), enabled });
   async function refresh(text: string) { await cache.invalidateQueries({ queryKey: key }); setMessage(text); }
   const create = useMutation({ mutationFn: () => api.createFolder(name, parent), onSuccess: async () => { setName(''); await refresh('Folder created.'); } });
@@ -68,7 +71,7 @@ export function FoldersPage() {
     <div className="page-heading"><div><span className="eyebrow">YOUR CONTENT, ORGANIZED</span><h1>Folders</h1><p>A little structure. A lot more room to create.</p></div><span className="page-emblem"><Icon name="folder" /></span></div>
     <Link className="secondary-button" to={`/app/search${parent ? `?folder=${encodeURIComponent(parent)}` : ''}`}>{parent ? 'Search this folder' : 'Search workspace files'}</Link>
 
-    <p className="muted-copy">Visibility and containing folders govern access. Editors can rename and add content; creators and managers control moves and permissions.</p>
+    <p className="muted-copy">Visibility and containing folders govern access. Editors can rename and add content; resource owners and managers control moves and permissions.</p>
     {!enabled && <p role="alert">Select a workspace and verify your email in account security to use folders.</p>}
     <nav aria-label="Folder breadcrumbs" className="flex flex-wrap gap-2">
       <button className={button} onClick={() => browse(null)}>All folders</button>
@@ -88,6 +91,7 @@ export function FoldersPage() {
         <button className={button} aria-label={`Rename ${item.name}`} onClick={() => open(item, 'rename')}>Rename</button>
         {(item.can_manage ?? item.can_write) && <button className={button} aria-label={`Move ${item.name}`} onClick={() => open(item, 'move')}>Move</button>}
       </> : <span>Read only</span>}
+      {item.can_manage && <Link className="secondary-button" to={`/app/folders/${item.id}/shares`} aria-label={`Share ${item.name}`}>Share</Link>}
       {item.can_manage && <Link className="secondary-button" to={`/app/permissions/folders/${item.id}`} aria-label={`Permissions for ${item.name}`}>Permissions</Link>}
       {item.can_manage && <TrashButton kind="folders" id={item.id} name={item.name} />}
     </li>)}</ul>

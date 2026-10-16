@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     DATABASE_ECHO: bool = False
 
     REDIS_URL: str = "redis://localhost:6379/0"
+    STORAGE_FREE_LIMIT_BYTES: int = Field(default=10 * 1024**3, ge=0, le=9007199254740991)
+    STORAGE_TEAM_LIMIT_BYTES: int = Field(default=100 * 1024**3, ge=0, le=9007199254740991)
+    LIVE_POLL_SECONDS: float = Field(default=3, ge=2, le=10)
+    LIVE_USER_CONNECTIONS: int = Field(default=4, ge=1, le=8)
+    LIVE_IP_CONNECTIONS: int = Field(default=64, ge=4, le=128)
+    LIVE_PROCESS_CONNECTIONS: int = Field(default=64, ge=1, le=128)
     JOB_LEASE_SECONDS: int = Field(default=300, ge=240, le=900)
     STORAGE_STAGE_BATCH_SIZE: int = Field(default=5, ge=1, le=10)
 

@@ -50,10 +50,11 @@ class FileSearchService:
         )
         return statement.order_by(*order).offset(query.offset).limit(query.limit + 1)
 
-    async def search(self, actor, query: FileSearchQuery, ip=""):
-        await AccountService(self.db).limit(
-            "file-search", ip, str(actor.id), max_identity=1200, max_ip=4800
-        )
+    async def search(self, actor, query: FileSearchQuery, ip="", *, observe=False):
+        if not observe:
+            await AccountService(self.db).limit(
+                "file-search", ip, str(actor.id), max_identity=1200, max_ip=4800
+            )
         role = await self.files.folders.authorize(actor)
         if query.scope == "folder":
             await self.files.folders.ancestors(actor, query.folder_id)

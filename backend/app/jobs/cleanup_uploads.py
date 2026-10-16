@@ -14,7 +14,7 @@ from app.core.database import async_session_maker
 from app.models import File, FileVersion, Tenant, UploadIntent
 from app.services.upload_cleanup import UploadCleanupService
 from app.services.uploads import utc
-from app.storage.base import ObjectRef, StorageError
+from app.storage.base import ObjectNotFoundError, ObjectRef, StorageError
 from app.storage.s3 import S3ObjectStorage
 
 logger = logging.getLogger(__name__)
@@ -160,6 +160,9 @@ async def tick(factory=async_session_maker, marker=None, *, stage=None, batch_si
                 scoped = S3ObjectStorage(settings, intent.tenant_id)
                 try:
                     async with factory() as db:
+                        await db.scalar(
+                            select(Tenant.id).where(Tenant.id == intent.tenant_id).with_for_update()
+                        )
                         file = await db.scalar(
                             select(File).where(
                                 File.id == intent.file_id,
@@ -180,6 +183,15 @@ async def tick(factory=async_session_maker, marker=None, *, stage=None, batch_si
                                 await scoped.abort_multipart(ref, upload_id)
                             # No public completion path exists without a file record.
                             await scoped.delete(ref)
+                            if await scoped.pending_for_object(ref):
+                                raise StorageError("Initialization parts still retained")
+                            try:
+                                await scoped.inspect_upload(ref)
+                            except ObjectNotFoundError:
+                                current = await db.get(UploadIntent, intent.file_id)
+                                current.cleaned_at = now
+                            else:
+                                raise StorageError("Initialization object still retained")
                         current = await db.get(UploadIntent, intent.file_id)
                         current.checked_at = now
                         await db.commit()
@@ -266,6 +278,13 @@ async def tick(factory=async_session_maker, marker=None, *, stage=None, batch_si
             from app.jobs.cleanup_trash import tick as trash_tick
 
             await trash_tick(factory, limit=min(batch_size, 10), report=report)
+        if stage in (None, "quotas"):
+            from app.services.quota_inventory import tick as quota_tick
+
+            inspected = await quota_tick(
+                factory, lambda tid: S3ObjectStorage(settings, tid), min(batch_size, 10)
+            )
+            report["inspected"] = report.get("inspected", 0) + inspected
         logger.info("Upload maintenance checked %s records; reclaimed %s", len(candidates), cleaned)
         return marker
     finally:

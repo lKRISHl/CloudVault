@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
 import type { PreviewResult } from '../../types';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
 
 export function PreviewPage() {
   const { fileId = '' } = useParams(); const [parameters] = useSearchParams();
@@ -11,6 +12,7 @@ export function PreviewPage() {
 }
 
 function Preview({ id, version }: { id: string; version: string | null }) {
+  const { revision } = useLiveResource(version ? { kind: 'version', resource_id: id, version_id: version } : { kind: 'file', resource_id: id });
   const [page, setPage] = useState(0); const [reload, setReload] = useState(0);
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [image, setImage] = useState(''); const [error, setError] = useState('');
@@ -32,7 +34,7 @@ function Preview({ id, version }: { id: string; version: string | null }) {
       if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : 'Preview unavailable');
     }).finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
-  }, [id, version, page, reload]);
+  }, [id, version, page, reload, revision]);
   return <main className="space-y-5">
     <header><p className="eyebrow">Read your content</p><h1 className="page-title">File preview</h1><p className="break-words">{result?.name}</p></header>
     <div className="flex flex-wrap gap-3"><Link className="secondary-button" to="/app/folders">Back to files</Link><Link className="secondary-button" to={`/app/files/${id}/versions`}>Versions and downloads</Link></div>

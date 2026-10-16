@@ -1,5 +1,28 @@
 # Security Considerations
 
+## Phase18 — local core acceptance; production gates remain
+
+Realtime uses verified bearer-authenticated ticket issuance, 20-second consumed Redis
+tickets and strict allowed Origin on a query-free WebSocket URL. The first frame carries
+the ticket; no JWT/ticket is placed in URLs/subprotocols. Every observation rechecks current
+session, verified identity, membership and ordinary resource service authorization. Connections
+expire after five minutes; frame/command/topic/time/lease and user/IP/process limits bound work.
+Snapshots contain only authorized state internally; outbound invalidations omit filenames,
+object keys, internal digests and signed capabilities. Own confirmed receipt counts are scoped
+to visible pending transfers. No provider/native work runs on observations.
+
+Cross-tab refresh/cookie writes use same-origin Web Locks; BroadcastChannel/storage carry only
+change signals. Epoch/generation fencing clears protected cache/modal/preview state. Automatic
+refresh binds subject, tenant and login session before retry. Unsupported locking/privacy
+configurations may fail closed and require sign-in; they do not use a non-atomic storage mutex.
+Socket hints cannot revoke previously received bytes or still-valid signed capabilities.
+No durable notification/replay guarantee or production capacity is implied.
+
+Initial execution was deferred; user-directed paired18+19 acceptance now passes actual Redis,
+nginx receipt/session-revocation and browser cross-tab/reconnect scopes. See phase19 evidence. L15 broader security remains open;
+L40 assigns production proxy/browser/broker matrix26, security/abuse27, alerts28, load32 and
+durable-notification scope20. Refresh-family replay response remains separately due27.
+
 ## Phase 0 Baseline
 
 - **CORS Configuration**: Restrict origins in production. Local development allows specific localhost ports.
@@ -217,3 +240,35 @@ Prior presigned URLs remain usable until expiry and received bytes cannot be rec
 Plan the upgrade capability window accordingly. Downgrade refuses retained uploaded bytes or
 active scan ownership; use a suitable coordinated backup instead of removing quarantine.
 See ADR-041 and docs/phases/phase17.md for exact local evidence and pending release gates.
+
+## Phase19 quota boundaries
+
+New upload, multipart initialization, replacement and queued-preview reservations are checked
+under the tenant write lock against deduplicated retained references. Quarantined/oversized,
+private/history/trash and failed/cancelled work remain allocated until cleanup proof. Unknown
+sizes, failed inventory and changed provider namespace pause new admissions. Existing reserved
+completion and read/cleanup paths remain available after a plan reduction; no automatic eviction.
+
+Only verified workspace managers may read aggregate usage; responses are no-store and reveal
+no object/grant identities. Plan changes are a confirmed DB-operator command, not a self-upgrade
+API. Worker inventory is privileged, bounded and tenant-filtered before persistence. It does
+not delete bytes or treat missing listing pages as absence. Preview allocations remain at the
+1MiB bound through ambiguous acknowledgements until delayed cleanup proves reclamation.
+
+This is conservative application allocation with eventual provider evidence. External writes,
+late signed capabilities, provider versions and large inventories need L41's explicit AWS/
+abuse/alert/load/billing gates26/27/28/32/25A. AI remains disabled/unimplemented; enforceable
+cost/input/job budgets must precede21 enablement. Never describe allocation as a provider invoice.
+
+
+### Phase18A collaboration source (acceptance pending)
+
+Named-recipient links require matching verified live account/session proof as well as the
+capability/password; anonymous links remain forwardable. Folder sharing follows current
+publisher-readable ancestry and current scan release. Group grants use fixed viewer/editor
+roles, combine with direct grants, and never bypass a private ancestor. Manager-controlled
+group membership is cleared on workspace departure. Resource ownership overrides management
+without rewriting immutable upload/version creator identity. Changes revoke affected links,
+while issued storage URLs retain expiry. Client-secret creation replay stores hashes only;
+legacy clients omitting the pair have no retry guarantee. Source migration022 is not applied;
+paired18A+20 acceptance and L42 independent/deployment/load gates remain pending.

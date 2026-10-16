@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -22,6 +23,7 @@ from app.core.database import Base
 class PreviewJob(Base):
     __tablename__ = "preview_jobs"
     __table_args__ = (
+        CheckConstraint("reserved_bytes BETWEEN 0 AND 1048576", name="ck_preview_quota_bytes"),
         UniqueConstraint("tenant_id", "requested_by", "request_id", name="uq_preview_request"),
         CheckConstraint(
             "state IN ('queued','running','ready','failed','cancelled')", name="ck_preview_state"
@@ -54,3 +56,7 @@ class PreviewJob(Base):
     namespace: Mapped[str] = mapped_column(String(64))
     digest: Mapped[str | None] = mapped_column(String(64))
     metadata_json: Mapped[dict | None] = mapped_column(JSON)
+    reserved_bytes: Mapped[int] = mapped_column(
+        BigInteger, default=1048576, server_default="1048576"
+    )
+    cleaned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

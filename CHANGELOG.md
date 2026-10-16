@@ -1,9 +1,18 @@
 # Changelog
 
-## Docker CI scan startup follow-up (2026-10-16, verification pending)
-- Add a bounded fresh-scanner/broker/storage/scan-worker readiness gate before CI uploads and scan dependency diagnostics on failure. Smoke timeouts report the last durable scan state.
-- Probe scanner freshness before claiming queued uploads so dependency outages cannot consume all per-version scan attempts. Quarantine and per-scan checks remain enforced. Authored outage/recovery and readiness deadline tests are unexecuted; remote rerun remains pending.
+## Phase19 — Storage Quotas (2026-10-16–17, locally verified)
+- Atomic workspace admission against retained current/history/trash/quarantine, upload/version reservations and conservative preview allocations. Plan defaults10GiB Free/100GiB Team, operator-only policy changes and manager-only usage UI; existing reservations can complete after a reduction.
+- Migration021 isolates storage policy from authentication, retains legacy unknown sizes and guards information-losing rollback. Bounded provider inventory charges orphan objects/parts and failed/unknown accounting pauses new work. Storage maintenance now rotates seven stages.
+- Real MinIO test found directory-prefixed multipart discovery omitted a live upload; bounded bucket paging plus tenant filtering fixes it. PG/concurrency/provider/Redis/migration, zero-quota browser and live nginx/receipt/logout/SMTP/transfer checks pass. Full browser run had23 passes/1 timeout with a passing isolated rerun. Backed-up021 upgrade preserves36 files/49 versions.18A remains pending by explicit user sequencing. See docs/phases/phase19.md.
 
+## Docker CI scan startup follow-up (2026-10-16, locally verified2026-10-17; remote pending)
+- Add a bounded fresh-scanner/broker/storage/scan-worker readiness gate before CI uploads and scan dependency diagnostics on failure. Smoke timeouts report the last durable scan state.
+- Probe scanner freshness before claiming queued uploads so dependency outages cannot consume all per-version scan attempts. Quarantine and per-scan checks remain enforced. Outage/recovery regression and three readiness deadline/retry tests now pass; the actual rebuilt Docker readiness gate and full upload smoke pass. Remote rerun remains pending.
+
+## Phase 18 — Realtime (implemented2026-10-16; local checkpoint2026-10-17)
+- Session-bound WebSockets, one-use Redis tickets, strict Origin and bounded leases/frames/topics. Authorized database observations send opaque current-view invalidations and own confirmed upload receipts; REST remains authoritative.
+- Cross-tab cookie locking/change signals, identity-bound automatic refresh, stale-scope reset, preview wakeups, reconnect and periodic REST fallback. No durable notification history or event replay is claimed.
+- Initial tests were deferred under the user's cadence. User then requested19 ahead of18A; combined18+19 local acceptance and source deployment021 now pass to recorded scopes, including actual nginx/Redis/receipt/revocation and cross-tab/offline browser cases. L15 broader security and L40 production/notification gates remain assigned. See docs/phases/phase18.md and ADR-042.
 
 ## Phase 17 — Malware Scanning (2026-10-16, locally verified)
 - Exact-version quarantine, full verified streaming hashes and private ClamAV verdicts gate current/history downloads, sharing and preview results. Migration 020 quarantines existing uploads and guards unsafe rollback.
@@ -247,3 +256,15 @@ All notable changes to CloudVault will be documented in this file.
 - Add current-member authorized, tenant-scoped download tickets for verified uploaded files; provider integrity checks, post-inspection/signing membership checks, grant rate limits and safe error responses.
 - Add signed attachment GET with safe Unicode filenames, octet-stream and no-store responses, default five-minute expiry, and native browser download controls with stale-session protection.
 - Add real signed GET/tampering and Chromium byte/filename/credential checks. No new database migration. See docs/phases/phase7.md and ADR-024.
+
+
+## Unreleased � Phase18A source, verification pending
+
+- Folder read-sharing, verified named-recipient access and retry-safe creation for paired
+  client request IDs/secrets; ownership transfer preserving original provenance.
+- Resource-authorized candidate search/readable grants; manager-managed workspace groups
+  with local viewer/editor grants, private-ancestor checks and departure cleanup.
+- Authored API/concurrency/migration/React/desktop/mobile coverage; not executed. Source022
+  unapplied; no running-app upgrade, commit, push or remote CI in this phase turn.
+
+- Scope decisions2026-10-17: external uploads/editing scheduled in new Phase24A; bounded scanned avatars in22A. Both carry automatic implementation/acceptance requirements;18A verification remains pending.

@@ -1,14 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
+import { StorageUsagePanel } from './StorageUsagePanel';
 
 const inputClass = 'block w-full border border-slate-300 rounded p-2';
 const buttonClass = 'border rounded px-3 py-2 disabled:opacity-50';
 
 export function SettingsPage() {
   const { user, reloadUser } = useAuth();
+  const location = useLocation(); const navigate = useNavigate();
   const cache = useQueryClient();
   const [fullName, setFullName] = useState(user?.full_name ?? '');
   const [orgName, setOrgName] = useState(user?.tenant?.name ?? '');
@@ -21,9 +24,13 @@ export function SettingsPage() {
   const [invitationOffset, setInvitationOffset] = useState(0);
   const [link, setLink] = useState('');
   const [message, setMessage] = useState('');
+  const transferredHere = location.state?.ownershipTransferredFor === `${user?.id}:${user?.tenant?.id}`;
+  const notice = message || (transferredHere ? 'Ownership transferred. You are now an admin.' : '');
   const verified = user?.email_verified === true && !!user?.tenant;
   const manager = verified && (user?.role === 'owner' || user?.role === 'admin');
   const key = ['organization', user?.tenant?.id, user?.id];
+  useLiveResource({ kind: 'members', offset }, [...key, 'members', offset], verified);
+  useLiveResource({ kind: 'invitations', offset: invitationOffset }, [...key, 'invitations', invitationOffset], manager);
   const members = useQuery({
     queryKey: [...key, 'members', offset], queryFn: () => api.members(offset), enabled: !!user && verified,
   });
@@ -65,7 +72,12 @@ export function SettingsPage() {
   const remove = useMutation({ mutationFn: api.removeMember, onSuccess: refresh });
   const revoke = useMutation({ mutationFn: api.revokeInvitation, onSuccess: refresh });
   const transfer = useMutation({ mutationFn: () => api.transferOwnership(transferTarget, transferPassword, transferConfirmation),
-    onSuccess: async () => { setTransferPassword(''); setTransferConfirmation(''); await refresh(); setMessage('Ownership transferred. You are now an admin.'); } });
+    onSuccess: async () => {
+      setTransferPassword(''); setTransferConfirmation(''); await refresh();
+      // Role refresh remounts protected page state; keep only a scoped, secret-free receipt.
+      navigate('/app/settings', { replace: true,
+        state: { ownershipTransferredFor: `${user?.id}:${user?.tenant?.id}` } });
+    } });
   const errors = [members.error, manager ? invitations.error : null, profile.error,
     organization.error, invitation.error, changeRole.error, remove.error, revoke.error, transfer.error].filter(Boolean);
 
@@ -82,7 +94,7 @@ export function SettingsPage() {
       <Link to="/app/security" className="block text-blue-600 underline">Account security and email</Link>
       {!verified && <p role="alert">Verify your email in account security before using organization features.</p>}
       {!user?.tenant && <p>Select or create a workspace from the workspace page.</p>}
-      {message && <p role="status">{message}</p>}
+      {notice && <p role="status">{notice}</p>}
       {errors.map((error, index) => <p role="alert" className="text-red-700" key={index}>
         {error instanceof Error ? error.message : 'Unable to complete request'}
       </p>)}
@@ -107,6 +119,7 @@ export function SettingsPage() {
           <button disabled={organization.isPending} className={buttonClass}>Save organization</button>
         </form> : <p>{user?.tenant?.name ?? 'No workspace selected'}</p>}
       </section>
+      <StorageUsagePanel />
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Members</h2>
         {verified && members.isPending && <p>Loading members…</p>}
@@ -187,6 +200,7 @@ export function SettingsPage() {
           <button className={buttonClass} disabled={transfer.isPending || transferConfirmation !== 'TRANSFER'}>Transfer ownership</button>
         </form>
       </section>}
+      {manager && <Link className="secondary-button" to="/app/groups">Manage workspace groups</Link>}
     </div>
   </main>;
 }

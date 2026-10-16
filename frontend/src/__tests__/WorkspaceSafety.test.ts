@@ -51,4 +51,16 @@ describe('Workspace request safety', () => {
     finish(response({ detail: 'Email verified' }));
     expect(await pending).toEqual({ detail: 'Email verified' });
   });
+
+  it.each(['sub', 'sid'])('does not retry a mutation after the shared cookie changes %s in the same workspace', async field => {
+    const claims = { sub: 'first-user', tid: 'same-workspace', sid: 'first-session' };
+    const encoded = (value: typeof claims) => `header.${btoa(JSON.stringify(value))}.signature`;
+    setAccessToken(encoded(claims));
+    const fetchMock = vi.fn(async (url: string) => url.endsWith('/auth/refresh')
+      ? response({ access_token: encoded({ ...claims, [field]: 'different' }) }) : response({ detail: 'Expired' }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(api.renameOrganization('Do not replay')).rejects.toThrow('Expired');
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/organizations/current'))).toHaveLength(1);
+    expect(getAccessToken()).toBeNull();
+  });
 });

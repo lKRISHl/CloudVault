@@ -78,12 +78,18 @@ services:
       context: ./backend
     ports:
       - "8000:8000"
-    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --ws-max-size 8192 --ws-max-queue 2"]
     volumes:
       - preview_ipc:/preview:ro
     environment: &backend-environment
       - DATABASE_URL=postgresql+asyncpg://cloudvault:cloudvault@postgres:5432/cloudvault
       - REDIS_URL=redis://redis:6379/0
+      - LIVE_POLL_SECONDS=${LIVE_POLL_SECONDS:-3}
+      - LIVE_USER_CONNECTIONS=${LIVE_USER_CONNECTIONS:-4}
+      - LIVE_IP_CONNECTIONS=${LIVE_IP_CONNECTIONS:-64}
+      - LIVE_PROCESS_CONNECTIONS=${LIVE_PROCESS_CONNECTIONS:-64}
+      - STORAGE_FREE_LIMIT_BYTES=${STORAGE_FREE_LIMIT_BYTES:-10737418240}
+      - STORAGE_TEAM_LIMIT_BYTES=${STORAGE_TEAM_LIMIT_BYTES:-107374182400}
       - CLAMD_HOST=clamav
       - CLAMD_PORT=3310
       - SCAN_MAX_BYTES=${SCAN_MAX_BYTES:-104857600}

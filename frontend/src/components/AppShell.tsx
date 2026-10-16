@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { Icon } from './ui/Icon';
+import { RealtimeStatus } from '../realtime/RealtimeProvider';
 
 export function AppShell() {
-  const { user, logout } = useAuth();
+  const { user, logout, scopeRevision } = useAuth();
   return <div className="vault-shell">
     <a href="#workspace-content" className="skip-link">Skip to content</a>
     <aside className="vault-sidebar">
@@ -21,6 +22,6 @@ export function AppShell() {
       <div className="sidebar-note"><Icon name="vault" /><strong>A home for your work.</strong><p>Keep your files organized in one workspace.</p></div>
       <div className="sidebar-account"><span className="account-avatar">{user?.full_name.slice(0, 1).toUpperCase()}</span><div><strong>{user?.full_name}</strong><small>{user?.role ?? 'Account'}</small></div><button onClick={() => void logout()} aria-label="Sign out">↗</button></div>
     </aside>
-    <div className="vault-main"><header className="vault-topbar"><span>Workspace / <strong>{user?.tenant?.name ?? 'Overview'}</strong></span><span className="identity-chip">{user?.email_verified ? 'Email verified' : 'Verify your email'}</span></header><div id="workspace-content" tabIndex={-1} className="vault-content"><Outlet /></div></div>
+    <div className="vault-main"><header className="vault-topbar"><span>Workspace / <strong>{user?.tenant?.name ?? 'Overview'}</strong></span><span className="identity-chip">{user?.email_verified ? 'Email verified' : 'Verify your email'}</span></header><div id="workspace-content" tabIndex={-1} className="vault-content"><RealtimeStatus /><Outlet key={`${user?.id}:${user?.tenant?.id}:${scopeRevision}`} /></div></div>
   </div>;
 }

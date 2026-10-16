@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
 
 export function WorkspaceSwitcher() {
   const { user, switchWorkspace, createWorkspace } = useAuth();
   const [name, setName] = useState('');
   const [offset, setOffset] = useState(0);
+  useLiveResource({ kind: 'workspaces', offset }, ['workspaces', user?.id, user?.tenant?.id, offset], user?.email_verified === true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const workspaces = useQuery({ queryKey: ['workspaces', user?.id, user?.tenant?.id, offset],

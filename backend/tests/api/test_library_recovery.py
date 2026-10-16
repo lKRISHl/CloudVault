@@ -303,6 +303,7 @@ async def test_legacy_intent_discard_refuses_and_mixed_creator_cancellation_is_m
                 request_id=uuid4(),
                 storage_bucket="cv-unit-uploads",
                 fingerprint="0" * 64,
+                reserved_bytes=123,  # This fixture knows its retained reservation size.
                 expires_at=datetime.now(UTC) + timedelta(hours=1),
             )
         )

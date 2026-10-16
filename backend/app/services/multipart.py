@@ -272,7 +272,11 @@ class MultipartService:
         )
         intent = await self.db.scalar(query)
         if intent is None:
+            from app.services.quotas import QuotaService
+
+            await QuotaService(self.db).admit(actor.tenant_id, payload.declared_size_bytes)
             intent = UploadIntent(
+                reserved_bytes=payload.declared_size_bytes,
                 file_id=uuid4(),
                 tenant_id=actor.tenant_id,
                 object_id=uuid4(),
@@ -293,6 +297,9 @@ class MultipartService:
             raise HTTPException(503, "Cannot reserve upload initialization")
         if intent.fingerprint != fingerprint:
             raise HTTPException(409, "Upload request ID belongs to different metadata")
+        if intent.reserved_bytes is None:
+            # An exact legacy request supplies a bound, but must pass fresh admission first.
+            raise HTTPException(409, "Legacy initialization requires operator reconciliation")
         if intent.cancelled_at:
             raise HTTPException(410, "Initialization cancelled; start a new upload")
         if not intent.scope_recorded:

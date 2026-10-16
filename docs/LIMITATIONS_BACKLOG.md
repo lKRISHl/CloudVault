@@ -1,5 +1,17 @@
 # CloudVault — Limitations and Closure Schedule
 
+2026-10-17 sequencing update: the user explicitly requested19 ahead of18A. Phase19 quota
+implementation/local acceptance passes to recorded scopes;18A remains pending and is the
+next development step after this checkpoint, before20. L19/L04/L39 accounting acceptance
+is being recorded in phase19; new quota/provider/load gates are L41. Earlier18+18A pairing
+below is historical and superseded by this instruction.
+
+Historical sequencing note 2026-10-16 (superseded above): Phase17 is locally verified and committed cb85538.
+Phase18/L15 implementation and authored tests are present, but verification has not run.
+User-requested cadence: execute acceptance after every two consecutive roadmap stages;
+the next checkpoint is 18 + 18A before19. This allows 18A implementation while18 checks
+remain pending; it does not close L15 or waive acceptance. Phase18 adds L40 below.
+
 2026-10-16 update: the user resumed Phase 15's deferred verification; 22/22 browser journeys,
 105 frontend tests, lint/build and cleanup pass. The navigation cache race found during
 completion is fixed and covered. Phase 16 local scope also passes decoder/isolation, Redis restart,
@@ -162,11 +174,19 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   Sources: [2B §J](phases/phase2b.md#j-limitations-and-operation), [12 §J](phases/phase12.md#j-operations-and-limitations).
   **When: 18A UX; 22A common pagination.** Add tenant-authorized lookup/search and accessible
   selection without enumerating private/foreign identities. Groups/custom roles are P01.
-- **L15 — Cross-tab workspace/refresh coordination, realtime roster/ACL/cache events absent.**
+- **L15 — Cross-tab workspace/refresh coordination and realtime roster/ACL/cache acceptance.**
   Sources: 2A/2B/9/12 §J. **When: 18 client/realtime; 27 refresh-security verification.**
   Coordinate shared-cookie changes and refresh ownership, reset scoped caches, reconnect
   safely, and stop stale writes. Verify multiple tabs, logout, removal and rapid switches.
   Previously received bytes/metadata cannot be remotely erased (D01).
+  **Source implemented in18; verification pending:** first-frame one-use tickets, fresh
+  session/membership/resource checks, bounded current-state observation, reconnect/REST
+  fallback, own receipt counts, Web Locks and secret-free shared-cookie change signals.
+  Execute real Redis/nginx/PG/browser multi-tab logout/removal/ACL/rapid-switch/worker-change
+  and receipt cases at the user-directed combined18+19 checkpoint. Local core passes:
+  actual Redis ticket/lease, nginx receipt/logout smoke, cross-tab/offline browser cases
+  and PG authority tests. Broader refresh-family security still belongs27.
+  Unsupported Web Locks/privacy configurations and production scaling remain L40.
 - **L16 — Filename search lacks recursive scope, fuzzy/accent-normalized matching and tags.**
   Source: [10 §J](phases/phase10.md#j-operations-and-limitations). **When: 21 tags; 22A lexical
   search/navigation.** Define search semantics and preserve resource/ancestor predicates
@@ -178,11 +198,18 @@ Each ID includes its source, assigned checkpoint and the evidence required for c
   Sources: 10/12/14 §J; 3 list bounds. **When: 22A common cursor/keyset strategy, scoped counts
   only where useful; 32 workload verification.** Cover files/search/history/large membership
   lists. Define consistency rather than promising an immutable snapshot or unlimited paging.
-- **L19 — No aggregate storage reservation/quota enforcement.** Sources: 6/8/14 §J.
+- **L19 — Aggregate storage reservation/quota acceptance and later cost/entitlement integration.** Sources: 6/8/14 §J.
   **When: 19; billing entitlements 25A.** Count current/history/trashed bytes once, pending
   reservations and unknown/orphan reconciliation separately; enforce concurrent limits and
   safe downgrade/over-quota behavior. Add bounded AI budgets before enabling AI in 21,
   then integrate subscription metering in 25A.
+  Source implemented19: locked retained-reference admission, plan/limit policy, own original/
+  replacement reservations, history/trash/quarantine, conservative preview bounds and bounded
+  provider inventory. Unknown sizes and failed reconciliation pause new allocations. Manager
+  usage and explicit DB-operator plan changes pass local acceptance in phase19, including PG
+  concurrent admission, real object/part evidence, migration guards and zero-quota browser denial.
+  See phase19/ADR-044. AI budgets remain a mandatory pre-enable21 gate; billing25A and L41
+  production capacity/provider/operational verification remain open.
 
 ### Durable maintenance and production-provider evidence
 
@@ -295,12 +322,8 @@ before claiming support; if excluded, document the boundary for the resume demo/
 - **P01 — Groups/custom resource roles:** decide in **18A**; existing workspace roles plus
   viewer/editor grants remain supported. Include permission precedence, membership lifecycle
   and ancestor semantics in any design. Source: 12/current limits.
-- **P02 — External folder editing/upload and delegated external collaboration:** decide in
-  **18A** after folder-read/named-recipient design. Do not imply anonymous read links grant
-  write, membership or AI access. Source: 11 §J.
-- **P03 — Profile avatar upload:** decide after scanning in **18A**; implement through safe
-  bounded storage/processing if included. Full-name-only profile remains the current scope.
-  Source: 2 §J.
+- **P02 - Controlled external uploads/editing:** user approved dedicated **24A** on2026-10-17, after24 and before25. Automatically implement scoped verified-recipient guest writes, current ACL/ancestor checks, quotas/scanning/version lifecycle, revocation, idempotency, audit and abuse controls with actual acceptance. Anonymous read links remain read-only; no current guest-write support is claimed. Source:11 and18A.
+- **P03 - Profile avatars:** user approved **22A** on2026-10-17. Automatically implement bounded scanned image upload, safe decode/re-encode, account/tenant privacy, quota inclusion and replacement/deletion/orphan cleanup, with malformed-image/security and lifecycle tests. Full-name-only profile remains supported until this work passes acceptance. Source:2 and18A.
 - **P04 — Provider object lock/version pinning and strict one-use/immediately revocable
   download access:** decide provider requirements in **16** and delivery architecture in
   **27**, before release. Strict revocation/one-use semantics need a separately designed
@@ -430,3 +453,71 @@ while implementing these tasks is fixed before proceeding, regardless of its pla
   **32** measure memory/CPU, queue delay/fairness and throughput with representative objects,
   then record the supported production scan-size/service limits. These are automatically
   required work when continuing those phases; they are not closed by installing ClamAV.
+
+## Newly tracked in Phase 18
+
+- **L40 — Realtime observation capacity, durable notification policy and deployment matrix.**
+  Source: [Phase18](phases/phase18.md), ADR-042. Current bounded DB observations coalesce
+  transitions, have no durable replay/inbox and incur reads per socket/subscription.
+  Defaults permit eight paged views/socket, four sockets/user, 64/IP/process and three-second
+  observation; none is a measured production capacity. Redis leases assume standalone Redis.
+  ASGI peer-IP limits require a trusted production proxy topology. Without Web Locks,
+  competing refreshes can safely fail closed instead of transparently adopting the session.
+  **When20:** decide/record whether durable user notifications are in scope; if included,
+  implement tenant-authorized persistence, retention/read state and replay/idempotency tests.
+  Audit history alone is not a user notification inbox. Explicit exclusion is a product
+  boundary, not an implemented inbox. **26:** prove actual nginx/TLS upgrade, Redis restart,
+  multi-process lease caps/expiry, slow clients, offline fallback and supported browser/privacy
+  combinations; implement fixes and document any unsupported deployments before release.
+  **27:** review Origin/ticket replay/expiry, session changes, proxy spoofing, denial of service
+  and strict current authority. **28:** implement secret-safe connection/reconnect/fallback,
+  failed lease and observation-latency/error metrics and verify actionable alerts on real
+  failures/recovery. **32:** measure many tenants/tabs/pages under representative DB/fanout
+  load, report latency/fairness/resource limits and implement required admission, cadence or
+  event-fanout changes. No invented performance claim or assumption that a Redis restart is
+  durable event delivery. Current status: implementation bounds only; these gates remain open.
+
+## Newly tracked in Phase19
+
+- **L41 — Conservative allocation, eventual provider evidence and production quota capacity.**
+  Source: [Phase19](phases/phase19.md), ADR-044. Known references/reservations are enforced
+  atomically; external writes and unknown provider overhead are discovered by bounded paged
+  inventory, not a simultaneous physical-byte snapshot. Preview allocation retains its1MiB
+  worst-case bound until cleanup. Local MinIO needs bucket-wide multipart discovery with
+  tenant filtering; long inventories and many tenants can delay reconciliation. Two upload
+  IDs/1024 parts per key are supported; excessive/unknown manifests pause new admissions.
+  Changed/failed namespaces require explicit reconciliation, not deletion of old evidence.
+  **26:** prove actual AWS object/multipart pagination, lost acknowledgements/late writes,
+  supported versioning/refusal, namespace changes and known-reference cleanup. **27:** review
+  presigned-capability/abuse and operator access policy. **28:** implement stale/failed inventory,
+  unresolved-size and reservation/over-quota alerts and test real failures/recovery. **32:**
+  measure aggregate SQL/tenant-lock cost, manifest bounds, cycle latency and tenant fairness;
+  implement justified indexes, admission or inventory extensions and document measured limits.
+  **25A:** implement the chosen billing metering, explicitly distinguishing conservative
+  allocation from provider invoice bytes. AI budgets stay a mandatory pre-enable21 condition.
+  These tasks are automatically included in their checkpoints. No production scale or exact
+  physical-byte billing guarantee is implied by the current local implementation.
+  **20/L36:** define/implement safe zero-usage evidence compaction without discarding live
+  cleanup or namespace/reconciliation references. Local19 evidence does not close these later gates.
+
+
+## Phase18A follow-through (2026-10-17)
+
+L10�L14: source implementation candidates now exist; none is closed before paired18A+20
+acceptance. See [phase18A](phases/phase18a.md) for exact scope, legacy retry-client semantics,
+new authored tests and operation boundaries. P01 groups were explicitly included by the user;
+fixed viewer/editor roles are implemented. P02/P03 were explicitly resolved2026-10-17: controlled external uploads/editing24A and
+bounded scanned avatars22A. Those checkpoints automatically own implementation/acceptance;
+no current external write or avatar support is implied.
+
+- **L42 � Collaboration acceptance and initial group/directory limits.** Source:18A report.
+  **When:18A+20 local checkpoint;26 deployment compatibility;27 independent security;
+  28 feature-aware alerts;32 measured query/lock/invalidation/fairness limits.** Prove actual
+  recipient identity/session, lost-response/concurrent replay, ownership provenance, private
+  ancestors, current subtree moves/trash/restore, direct/group precedence and permanent
+  departure cleanup. Initial100 groups/workspace,1000 members/group,100 grants/group,
+  pages25/offset10000 and15-second group-directory polling are explicit unbenchmarked bounds.
+  Keep pending acceptance separate from verified claims. Audit share/group/ownership events
+  in20; URLs remain reusable until expiry and received bytes cannot be recalled (D01/D02).
+  Legacy share-create clients must adopt request-ID/client-secret pair for retry guarantees;
+  form reload intentionally does not recover raw secrets. Consider public API contract24.

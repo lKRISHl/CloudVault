@@ -4,14 +4,18 @@ from app.api.accounts import router as accounts_router
 from app.api.auth import router as auth_router
 from app.api.files import router as files_router
 from app.api.folders import router as folders_router
+from app.api.groups import router as groups_router
 from app.api.health import router as health_router
 from app.api.organizations import router as organizations_router
 from app.api.permissions import router as permissions_router
+from app.api.realtime import router as realtime_router
 from app.api.shares import router as shares_router
 from app.api.trash import router as trash_router
 from app.api.users import router as users_router
 
 api_router = APIRouter()
+api_router.include_router(groups_router, prefix="/groups", tags=["groups"])
+api_router.include_router(realtime_router, prefix="/realtime", tags=["realtime"])
 api_router.include_router(trash_router, tags=["trash"])
 api_router.include_router(permissions_router, tags=["permissions"])
 api_router.include_router(shares_router, tags=["sharing"])

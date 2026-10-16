@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
 import { DestinationPicker } from '../folders/DestinationPicker';
 
 export function TrashPage() {
@@ -18,6 +19,7 @@ function Trash() {
   const [restoreId, setRestoreId] = useState<string | null>(null); const [restoreName, setRestoreName] = useState('');
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  useLiveResource({ kind: 'trash', offset }, ['trash', user?.tenant?.id, user?.id, offset]);
   const query = useQuery({ queryKey: ['trash', user?.tenant?.id, user?.id, offset], queryFn: ({ signal }) => api.trash(offset, signal) });
   async function mutate(id: string, purge = false, destination?: string | null) {
     setBusy(true); setError(''); setMessage('');

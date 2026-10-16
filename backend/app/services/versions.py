@@ -207,6 +207,9 @@ class VersionService:
         else:
             if file.version_generation != payload.base_generation:
                 raise HTTPException(409, "Current version changed; refresh and start again")
+            from app.services.quotas import QuotaService
+
+            await QuotaService(self.db).admit(actor.tenant_id, payload.declared_size_bytes)
             if multipart and payload.part_size != settings.MULTIPART_PART_BYTES:
                 raise HTTPException(409, "Chunk configuration changed; refresh upload settings")
             pending = await self.db.scalar(

@@ -13,10 +13,15 @@ class ScannerReadinessTests(unittest.TestCase):
         with (
             patch("scripts.wait_for_scanner.time.monotonic", side_effect=[0, 0, 1, 2]),
             patch("scripts.wait_for_scanner.time.sleep") as sleep,
-            patch("scripts.wait_for_scanner.subprocess.run", side_effect=[
-                SimpleNamespace(returncode=1, stdout='{"state":"dependency_unavailable"}'),
-                SimpleNamespace(returncode=0, stdout='{"jobs":[{"state":"ok"}]}'),
-            ]) as run,
+            patch(
+                "scripts.wait_for_scanner.subprocess.run",
+                side_effect=[
+                    SimpleNamespace(
+                        returncode=1, stdout='{"state":"dependency_unavailable"}'
+                    ),
+                    SimpleNamespace(returncode=0, stdout='{"jobs":[{"state":"ok"}]}'),
+                ],
+            ) as run,
         ):
             wait_for_scanner(timeout=10)
         self.assertEqual(run.call_count, 2)
@@ -25,21 +30,29 @@ class ScannerReadinessTests(unittest.TestCase):
 
     def test_unready_dependencies_fail_at_deadline(self):
         with (
-            patch("scripts.wait_for_scanner.time.monotonic", side_effect=[0, 0, 10, 10]),
-            patch("scripts.wait_for_scanner.subprocess.run", return_value=
-                SimpleNamespace(returncode=1, stdout="")),
+            patch(
+                "scripts.wait_for_scanner.time.monotonic", side_effect=[0, 0, 10, 10]
+            ),
+            patch(
+                "scripts.wait_for_scanner.subprocess.run",
+                return_value=SimpleNamespace(returncode=1, stdout=""),
+            ),
+            self.assertRaisesRegex(RuntimeError, "Quarantine remains enforced"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "Quarantine remains enforced"):
-                wait_for_scanner(timeout=10)
+            wait_for_scanner(timeout=10)
 
     def test_stalled_probe_cannot_extend_deadline(self):
         with (
-            patch("scripts.wait_for_scanner.time.monotonic", side_effect=[0, 0, 10, 10]),
-            patch("scripts.wait_for_scanner.subprocess.run", side_effect=
-                subprocess.TimeoutExpired(COMMAND, 10)) as run,
+            patch(
+                "scripts.wait_for_scanner.time.monotonic", side_effect=[0, 0, 10, 10]
+            ),
+            patch(
+                "scripts.wait_for_scanner.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(COMMAND, 10),
+            ) as run,
+            self.assertRaisesRegex(RuntimeError, "startup deadline"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "startup deadline"):
-                wait_for_scanner(timeout=10)
+            wait_for_scanner(timeout=10)
         self.assertEqual(run.call_args.kwargs["timeout"], 10)
 
 

@@ -1,10 +1,12 @@
 # Development Plan
 
-This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Complete, test, document, and explain each phase before starting the next. No AstraTransfer dependency is permitted.
+This plan follows the master roadmap supplied by the project owner, with approved extensions for account lifecycle, multi-organization membership, and billing. Original Phase 0–33 numbers are preserved; added stages use letter suffixes. Implement, document and explain each phase; execute verification at the two-phase checkpoints requested by the user. No AstraTransfer dependency is permitted.
 
 Current state: Phase 17 is implemented and locally verified on application schema 020_malware_scanning. Real ClamAV/queue/provider release and detection, quarantine/browser tests, migration and app rescans pass; 113 frontend tests and 22/22 browser regression journeys pass. Exact backend baseline/focused reruns and the host FFmpeg skip are recorded in docs/phases/phase17.md. Phases 15/16 are committed in 6bf868f; Phase17 is committed with its verification notes. No browser deferral remains. AWS/production certification retains 26/31 and other assigned gates.
 
-Next action when requested: Phase 18 realtime and its due limitations. Phase18 has not started. Keep production-provider, security, quota, monitoring and recovery gates assigned to their later phases.
+Current source: Phase18 realtime core and Phase19 storage quotas are implemented and locally verified to the recorded scopes. Source/application schema021_storage_quotas after a backed-up upgrade preserving36 files/49 versions. See docs/phases/phase18.md, phase19.md and ADR-042/044. Initial full-suite failures and browser timeout/reruns remain explicit. Phase17 is committed cb85538; Docker scan-startup fix c3cf0ee. Phases18/19 are uncommitted.
+
+User sequencing override (2026-10-16): start19 ahead of18A. Keep18A explicitly pending; the testing checkpoint is now18+19. Finish its due acceptance, then return to18A before20. Test every two actually implemented roadmap stages, including lettered stages; author tests with implementation, and never call pending acceptance complete. An unpaired final stage still needs acceptance. Known security/data-loss defects are fixed immediately. Keep production-provider, security, quota, monitoring and recovery gates assigned to their later phases.
 
 ## Limitations ownership and closure
 
@@ -12,9 +14,9 @@ Every numbered/lettered phase report must include "Limitations requiring explici
 
 Standing user instruction: an ordinary "continue" authorizes the next scheduled development step, including its assigned limitation fixes and acceptance checks. Read docs/LIMITATIONS_BACKLOG.md before implementation, include every due L item and P decision in the working scope, and do not wait for the user to request each limitation separately. Complete the authorized implementation, tests and documentation autonomously. New limitations must receive an ID, checkpoint and acceptance criteria rather than being silently deferred.
 
-Do not mark a phase complete or advance past it with an unresolved assigned acceptance check. Complete independent work when an external dependency is unavailable, keep the affected item explicitly open, and report the exact dependency and next action. Ask only for genuinely missing product decisions, credentials, externally controlled prerequisites or actions requiring separate authorization; an existing agreed scope is not a reason to ask again. Deliberate D constraints are reviewed/documented, not falsely promised to disappear. This instruction governs active development when work resumes; it does not create background/scheduled execution or authorize remote push, external CI dispatch, publication, paid resources or destructive data removal.
+Do not mark a phase complete or advance past its two-phase checkpoint with an unresolved assigned acceptance check. The next member of the pair may be implemented while verification is pending. Complete independent work when an external dependency is unavailable, keep the affected item explicitly open, and report the exact dependency and next action. Ask only for genuinely missing product decisions, credentials, externally controlled prerequisites or actions requiring separate authorization; an existing agreed scope is not a reason to ask again. Deliberate D constraints are reviewed/documented, not falsely promised to disappear. This instruction governs active development when work resumes; it does not create background/scheduled execution or authorize remote push, external CI dispatch, publication, paid resources or destructive data removal.
 
-[Limitations backlog and schedule](docs/LIMITATIONS_BACKLOG.md) is the current register of historical gaps, resolved items, planned closures, product decisions and intentional constraints. Entries now extend through L38; closed local scope, open verification, product decisions and design boundaries are labelled individually. Historical phase reports remain records of their original scope, not the live backlog.
+[Limitations backlog and schedule](docs/LIMITATIONS_BACKLOG.md) is the current register of historical gaps, resolved items, planned closures, product decisions and intentional constraints. Entries now extend through L41; closed local scope, open verification, product decisions and design boundaries are labelled individually. Historical phase reports remain records of their original scope, not the live backlog.
 
 Every phase must reference the relevant register IDs and record actual acceptance evidence. Scheduling does not close an item. Security/data-loss defects block further work immediately. Remote CI requires separate push/dispatch authorization; production readiness is not inferred from completed phase numbers. Phase order is a dependency schedule, not a calendar-date or duration promise.
 
@@ -315,16 +317,18 @@ Status: Implemented and locally verified. Exact-version quarantine/release, priv
 
 Limitations closure work: L15: cross-tab workspace/refresh coordination, scoped-cache reset and roster/ACL/reconnect events; verify refresh security again in 27.
 
-Status: Not started.
+Status: Core implemented and locally verified at18+19. Actual Redis, backend transport/authority, nginx/own-receipt/logout, cross-tab/reconnect and browser regression scopes pass with recorded reruns. See docs/phases/phase18.md, phase19.md and ADR-042; L40 production/security/load/notification gates remain open.
 
-- WebSockets
-- upload/processing events
-- notifications
-- reconnect handling
+- Session-bound WebSockets with one-use Redis tickets, strict Origin and bounded leases/frames/subscriptions.
+- Authorized bounded database observations for visible upload receipts, scans, previews, roster and resource/ACL changes; opaque invalidations trigger ordinary authorized REST reads.
+- Ephemeral change notices, reconnect/resync and periodic REST fallback; no durable event history or notification inbox.
+- Cross-tab shared-cookie locking, secret-free change signals and stale-scope cancellation/reset (L15).
+- Paired acceptance must prove real Redis tickets/leases and nginx upgrade, tenant/private-resource isolation, logout/removal/ACL revocation, concurrent refresh/workspace switches, receipt counts and worker changes, offline recovery and REST fallback.
+- L40: provider/proxy/browser failure matrix in 26, ticket/lease/refresh abuse review in 27, operational alerts in 28 and representative observation/fanout load in 32. Durable notification policy is decided in 20.
 
 ## PHASE 18A — Collaboration Completion and Explicit MVP Scope
 
-Status: Planned; not implemented. Complete after 18 and before 19.
+Status: Source implementation prepared2026-10-17, including groups explicitly chosen by the user; acceptance PENDING at the18A+20 checkpoint. See docs/phases/phase18a.md and ADR-045. Running app remains021; source022 is unapplied. P02/P03 resolved2026-10-17: scanned avatars22A; controlled external uploads/editing24A. These scheduled capabilities are not implemented yet.
 
 Closure ownership: L10–L14. Scope decisions: P01–P03.
 
@@ -333,7 +337,7 @@ Closure ownership: L10–L14. Scope decisions: P01–P03.
 - Idempotent share creation without exposing stored raw secrets or misrepresenting URL grants as completed delivery.
 - Authorized resource ownership transfer with membership, version provenance, grant/link and ancestor consequences.
 - Tenant-scoped member/grant lookup and readable recipient selection beyond the currently loaded page.
-- Decide whether groups/custom roles, external editing/upload and profile avatars belong in the MVP. Record include/exclude decisions; included features require their own implementation and acceptance evidence before support is claimed.
+- User included groups now: manager-controlled membership and local viewer/editor grants; no arbitrary custom role definitions. User scheduled external editing/upload in24A and bounded scanned profile avatars in22A; automatically include implementation and acceptance at those checkpoints before claiming support.
 
 Completion criteria:
 - Sharing/ownership/group scope cannot bypass private ancestors, tenant membership or current permissions, including concurrent move/removal/restore operations.
@@ -345,7 +349,9 @@ Limitations closure work: L19 and L04 accounting: concurrent reservations, retai
 
 L39: explicitly count retained quarantined/blocked/oversized content and scan reservations; test retries/cleanup without double counting or silently exempting bytes.
 
-Status: Not started.
+Status: Implemented and locally verified2026-10-17; application upgraded021. See docs/phases/phase19.md and ADR-044 for actual PG/concurrency/Redis/provider/migration/browser/live evidence and initial failure/rerun details. Atomic retained-reference accounting covers original/replacement reservations, history/trash/quarantine, bounded preview allocations and provider orphan evidence; manager-only usage UI and operator plan/limit changes. Billing remains25A; AI budgets must precede enablement21. No production physical-byte billing claim.
+
+L41: production quota/inventory compatibility26, capability/abuse policy27, inventory/reservation alerts28 and measured aggregate-query/tenant-lock/inventory-cycle limits32. Conservative allocation versus invoice metering is25A work. Acceptance must verify unknown sizes fail closed and exact identity grouping/reclamation never frees capacity merely on cancellation/expiry.
 
 - usage calculation
 - quotas
@@ -353,6 +359,10 @@ Status: Not started.
 - plan-specific limits
 
 ## PHASE 20 — Audit Logs
+
+L40: explicitly decide whether durable user notifications are in scope. Audit history is not an inbox. If included, implement authorized persistence, retention/read state and replay/idempotency acceptance; otherwise record the explicit product exclusion.
+
+L41/L36: compact safe zero-usage quota inventory evidence under an explicit retention policy without losing live cleanup/namespace/reconciliation references.
 
 Limitations closure work: L21/L32/L36 and L04 retention: audited content/permission/deletion transitions, technical metadata retention/compaction that preserves live cleanup refs, and honest issued-grant events rather than completed-download claims.
 
@@ -388,11 +398,16 @@ Status: Not started.
 
 Status: Planned; not implemented. Complete after 22 and before 23.
 
-Closure ownership: L16/L18; measured scale verification continues in 32.
+Closure ownership: L16/L18 and P03 avatar implementation; measured scale verification continues in 32.
 
 - Define recursive filename scope, fuzzy/accent normalization and tag filtering separately from semantic search.
 - Use a common cursor/keyset strategy where needed for files/search/history/large membership lists; add scoped totals only where useful.
 - Preserve current tenant/resource/ancestor predicates before pagination/count/context and document concurrent-update consistency.
+
+User-approved P03 addition (2026-10-17), automatically required at this checkpoint:
+- Implement bounded avatar upload/storage and safe image decoding/re-encoding after scanning, using tenant/account-authorized access and private object references.
+- Set explicit type, byte, pixel/dimension and processing limits. Include quota accounting, replacement/deletion cleanup, account deletion, failed scans and abandoned uploads; do not persist image bytes in PostgreSQL.
+- Add accessible profile controls/fallbacks and privacy/cache behavior. Test spoofed MIME, malformed/decompression-bomb images, unauthorized access, quarantine, retries and lifecycle recovery before enabling avatars.
 
 Completion criteria:
 - Private deep hierarchies, broad/short terms, Unicode, concurrent changes and large-list navigation are tested with actual query-plan evidence.
@@ -418,6 +433,21 @@ Status: Not started.
 - API keys/tokens
 - rate limits
 - documentation
+
+## PHASE 24A - Controlled External Collaboration
+
+Status: Planned; explicitly approved2026-10-17. Implement after24 and before25.
+Closure ownership: P02. This work is automatically included when this checkpoint is reached.
+Dependencies: existing ACLs/groups, scanning, quotas, audit events and the public API contract.
+
+- Implement controlled guest uploads/editing with explicit recipient identity proof, resource-scoped invitations and least-privilege capabilities. Define editing as content replacement/versioning or explicitly supported operations; do not imply a real-time document editor.
+- Specify current-ancestor/move/ownership/revocation/expiry behavior and guest lifecycle without implicitly granting workspace membership, administration or unrelated resource access.
+- Keep anonymous read links read-only. Separate guest write authorization, bounded transfer grants, request idempotency, cancellation/resume, versions, scan quarantine and quota admission.
+- Add owner-visible management and recipient UX, meaningful audit records, per-guest/workspace abuse limits and automatic abandoned/expired transfer cleanup.
+
+Completion criteria:
+- Actual identity, tenant/ancestor boundaries, changed/missing permissions, forwarded/revoked invitations, concurrent moves/removals, malicious uploads and quota exhaustion pass API/provider/browser acceptance.
+- Prove failed/retried transfers cannot bypass scan release or lose retained-byte accounting; prove cleanup and version provenance. Carry production security/abuse/deployment/alerts/load proof to26/27/28/31/32 without claiming it is already certified.
 
 ## PHASE 25 — Webhooks
 
@@ -458,6 +488,10 @@ Limitations closure work: L20/L22/L23/L31/L33/L35: actual chosen-provider/browse
 
 L39: verify actual AWS scan streams, immutable conditional reads, scanner image pinning/private deployment and failure/recovery, including outstanding pre-upgrade capabilities.
 
+L41: certify actual AWS quota inventory, known/orphan references, late-write/reclamation and namespace/versioning refusal behavior before release.
+
+L40: verify actual nginx/TLS WebSocket upgrade, Redis restart, multi-process lease limits/expiry, slow clients, REST fallback and supported browser/privacy combinations. Implement discovered fixes before release; current-state observation does not imply durable replay.
+
 Status: Not started.
 
 - unit tests
@@ -476,6 +510,10 @@ Completion criteria:
 Limitations closure work: L15/L21/L24/L27–L30/L32 and P04 delivery decision: MFA/recovery codes and inaccessible-mailbox support policy, refresh-family replay handling, trusted proxies/rate/CPU/timing abuse review, provider/retention/logging policies and independent assessment requirements before public release.
 
 L39: review scan-size/format/encrypted/archive policy, false negatives and parser isolation; implement/verify the selected retroactive rescan, signature-change threat-response and released-content revocation policy.
+
+L41: review quota/reservation abuse, signed-capability overlap and confirmed operator plan/reconciliation access.
+
+L40: test socket Origin, one-use ticket replay/expiry, current session/resource revocation, trusted-proxy IP handling and connection/command/refresh abuse under the deployment threat model.
 
 Status: Not started.
 
@@ -497,6 +535,10 @@ Completion criteria:
 Limitations closure work: L25/L26/L32/L36: feature-aware dependency probes, cleanup/backlog age/errors, real SMTP alerts, secret-safe logs/traces/metrics and clearly labeled provider-observed download telemetry.
 
 L39: alert on signature freshness/updater failure, unavailable scanner, oldest pending/failed scan and quarantine counts; verify alerts on actual failures and recovery.
+
+L41: alert on stale/failed quota inventory, unresolved sizes, retained reservations and over-quota state; prove real failure/recovery notifications.
+
+L40: implement secret-safe connection/reconnect/fallback, failed-lease and observation latency/error metrics; trigger and recover real faults to prove actionable alerts.
 
 Status: Not started.
 
@@ -552,6 +594,10 @@ Status: Not started.
 Limitations closure work: L18/L29/L33: measure representative tenant-lock, search/ACL/history, transfer, queue and abuse workloads; tune only from recorded results.
 
 L39: measure scanner RAM/CPU, source-size/format limits, queue delay and tenant fairness using representative files; record supported production scan limits from results.
+
+L41: measure aggregate quota-query/tenant-lock cost, provider page-cycle latency, manifest bounds and tenant fairness; implement necessary indexing/admission/inventory improvements.
+
+L40: measure representative tenant/tab/subscription fanout, DB load, change latency and fairness; implement admission, cadence or event-fanout changes justified by results and publish measured supported limits.
 
 Status: Not started.
 

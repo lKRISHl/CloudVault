@@ -9,8 +9,10 @@ import { api } from '../services/api';
 
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ user: { id: 'me', tenant: { id: 'workspace' } } }) }));
 beforeEach(() => {
-  vi.spyOn(api, 'permissions').mockResolvedValue({ name: 'Secret.pdf', visibility: 'workspace', items: [], offset: 0, has_more: false });
-  vi.spyOn(api, 'members').mockResolvedValue([{ user_id: 'member', full_name: 'Team Member', email: 'member@example.com', role: 'member', joined_at: '' }]);
+  vi.spyOn(api, 'groups').mockResolvedValue({ items: [{ id: 'group', name: 'Design' }], offset: 0, has_more: false });
+  vi.spyOn(api, 'setGroupGrant').mockResolvedValue();
+  vi.spyOn(api, 'permissions').mockResolvedValue({ owner_id: 'me', name: 'Secret.pdf', visibility: 'workspace', items: [], offset: 0, has_more: false });
+  vi.spyOn(api, 'permissionCandidates').mockResolvedValue({ items: [{ user_id: 'member', full_name: 'Team Member', email: 'member@example.com' }], offset: 0, has_more: false });
   vi.spyOn(api, 'setVisibility').mockResolvedValue(); vi.spyOn(api, 'setGrant').mockResolvedValue();
 });
 afterEach(() => vi.restoreAllMocks());
@@ -36,7 +38,7 @@ it('grants only viewer/editor roles to selected paginated members', async () => 
 });
 
 it('removes grants while explaining workspace access still applies', async () => {
-  vi.mocked(api.permissions).mockResolvedValue({ name: 'Secret.pdf', visibility: 'workspace', items: [{ user_id: 'member', role: 'viewer' }], offset: 0, has_more: false });
+  vi.mocked(api.permissions).mockResolvedValue({ owner_id: 'me', name: 'Secret.pdf', visibility: 'workspace', items: [{ user_id: 'member', role: 'viewer', full_name: 'Team Member', email: 'member@example.com' }], offset: 0, has_more: false });
   show(); await screen.findByRole('button', { name: 'Remove access member' });
   await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Remove access member' })); });
   expect(api.setGrant).toHaveBeenCalledWith('files', 'file', 'member', null);
@@ -47,18 +49,18 @@ it('does not show permission actions on denial and offers retry', async () => {
   vi.mocked(api.permissions).mockRejectedValue(new Error('Management access required'));
   show(); expect(await screen.findByRole('alert')).toHaveTextContent('Management access required');
   expect(screen.queryByRole('button', { name: 'Make private' })).not.toBeInTheDocument();
-  vi.mocked(api.permissions).mockResolvedValue({ name: 'Secret.pdf', visibility: 'private', items: [], offset: 0, has_more: false });
+  vi.mocked(api.permissions).mockResolvedValue({ owner_id: 'me', name: 'Secret.pdf', visibility: 'private', items: [], offset: 0, has_more: false });
   await act(async () => { await userEvent.click(screen.getByRole('button', { name: 'Retry permissions' })); });
   expect(await screen.findByRole('button', { name: 'Make private' })).toBeDisabled();
 });
 
 it('pages member candidates and clears the previous selection', async () => {
-  vi.mocked(api.members).mockImplementation(async offset => Array.from({ length: offset ? 1 : 25 }, (_, i) => ({ user_id: `${offset}-${i}`, full_name: `Member ${offset}-${i}`, email: `${offset}-${i}@example.com`, role: 'member', joined_at: '' })));
+  vi.mocked(api.permissionCandidates).mockImplementation(async (_kind, _id, _q, offset) => ({ items: Array.from({ length: offset ? 1 : 25 }, (_, i) => ({ user_id: `${offset}-${i}`, full_name: `Member ${offset}-${i}`, email: `${offset}-${i}@example.com` })), offset, has_more: offset === 0 }));
   show(); const user = userEvent.setup(); await screen.findByRole('option', { name: 'Member 0-0 · 0-0@example.com' });
   await act(async () => { await user.selectOptions(screen.getByLabelText('Workspace member'), '0-0'); await user.click(screen.getByRole('button', { name: 'Next members' })); });
   expect(await screen.findByRole('option', { name: 'Member 25-0 · 25-0@example.com' })).toBeVisible();
   expect(screen.getByLabelText('Workspace member')).toHaveValue('');
-  expect(api.members).toHaveBeenLastCalledWith(25, 25);
+  expect(api.permissionCandidates).toHaveBeenLastCalledWith('files', 'file', '', 25, expect.any(AbortSignal));
 });
 
 it('renames completed files and reports conflicts without losing the form', async () => {
@@ -72,4 +74,25 @@ it('renames completed files and reports conflicts without losing the form', asyn
   await act(async () => { await user.click(screen.getByRole('button', { name: 'Save filename' })); });
   await waitFor(() => expect(screen.queryByLabelText('New filename')).not.toBeInTheDocument());
   expect(api.renameFile).toHaveBeenCalledWith('file', 'New.txt');
+});
+
+
+it('searches authorized candidates and transfers ownership to the selected member', async () => {
+  vi.spyOn(api, 'transferResource').mockResolvedValue();
+  show(); const user = userEvent.setup();
+  await screen.findByRole('option', { name: 'Team Member � member@example.com' });
+  await user.type(screen.getByLabelText('Search members by name or email'), 'member');
+  await waitFor(() => expect(api.permissionCandidates).toHaveBeenLastCalledWith('files', 'file', 'member', 0, expect.any(AbortSignal)));
+  await user.selectOptions(screen.getByLabelText('Workspace member'), 'member');
+  await user.click(screen.getByRole('button', { name: 'Transfer ownership to selected member' }));
+  expect(api.transferResource).toHaveBeenCalledWith('files', 'file', 'member');
+});
+
+
+it('grants an existing role to a selected workspace group', async () => {
+  show(); const user = userEvent.setup();
+  await screen.findByRole('option', { name: 'Design' });
+  await user.selectOptions(screen.getByLabelText('Workspace group'), 'group');
+  await user.click(screen.getByRole('button', { name: 'Save group access' }));
+  expect(api.setGroupGrant).toHaveBeenCalledWith('files', 'file', 'group', 'viewer');
 });

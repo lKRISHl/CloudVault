@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../services/api';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
 
 export function DestinationPicker({ title, busy, choose, cancel, action = 'Move here' }: {
   title: string; busy: boolean; choose: (id: string | null) => void; cancel: () => void; action?: string;
@@ -9,6 +10,7 @@ export function DestinationPicker({ title, busy, choose, cancel, action = 'Move 
   const { user } = useAuth();
   const [parent, setParent] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+  useLiveResource({ kind: 'folders', parent_id: parent, offset }, ['folder-destination', user?.tenant?.id, user?.id, title, parent, offset]);
   const query = useQuery({ queryKey: ['folder-destination', user?.tenant?.id, user?.id, title, parent, offset], queryFn: ({ signal }) => api.folders(parent, offset, signal) });
   function browse(id: string | null) { setParent(id); setOffset(0); }
   return <section role="dialog" aria-label={title} className="border rounded-xl p-4 space-y-3">

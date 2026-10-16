@@ -8,6 +8,7 @@ import { RenameFile } from '../folders/RenameFile';
 import { TrashButton } from '../trash/TrashButton';
 import { api } from '../../services/api';
 import type { FileSearchQuery } from '../../types';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
 
 const defaults = { q: '', status: '', upload_method: '', declared_content_type: '', min_bytes: '', max_bytes: '',
   mine: false, scope: 'workspace', sort: 'name', direction: 'asc', limit: '25' };
@@ -26,6 +27,7 @@ function SearchWorkspace({ folderId }: { folderId: string | null }) {
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState('');
   const pageSize = filters.limit ?? 25;
+  useLiveResource({ kind: 'search', search: { ...filters, offset, limit: pageSize } }, ['file-search', user?.tenant?.id, user?.id, filters, offset]);
   const query = useQuery({ queryKey: ['file-search', user?.tenant?.id, user?.id, filters, offset],
     queryFn: ({ signal }) => api.searchFiles({ ...filters, offset, limit: pageSize }, signal) });
   function submit(event: FormEvent) {

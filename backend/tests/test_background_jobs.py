@@ -164,7 +164,7 @@ async def test_storage_task_uses_committed_inventory_marker(db_factory, monkeypa
         return marker
 
     monkeypatch.setattr(cleanup_uploads, "tick", tick)
-    for _ in range(9):
+    for _ in range(10):
         assert await tasks.run_job("storage") == "completed"
     assert seen == [None, ("key", "upload")]
     async with db_factory() as db:
@@ -177,6 +177,7 @@ async def test_storage_task_uses_committed_inventory_marker(db_factory, monkeypa
             "policies",
             "versions",
             "trash",
+            "quotas",
         }
 
 
@@ -194,9 +195,9 @@ async def test_failed_stage_rotates_and_cannot_be_masked_by_next_success(db_fact
 
     with pytest.raises(RuntimeError):
         await service.run("storage", handler)
-    for _ in range(5):
+    for _ in range(6):
         await service.run("storage", handler)
-    assert seen == ["uploads", "intents", "orphans", "policies", "versions", "trash"]
+    assert seen == ["uploads", "intents", "orphans", "policies", "versions", "trash", "quotas"]
     health = await service.health("storage")
     assert health["state"] == "degraded"
     assert health["stages"]["uploads"]["state"] == "failed"

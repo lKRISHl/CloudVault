@@ -28,12 +28,12 @@ it('creates protected restricted links, shows a one-time URL and revokes', async
     await user.type(screen.getByLabelText('Maximum download grants (optional)'), '1');
     await user.click(screen.getByRole('button', { name: 'Create share link' }));
   });
-  expect(api.createShare).toHaveBeenCalledWith('file', { expires_in_hours: 24, password: 'separate-password', allow_download: true, max_downloads: 1 });
+  expect(api.createShare).toHaveBeenCalledWith('file', expect.objectContaining({ expires_in_hours: 24, password: 'separate-password', allow_download: true, max_downloads: 1, request_id: expect.any(String), token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) }), 'files');
   expect(await screen.findByLabelText('New share URL')).toHaveValue('http://localhost/share#token=secret');
   expect(screen.getByLabelText('Optional link password')).toHaveValue('');
-  expect(cache.getQueryCache().findAll({ queryKey: ['shares', 'workspace', 'me', 'file'] })).toHaveLength(1);
+  expect(cache.getQueryCache().findAll({ queryKey: ['shares', 'workspace', 'me', 'files', 'file'] })).toHaveLength(1);
   await act(async () => { await user.click(screen.getByRole('button', { name: 'Revoke link link' })); });
-  expect(api.revokeShare).toHaveBeenCalledWith('file', 'link');
+  expect(api.revokeShare).toHaveBeenCalledWith('file', 'link', 'files');
   expect(screen.queryByLabelText('New share URL')).not.toBeInTheDocument();
 });
 
@@ -102,4 +102,36 @@ it('adopts another share link in the same tab and clears previous credentials an
   await act(async () => { await user.click(screen.getByRole('button', { name: 'Open shared file' })); });
   expect(await screen.findByText('Second.txt')).toBeVisible();
   expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ token: 'b'.repeat(43), password: '' });
+});
+
+
+it('retries ambiguous creation with the same request and secret, then changes them for new options', async () => {
+  vi.spyOn(api, 'shares').mockResolvedValue({ file_name: 'Report.txt', items: [], offset: 0, has_more: false });
+  const create = vi.spyOn(api, 'createShare').mockRejectedValue(new Error('Reply lost'));
+  manage(); const user = userEvent.setup();
+  await screen.findByRole('button', { name: 'Create share link' });
+  await user.click(screen.getByRole('button', { name: 'Create share link' }));
+  await screen.findByRole('alert');
+  const original = create.mock.calls[0][1];
+  await user.click(screen.getByRole('button', { name: 'Create share link' }));
+  await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+  expect(create.mock.calls[1][1]).toEqual(original);
+  await user.type(screen.getByLabelText('Named recipient email (optional)'), 'recipient@example.com');
+  await user.click(screen.getByRole('button', { name: 'Create share link' }));
+  await waitFor(() => expect(create).toHaveBeenCalledTimes(3));
+  expect(create.mock.calls[2][1].request_id).not.toEqual(original.request_id);
+});
+
+it('requires explicit recipient proof and browses a shared folder without edit controls', async () => {
+  window.history.replaceState({}, '', '/share#token=' + 'a'.repeat(43));
+  setAccessToken('verified-account-token');
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ name: 'Client folder', folder_id: 'root', items: [{ id: 'nested', kind: 'folder', name: 'Nested' }], offset: 0, has_more: false, expires_at: link.expires_at }), { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  render(<MemoryRouter><PublicSharePage /></MemoryRouter>);
+  await userEvent.click(screen.getByRole('checkbox', { name: /Prove recipient identity/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Open shared file' }));
+  expect(await screen.findByRole('region', { name: 'Shared folder' })).toBeVisible();
+  expect(fetch).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ credentials: 'omit', headers: expect.objectContaining({ Authorization: 'Bearer verified-account-token' }) }));
+  expect(screen.getByRole('button', { name: 'Open folder Nested' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: /Upload|Edit/ })).not.toBeInTheDocument();
 });

@@ -14,7 +14,7 @@ from app.models import BackgroundJob
 from app.services.uploads import utc
 
 JOBS = frozenset(("email", "storage", "previews", "scans"))
-STORAGE_STAGES = ("uploads", "intents", "orphans", "policies", "versions", "trash")
+STORAGE_STAGES = ("uploads", "intents", "orphans", "policies", "versions", "trash", "quotas")
 
 
 def storage_state(cursor):
@@ -85,7 +85,8 @@ def read_marker(cursor):
 def stage_health(cursor, now):
     state = storage_state(cursor)
     maximum_age = max(
-        600, settings.UPLOAD_CLEANUP_INTERVAL_SECONDS * 6 + settings.JOB_LEASE_SECONDS
+        600,
+        settings.UPLOAD_CLEANUP_INTERVAL_SECONDS * len(STORAGE_STAGES) + settings.JOB_LEASE_SECONDS,
     )
     results = {}
     for name in STORAGE_STAGES:

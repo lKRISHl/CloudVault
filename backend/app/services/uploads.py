@@ -120,6 +120,9 @@ class UploadService:
                 await self.parent_authority(actor, role, existing)
                 result = await self.ticket(actor, role, existing)
             else:
+                from app.services.quotas import QuotaService
+
+                await QuotaService(self.db).admit(actor.tenant_id, payload.declared_size_bytes)
                 metadata = FileMetadataCreate(
                     **payload.model_dump(include=FileMetadataCreate.model_fields.keys())
                 )

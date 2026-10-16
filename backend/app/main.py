@@ -40,7 +40,7 @@ def create_app() -> FastAPI:
         path = request.url.path
         if any(
             path.startswith(f"{settings.API_V1_PREFIX}/{kind}")
-            for kind in ("shares/", "files", "folders", "trash")
+            for kind in ("shares/", "files", "folders", "trash", "realtime", "groups")
         ):
             response.headers["Cache-Control"] = "no-store"
             response.headers["Referrer-Policy"] = "no-referrer"

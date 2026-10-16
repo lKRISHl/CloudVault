@@ -10,6 +10,7 @@ import { RenameFile } from './RenameFile';
 import { TrashButton } from '../trash/TrashButton';
 import { FileRecoveryActions } from './FileRecoveryActions';
 import { ScanStatus } from './ScanStatus';
+import { useLiveResource } from '../../realtime/RealtimeProvider';
 
 export function FileList({ folderId, writable = false }: { folderId: string | null; writable?: boolean }) {
   const { user } = useAuth();
@@ -23,6 +24,7 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
     finally { setCancelId(null); }
   }
   const [offset, setOffset] = useState(0);
+  const live = useLiveResource({ kind: 'files', parent_id: folderId, offset }, ['files', user?.tenant?.id, user?.id, folderId, offset]);
   const [retryId, setRetryId] = useState<string | null>(null);
   const query = useQuery({ queryKey: ['files', user?.tenant?.id, user?.id, folderId, offset],
     queryFn: () => api.files(folderId, offset),
@@ -45,6 +47,7 @@ export function FileList({ folderId, writable = false }: { folderId: string | nu
       {file.status === 'uploaded' && <ScanStatus state={file.scan_status} />}
       {file.upload_method === 'multipart' && <p>{file.multipart_state === 'aborted' ? 'Multipart upload cancelled. The name stays reserved until cleanup.' : 'Chunked upload'}</p>}
       <p>Declared type: {file.declared_content_type ?? 'Type unspecified'}</p>
+      {file.status === 'pending' && file.created_by === user?.id && live.progress[file.id] !== undefined && <p>Server confirmed {live.progress[file.id].toLocaleString()} of {file.declared_size_bytes.toLocaleString()} declared bytes. In-flight bytes may not be confirmed yet.</p>}
       <p>{file.can_write ? 'Creator or manager access' : 'Read only'}</p>
       {file.status === 'uploaded' && <DownloadButton id={file.id} name={file.name} />}
       {file.status === 'uploaded' && <Link className="secondary-button ml-3" to={`/app/files/${file.id}/preview`} aria-label={`Preview ${file.name}`}>Preview</Link>}

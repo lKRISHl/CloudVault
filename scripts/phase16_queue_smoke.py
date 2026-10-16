@@ -172,7 +172,7 @@ asyncio.run(seed())
             ),
             65,
         )
-        print("All six stages made progress after crash recovery", flush=True)
+        print("All storage stages made progress after crash recovery", flush=True)
 
         def remaining():
             return int(

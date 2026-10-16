@@ -5,6 +5,8 @@ import type { TrashEntry } from '../types';
 import type { VersionPage, VersionStart, VersionTicket } from '../types';
 import type { VersionMultipartTicket } from '../types';
 import type { PreviewJob, PreviewResult } from '../types';
+import { withSessionLock } from '../auth/sessionCoordination';
+import { watchTopic } from '../realtime/registry';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const API_V1 = `${API_BASE}/api/v1`;
@@ -41,6 +43,13 @@ export class ApiRequestError extends Error {
   }
 }
 
+export interface StorageUsage {
+  plan: 'free' | 'team'; limit_bytes: number; retained_bytes: number;
+  reserved_bytes: number; derivative_bytes: number; orphan_bytes: number;
+  allocated_bytes: number; available_bytes: number; unresolved_references: number;
+  over_quota: boolean; reconciliation_required: boolean;
+}
+
 async function parseError(response: Response): Promise<string> {
   try {
     const errorData = await response.json();
@@ -56,16 +65,20 @@ async function parseError(response: Response): Promise<string> {
 function refreshSession(): Promise<TokenResponse> {
   if (!refreshPromise) {
     const epoch = sessionEpoch;
-    refreshPromise = fetchApi<TokenResponse>(`${API_V1}/auth/refresh`, {
-      method: 'POST',
-    }, false).then((session) => {
+    refreshPromise = withSessionLock(() => {
       if (epoch !== sessionEpoch) throw new ApiRequestError('Session changed; try again', 409);
-      const workspace = (token: string) => {
-        try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).tid; }
+      return fetchApi<TokenResponse>(`${API_V1}/auth/refresh`, { method: 'POST' }, false);
+    }).then((session) => {
+      if (epoch !== sessionEpoch) throw new ApiRequestError('Session changed; try again', 409);
+      const scope = (token: string) => {
+        try {
+          const claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          return JSON.stringify([claims.sub, claims.tid, claims.sid]);
+        }
         catch { return undefined; }
       };
-      if (accessToken && workspace(accessToken) !== workspace(session.access_token)) {
-        throw new ApiRequestError('Workspace changed in another tab; reload to continue', 401);
+      if (accessToken && scope(accessToken) !== scope(session.access_token)) {
+        throw new ApiRequestError('Identity, workspace or login session changed; restore the shared session first', 401);
       }
       accessToken = session.access_token;
       return session;
@@ -83,6 +96,11 @@ async function tryRefresh(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function refreshSharedSession(): Promise<TokenResponse> {
+  if (refreshPromise) await refreshPromise.catch(() => undefined);
+  return refreshSession();
 }
 
 async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Promise<T> {
@@ -131,32 +149,40 @@ async function fetchApi<T>(url: string, options?: RequestInit, retry = true): Pr
   return data;
 }
 
-function previewDelay(signal?: AbortSignal) {
+function previewDelay(signal?: AbortSignal, notifications?: Set<() => void>) {
   return new Promise<void>((resolve, reject) => {
-    const abort = () => { clearTimeout(timer); reject(new DOMException('Preview cancelled', 'AbortError')); };
-    const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve(); }, 1500);
-    if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, { once: true });
+    const cleanup = () => { clearTimeout(timer); notifications?.delete(finish); signal?.removeEventListener('abort', abort); };
+    const finish = () => { cleanup(); resolve(); };
+    const abort = () => { cleanup(); reject(new DOMException('Preview cancelled', 'AbortError')); };
+    const timer = setTimeout(finish, 1500);
+    if (signal?.aborted) abort(); else { notifications?.add(finish); signal?.addEventListener('abort', abort, { once: true }); }
   });
 }
 
 async function queuedPreview(id: string, version_id: string | null, page: number, signal?: AbortSignal): Promise<PreviewResult> {
   const base = `${API_V1}/files/${id}/preview-jobs`;
+  const epoch = sessionEpoch; const notifications = new Set<() => void>();
   let job: PreviewJob | undefined;
+  let stopLive: (() => void) | undefined;
   try {
     job = await fetchApi<PreviewJob>(base, { method: 'POST', body: JSON.stringify({ version_id, page, request_id: crypto.randomUUID() }), signal });
+    stopLive = watchTopic({ kind: 'preview', resource_id: id, job_id: job.id }, () => notifications.forEach(notify => notify()));
     for (let poll = 0; poll < 600; poll += 1) {
+      if (epoch !== sessionEpoch) throw new ApiRequestError('Workspace or session changed; try again', 409);
       if (job.state === 'ready' && job.preview) return job.preview;
       if (job.state === 'failed' || job.state === 'cancelled') throw new Error('Preview failed, expired or cancelled. Refresh to try again.');
-      await previewDelay(signal);
+      await previewDelay(signal, notifications);
       job = await fetchApi<PreviewJob>(`${base}/${job.id}`, { signal });
     }
     throw new Error('Preview wait expired. Refresh to try again.');
   } finally {
+    stopLive?.();
     if (signal?.aborted && job) void fetchApi(`${base}/${job.id}`, { method: 'DELETE' }).catch(() => {});
   }
 }
 
 export const api = {
+  realtimeTicket: (signal?: AbortSignal) => fetchApi<{ ticket: string; expires_in: number }>(`${API_V1}/realtime/ticket`, { method: 'POST', signal }),
   retryScan: (id: string, version: string, signal?: AbortSignal) => fetchApi<{ detail: string }>(`${API_V1}/files/${id}/versions/${version}/scan`, { method: 'POST', signal }),
   preview: (id: string, version_id: string | null, page = 0, signal?: AbortSignal) => queuedPreview(id, version_id, page, signal),
   startVersionMultipart: (id: string, payload: VersionStart & { part_size: number; checksums: string[] }, signal?: AbortSignal) => fetchApi<VersionMultipartTicket>(`${API_V1}/files/${id}/versions/multipart`, { method: 'POST', body: JSON.stringify(payload), signal }),
@@ -180,13 +206,21 @@ export const api = {
   moveFile: (id: string, folder_id: string | null, source_folder_id: string | null) => fetchApi<FileMetadata>(`${API_V1}/files/${id}/move`, { method: 'POST', body: JSON.stringify({ folder_id, source_folder_id }) }),
   discardMetadata: (id: string, confirmation: string) => fetchApi<void>(`${API_V1}/files/${id}/discard-metadata`, { method: 'POST', body: JSON.stringify({ confirmation }) }),
   purgeTrash: (id: string, confirmation: string) => fetchApi<{ detail: string }>(`${API_V1}/trash/${id}/purge`, { method: 'POST', body: JSON.stringify({ confirmation }) }),
-  permissions: (kind: 'files' | 'folders', id: string, offset: number, signal?: AbortSignal) => fetchApi<{ name: string; visibility: 'workspace' | 'private'; items: { user_id: string; role: 'viewer' | 'editor' }[]; offset: number; has_more: boolean }>(`${API_V1}/${kind}/${id}/permissions?offset=${offset}`, { signal }),
+  permissions: (kind: 'files' | 'folders', id: string, offset: number, signal?: AbortSignal) => fetchApi<{ owner_id: string; owner_name?: string; name: string; visibility: 'workspace' | 'private'; items: { user_id: string; role: 'viewer' | 'editor'; full_name: string; email: string }[]; group_items?: { group_id: string; name: string; role: 'viewer' | 'editor' }[]; offset: number; has_more: boolean }>(`${API_V1}/${kind}/${id}/permissions?offset=${offset}`, { signal }),
   setVisibility: (kind: 'files' | 'folders', id: string, visibility: 'workspace' | 'private') => fetchApi<void>(`${API_V1}/${kind}/${id}/permissions`, { method: 'PATCH', body: JSON.stringify({ visibility }) }),
   setGrant: (kind: 'files' | 'folders', id: string, userId: string, role: 'viewer' | 'editor' | null) => fetchApi<void>(`${API_V1}/${kind}/${id}/permissions/${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
   renameFile: (id: string, name: string) => fetchApi<FileMetadata>(`${API_V1}/files/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
-  shares: (id: string, offset: number, signal?: AbortSignal) => fetchApi<{ file_name: string; items: ShareLink[]; offset: number; has_more: boolean }>(`${API_V1}/files/${id}/shares?offset=${offset}`, { signal }),
-  createShare: (id: string, payload: { expires_in_hours: number; password: string | null; allow_download: boolean; max_downloads: number | null }) => fetchApi<ShareLink & { share_url: string }>(`${API_V1}/files/${id}/shares`, { method: 'POST', body: JSON.stringify(payload) }),
-  revokeShare: (fileId: string, id: string) => fetchApi<void>(`${API_V1}/files/${fileId}/shares/${id}`, { method: 'DELETE' }),
+  groups: (q = '', offset = 0, signal?: AbortSignal) => fetchApi<{ items: { id: string; name: string }[]; offset: number; has_more: boolean }>(`${API_V1}/groups?q=${encodeURIComponent(q)}&offset=${offset}`, { signal }),
+  createGroup: (name: string) => fetchApi<{ id: string; name: string }>(`${API_V1}/groups`, { method: 'POST', body: JSON.stringify({ name }) }),
+  deleteGroup: (id: string) => fetchApi<void>(`${API_V1}/groups/${id}`, { method: 'DELETE' }),
+  groupMembers: (id: string, q: string, offset: number, candidates = false, signal?: AbortSignal) => fetchApi<{ items: { user_id: string; full_name: string; email: string }[]; offset: number; has_more: boolean }>(`${API_V1}/groups/${id}/members?q=${encodeURIComponent(q)}&offset=${offset}&candidates=${candidates}`, { signal }),
+  setGroupMember: (id: string, userId: string, present: boolean) => fetchApi<void>(`${API_V1}/groups/${id}/members/${userId}`, { method: 'PUT', body: JSON.stringify({ present }) }),
+  setGroupGrant: (kind: 'files' | 'folders', id: string, groupId: string, role: 'viewer' | 'editor' | null) => fetchApi<void>(`${API_V1}/${kind}/${id}/group-permissions/${groupId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  permissionCandidates: (kind: 'files' | 'folders', id: string, q: string, offset: number, signal?: AbortSignal) => fetchApi<{ items: { user_id: string; full_name: string; email: string }[]; offset: number; has_more: boolean }>(`${API_V1}/${kind}/${id}/permission-candidates?q=${encodeURIComponent(q)}&offset=${offset}`, { signal }),
+  transferResource: (kind: 'files' | 'folders', id: string, userId: string) => fetchApi<void>(`${API_V1}/${kind}/${id}/ownership`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
+  shares: (id: string, offset: number, signal?: AbortSignal, kind: 'files' | 'folders' = 'files') => fetchApi<{ file_name: string; items: ShareLink[]; offset: number; has_more: boolean }>(`${API_V1}/${kind}/${id}/shares?offset=${offset}`, { signal }),
+  createShare: (id: string, payload: { expires_in_hours: number; password: string | null; allow_download: boolean; max_downloads: number | null; recipient_email?: string | null; request_id?: string; token?: string }, kind: 'files' | 'folders' = 'files') => fetchApi<ShareLink & { share_url: string }>(`${API_V1}/${kind}/${id}/shares`, { method: 'POST', body: JSON.stringify(payload) }),
+  revokeShare: (fileId: string, id: string, kind: 'files' | 'folders' = 'files') => fetchApi<void>(`${API_V1}/${kind}/${fileId}/shares/${id}`, { method: 'DELETE' }),
   searchFiles: (filters: FileSearchQuery, signal?: AbortSignal) => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
@@ -221,13 +255,14 @@ export const api = {
     fetchApi<TokenResponse>(`${API_V1}/auth/register`, {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
+    }, false),
   login: (payload: LoginPayload) =>
     fetchApi<TokenResponse>(`${API_V1}/auth/login`, {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
+    }, false),
   refresh: refreshSession,
+  storageUsage: () => fetchApi<StorageUsage>(`${API_V1}/organizations/current/storage-usage`),
   logout: () =>
     fetchApi<void>(`${API_V1}/auth/logout`, {
       method: 'POST',
@@ -306,10 +341,10 @@ export const api = {
   }),
 };
 
-export async function publicShareRequest<T>(action: 'access' | 'download-url', payload: { token: string; password: string }, signal?: AbortSignal): Promise<T> {
-  // Public capabilities never inherit the signed-in user's cookies or authorization.
+export async function publicShareRequest<T>(action: 'access' | 'download-url' | 'folder', payload: { token: string; password: string; folder_id?: string; file_id?: string; offset?: number }, signal?: AbortSignal, proveIdentity = false): Promise<T> {
+  // Identity proof is explicit; anonymous capabilities do not inherit authentication.
   const response = await fetch(`${API_V1}/shares/${action}`, { method: 'POST', body: JSON.stringify(payload),
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, credentials: 'omit',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(proveIdentity && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) }, credentials: 'omit',
     referrerPolicy: 'no-referrer', cache: 'no-store', signal });
   if (!response.ok) throw new ApiRequestError(await parseError(response), response.status);
   return response.json();

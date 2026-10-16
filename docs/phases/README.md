@@ -1,6 +1,17 @@
 # Phase Reports
 
+## Current implementation
+
+- [Phase18A - Collaboration and groups](phase18a.md): source prepared; paired18A+20 acceptance pending. Running app remains021;022 unapplied.
+
 ## Latest completed phase
+
+- [Phase19 — Storage Quotas](phase19.md) and [Phase18 — Realtime](phase18.md): combined
+  local checkpoint passes to recorded scopes; source/app schema021. Full browser run had
+  one invitation timeout with a passing isolated rerun; exact evidence and future gates remain explicit.
+
+- [Phase 17 — Malware Scanning](phase17.md): locally verified exact-version quarantine,
+  actual ClamAV/queue/provider/browser acceptance and application migration; commit cb85538.
 
 - [Phase 16 — Redis and Background Jobs](phase16.md): maintenance queues, bounded stage
   rotation, operator backlog health and reference reconciliation/cancellation implemented;
@@ -14,8 +25,15 @@
 
 Keep completed phase explanations in this folder, named `phase<N>.md`, such as
 `phase2.md` and `phase3.md`. Added stages use lowercase suffixes, such as `phase2a.md`,
-`phase2b.md`, and `phase25a.md`. Create a report after implementing and testing its phase;
-do not create placeholder reports for unfinished phases.
+`phase2b.md`, and `phase25a.md`. Create a report for implemented work; do not create empty
+placeholder reports. User-requested cadence (2026-10-16): author tests with each feature,
+execute verification every two consecutive roadmap stages, including lettered stages.
+An interim report must say implemented/verification pending, list unexecuted checks and
+name its checkpoint. Neither phase is locally complete until assigned acceptance passes.
+
+Current implementations: [Phase18 — Realtime](phase18.md) and [Phase19 — Storage Quotas](phase19.md).
+The user explicitly requested19 ahead of18A; combined18+19 local verification is recorded.
+Phase18A remains pending and must be revisited. Running app upgrade status is in CONTINUE.md.
 
 Each report should explain what was built, why, architecture, important files,
 technical concepts, request flows, security, test results, decisions, limitations,
@@ -66,3 +84,5 @@ does not need to request each fix again. Unfinished assigned checks prevent phas
 - [Phase 14B — Core Library Movement and Recovery](phase14b.md)
 
 Current cross-phase status and follow-up schedule: [Limitations backlog](../LIMITATIONS_BACKLOG.md). Older phase reports retain their historical implementation scope.
+
+- [Phase18A � Collaboration and groups (source prepared; paired acceptance pending)](phase18a.md)

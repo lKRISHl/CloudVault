@@ -76,10 +76,18 @@ async def serve():
         async def fixture_renderer(data, page):
             command = BACKEND / "app" / "previews" / "worker.py"
             process = await asyncio.create_subprocess_exec(
-                sys.executable, "-I", str(command), str(page),
-                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+                sys.executable,
+                "-I",
+                str(command),
+                str(page),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
-                env={key: os.environ[key] for key in ("SystemRoot", "TEMP", "TMP") if key in os.environ},
+                env={
+                    key: os.environ[key]
+                    for key in ("SystemRoot", "TEMP", "TMP")
+                    if key in os.environ
+                },
             )
             try:
                 output, _ = await asyncio.wait_for(process.communicate(data), 12)
@@ -90,6 +98,7 @@ async def serve():
                 if process.returncode is None:
                     process.kill()
                     await process.wait()
+
         previews.isolated_render = fixture_renderer
 
     @event.listens_for(engine.sync_engine, "connect")
@@ -106,6 +115,7 @@ async def serve():
                 await asyncio.sleep(0.1)
 
     dispatcher = asyncio.create_task(delivery_loop())
+
     async def preview_fixture_loop():
         # Disposable DB/owned provider fixtures only; this does not certify Celery or Redis.
         from app.jobs.preview_queue import tick
@@ -118,8 +128,10 @@ async def serve():
 
     preview_dispatcher = (
         asyncio.create_task(preview_fixture_loop())
-        if os.getenv("TEST_PREVIEW_FIXTURE_RENDERER") == "1" else None
+        if os.getenv("TEST_PREVIEW_FIXTURE_RENDERER") == "1"
+        else None
     )
+
     async def scan_fixture_loop():
         # Generated legacy browser fixtures only. Real Phase17 acceptance uses ClamAV
         # and Celery instead; this dependency never bypasses the release gate or hashing.
@@ -148,7 +160,8 @@ async def serve():
 
     scan_dispatcher = (
         asyncio.create_task(scan_fixture_loop())
-        if os.getenv("TEST_SCAN_FIXTURE") == "1" and os.getenv("TEST_S3_ENDPOINT") else None
+        if os.getenv("TEST_SCAN_FIXTURE") == "1" and os.getenv("TEST_S3_ENDPOINT")
+        else None
     )
     try:
         await uvicorn.Server(
@@ -158,6 +171,8 @@ async def serve():
                 port=48000,
                 log_level="warning",
                 access_log=False,
+                ws_max_size=8192,
+                ws_max_queue=2,
             )
         ).serve()
     finally:
@@ -176,6 +191,9 @@ async def serve():
 
 
 def main():
+    # Real live tests use a separately selected development/test Redis database.
+    if os.getenv("TEST_REDIS_URL"):
+        os.environ["REDIS_URL"] = os.environ["TEST_REDIS_URL"]
     with tempfile.TemporaryDirectory(prefix="cloudvault-e2e-") as directory:
         os.environ.update(
             {
@@ -288,9 +306,13 @@ def cleanup_storage():
     )
     try:
         try:
-            for page in client.get_paginator("list_multipart_uploads").paginate(Bucket=bucket):
+            for page in client.get_paginator("list_multipart_uploads").paginate(
+                Bucket=bucket
+            ):
                 for upload in page.get("Uploads", []):
-                    client.abort_multipart_upload(Bucket=bucket, Key=upload["Key"], UploadId=upload["UploadId"])
+                    client.abort_multipart_upload(
+                        Bucket=bucket, Key=upload["Key"], UploadId=upload["UploadId"]
+                    )
             for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket):
                 for item in page.get("Contents", []):
                     client.delete_object(Bucket=bucket, Key=item["Key"])

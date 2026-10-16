@@ -73,7 +73,7 @@ class TrashService:
                 exists().where(
                     Folder.tenant_id == actor.tenant_id,
                     Folder.id.in_(ids),
-                    Folder.created_by != actor.id,
+                    PermissionService.owner_column(Folder) != actor.id,
                     or_(
                         Folder.trash_id.is_(None),
                         Folder.trash_id.in_(
@@ -87,7 +87,7 @@ class TrashService:
                 exists().where(
                     File.tenant_id == actor.tenant_id,
                     File.folder_id.in_(ids),
-                    File.created_by != actor.id,
+                    PermissionService.owner_column(File) != actor.id,
                     File.upload_cleanup_at.is_(None),
                     File.object_purged_at.is_(None),
                 )
@@ -223,7 +223,7 @@ class TrashService:
         manages = (
             literal(True)
             if role in (UserRole.OWNER, UserRole.ADMIN)
-            else model.created_by == actor.id
+            else PermissionService.owner_column(model) == actor.id
         )
         if model is File:
             return and_(manages, PermissionService.file_read(actor, role, include_trash=True))

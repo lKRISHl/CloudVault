@@ -328,6 +328,43 @@
   and https://docs.clamav.net/manual/Usage/Scanning.html . Local real-engine/queue evidence and
   remaining verification are recorded in docs/phases/phase17.md.
 
+## ADR-042: Authorized Current-State Observations and Shared-Cookie Coordination
+
+- 2026-10-16: Phase18 uses WebSockets to invalidate bounded authorized current views.
+  Read existing service-layer pages at a bounded cadence and hash them internally; detect
+  committed worker/API changes without adding a publication hook to every writer. Emit
+  opaque subscription changes and only the uploader's visible confirmed receipt counts.
+  No file names, object keys, raw content, snapshot hashes or access grants enter frames.
+  REST remains responsible for current authorization, quarantine and capability issuance.
+- This deliberately coalesces transitions. It is not a durable event stream, replay cursor,
+  outbox or notification inbox. The cost is repeated DB/service reads per socket/topic.
+  L40 requires a Phase20 durable-notification decision, real deployment/browser matrix26,
+  security27, alerts28 and measured capacity/fairness32 with any necessary fanout/admission
+  redesign. Installing WebSockets does not certify production scale or reliable history.
+- Ticket POST requires a verified authenticated actor. Random 20-second tickets are stored
+  hashed in Redis, consumed by GETDEL and supplied in the first frame of a strict-Origin,
+  query-free socket. Bind user/tenant/session, recheck authority every observation and renew
+  the connection capability after five minutes. No long-lived JWTs/tickets in URLs/logs.
+- Atomic standalone Redis leases bound global user/IP connections across API processes;
+  local process, handshake, command, topic, frame, send and observation bounds limit work.
+  No S3/renderer calls are made. End DB transactions before sending; release leases on
+  cleanup, with expiry after crashes. Redis failures close the feed and retain REST fallback.
+  Multi-key Lua is not a Redis Cluster compatibility claim. Proxy-IP trust requires review.
+- Client subscriptions deduplicate, cap at eight and fall back to periodic REST on overflow
+  or lost transport. Reconnect resynchronizes current state instead of claiming replay.
+  Access loss resets protected caches/local page state and revokes preview blobs. Received
+  data and issued signed capabilities retain their existing recall limitations (D01/D02).
+- Same-origin Web Locks serialize refresh and cookie-changing actions across tabs. Broadcast
+  and storage events contain only invalidation signals; cookies remain HttpOnly and access
+  tokens remain in memory. Epoch/generation fences stop old responses. Automatic refresh
+  must match subject, selected tenant and login session before retrying a request. Reconcile
+  an interrupted cookie action after releasing the lock; never replay the original mutation.
+  Without Web Locks, single-use server rotation remains authoritative; competing unsupported
+  tabs may need sign-in. No non-atomic localStorage lock is presented as equivalent.
+- No migration. Authored backend/frontend/Redis/browser tests are unexecuted under the user's
+  two-phase testing policy. L15 closure and local completion await combined18+18A acceptance
+  before19. Running Docker remains the verified Phase17 image/schema020. See phase18 report.
+
 ## ADR-043: Separate Scanner Dependency Availability from Version Attempts
 
 - 2026-10-16: the supplied GitHub run38908641680/job116998545388 traceback timed out
@@ -346,3 +383,64 @@
 - Outage/recovery and readiness timeout regressions are authored but unexecuted under the
   user's paired testing cadence. Exact remote root cause and a successful CI rerun remain
   pending; this is a startup/retry-budget correction, not proof that the remote outage is fixed.
+
+## ADR-044: Retained-Reference Quota Admission and Bounded Provider Evidence
+
+- 2026-10-16â€“17: serialize new source/replacement/preview admission with the existing
+  tenant write lock. Aggregate retained bucket/file/object identities rather than maintaining
+  a crash-sensitive counter or counting visible files. Current File/snapshot/initialization
+  mirrors count once; history/trash/quarantine remain allocated until cleanup proof.
+- StorageQuota is a separate per-workspace policy table, not an authentication Tenant field.
+  Default Free10GiB/Team100GiB limits are configurable and operator-assigned, not paid billing.
+  A confirmed DB-operator command changes plan/override; no customer entitlement endpoint.
+  Lower limits preserve data, existing grants/reserved completions, downloads and cleanup;
+  new admissions fail while over quota. Billing/AI gates remain25A/21 before enablement.
+- Commit multipart initialization size before provider creation. Unknown legacy bounds pause
+  new admissions, never count as zero. Queued previews retain their full1MiB output allocation
+  until confirmed delayed cleanup, including failed/cancelled/unsupported work: an earlier
+  provider write may have succeeded despite lost acknowledgement. No premature capacity return.
+- Add a seventh rotating storage stage: bounded per-workspace object/multipart inventory plus
+  exact rechecks of retained observations. Persist selection/failure before provider I/O and
+  serialize evidence with admission. Inventory never deletes. Unknown/excessive manifests,
+  namespace changes and failed/versioned-provider checks pause new allocations. Exact
+  observed bytes can increase known allocation; no page absence is reclamation proof.
+- Real local MinIO testing showed directory-prefixed multipart listing omitted an active
+  upload while bucket/exact-key listings exposed it. Use bounded privileged bucket pages
+  for multipart discovery, then tenant-filter before recording; object pages remain scoped.
+  At most2 simultaneous upload IDs/1024 parts each are examined per key. Unknown larger
+  populations require reconciliation. This is eventually observed evidence, not a snapshot
+  or invoice-grade physical-byte claim. L41 assigns AWS/failure26, abuse27, alerts28,
+  measured query/lock/inventory fairness32 and billing metering25A.
+- Migration021 preserves legacy unknowns, adds no content bytes and does not delete resources.
+  Rollback refuses custom policy, unknown/positive provider evidence and unmaterialized bounds
+  the older schema cannot reconstruct. Normal source refs remain reconstructable; earlier
+  quarantine/version/trash rollback guards remain unchanged. Restore a coordinated backup
+  when representation would be lost. No production migration or provider certification.
+- User explicitly moved19 ahead of18A; combined18+19 testing runs now, and18A remains pending.
+  Phase19 report records initial failures and exact reruns rather than labelling the initial
+  full suite green. No remote push/CI dispatch is authorized by implementation.
+
+
+## ADR-045 — Current-tree sharing, recipient proof, ownership and directory groups (2026-10-17)
+
+Phase18A extends read capabilities to a current folder subtree; every request rechecks the
+publisher's live membership, resource management, ancestor/local ACL and scan release. Named
+recipient links additionally require a live verified matching-email account session, explicitly
+submitted by the recipient UI. They grant no workspace membership or external write capability.
+Creation retry uses publisher-scoped UUID plus client-held random256-bit secret and immutable
+options/password checks. Only hashes/fingerprint are persisted. Replays never renew expiry or
+revive revocation; legacy clients without the pair retain their documented old semantics.
+
+Management ownership is a separate override table, falling back to immutable created_by for
+legacy resources. Transfer is local and serialized, checks target membership/ancestor access,
+preserves upload/version provenance and explicit grants, and revokes affected links. Managers
+retain recovery authority after departure; original upload control remains creator-scoped.
+
+User explicitly included groups now. Workspace managers control membership; resource managers
+assign existing local viewer/editor roles. Direct/group grants combine without deny precedence,
+ancestor bypass, inherited editing or admin/ownership escalation. Departure clears memberships.
+Group mutations invalidate affected link roots/subtrees in the same tenant transaction. Bounds
+are100 groups/workspace,1000 members and100 resource grants/group; no measured-scale claim.
+User explicitly resolved P02/P03 on2026-10-17: controlled external uploads/editing in dedicated24A after24/before25, and bounded scanned avatars in22A. Both automatically require implementation/acceptance at their checkpoint; neither is current functionality. Anonymous sharing stays read-only.
+Acceptance is pending18A+20; migration022 is unapplied. Independent review/load/alert gates L42
+are automatically due26/27/28/32. These are design/source decisions, not verification evidence.

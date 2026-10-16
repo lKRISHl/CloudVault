@@ -10,6 +10,13 @@ jobs:
   backend-tests:
     runs-on: ubuntu-latest
     services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
       postgres:
         image: postgres:16-alpine
         env:
@@ -24,6 +31,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://cloudvault:cloudvault@localhost:5432/cloudvault_test
       TEST_DATABASE_URL: postgresql+asyncpg://cloudvault:cloudvault@localhost:5432/cloudvault_test
+      TEST_REDIS_URL: redis://localhost:6379/14
     defaults:
       run:
         working-directory: ./backend
@@ -71,7 +79,7 @@ jobs:
         working-directory: ./backend
         run: |
           pip install -r requirements-dev.txt
-          TEST_S3_ENDPOINT=http://localhost:9000 TEST_S3_ACCESS_KEY=minioadmin TEST_S3_SECRET_KEY=minioadmin python -m pytest tests/test_storage_integration.py tests/test_uploads_integration.py tests/test_multipart_integration.py -q
+          TEST_S3_ENDPOINT=http://localhost:9000 TEST_S3_ACCESS_KEY=minioadmin TEST_S3_SECRET_KEY=minioadmin python -m pytest tests/test_storage_integration.py tests/test_uploads_integration.py tests/test_multipart_integration.py tests/test_quotas_integration.py -q
       - name: Wait for fresh scanner and scan queue readiness
         timeout-minutes: 12
         run: |
@@ -79,6 +87,8 @@ jobs:
           python scripts/wait_for_scanner.py
       - name: Verify Docker API upload with real SMTP
         run: python scripts/upload_smoke.py
+      - name: Verify nginx realtime receipts, retained quota and session revocation
+        run: python scripts/realtime_smoke.py
       - name: Verify upload maintenance worker
         run: docker compose exec -T backend python -m app.jobs.cleanup_uploads --once
       - name: Set up Node for real upload browser check
@@ -91,6 +101,10 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
           TEST_S3_ENDPOINT=http://localhost:9000 TEST_S3_ACCESS_KEY=minioadmin TEST_S3_SECRET_KEY=minioadmin npx playwright test e2e/uploads.pw.ts e2e/multipart.pw.ts
+      - name: Zero-quota browser admission with disposable data
+        working-directory: ./frontend
+        run: |
+          TEST_QUOTA_ZERO_LIMIT=1 STORAGE_FREE_LIMIT_BYTES=0 TEST_S3_ENDPOINT=http://localhost:9000 TEST_S3_ACCESS_KEY=minioadmin TEST_S3_SECRET_KEY=minioadmin npx playwright test e2e/quotas.pw.ts
       - name: Scan dependency diagnostics
         if: failure()
         run: |
